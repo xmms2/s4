@@ -1,0 +1,23 @@
+# encoding: utf-8
+#
+# WAF build scripts for XMMS2
+# Copyright (C) 2006-2009 XMMS2 Team
+#
+
+backend = 'homegrown'
+
+def build(bld):
+    bld.add_subdirs(backend)
+    obj = bld.new_task_gen('cc', 'staticlib')
+    obj.source = "entry.c s4.c set.c".split()
+    obj.includes = '../include'
+    obj.target = 's4'
+    obj.install_path = 0
+    obj.uselib_local = 's4_backend'
+    obj.uselib = 'xmmstypes'
+
+def configure(conf):
+    return True
+
+def set_options(opt):
+    pass
