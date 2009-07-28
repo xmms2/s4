@@ -120,7 +120,7 @@ static void map_sync (s4be_t *s4, size_t len)
 
 
 /* Sync the database if it is dirty */
-void sync_db (s4be_t *s4)
+void s4be_sync (s4be_t *s4)
 {
 	header_t *header;
 
@@ -165,7 +165,7 @@ static void init_db (s4be_t *s4)
 	memset (header, -1, sizeof (header_t));
 	header->sync_state = DIRTY;
 	header->free = 0;
-	sync_db(s4);
+	s4be_sync (s4);
 }
 
 
@@ -204,6 +204,7 @@ static void mark_dirty (s4be_t *s4)
 }
 
 
+#if 0
 /* The loop for the sync thread */
 static gpointer sync_thread (gpointer be)
 {
@@ -216,7 +217,7 @@ static gpointer sync_thread (gpointer be)
 	g_mutex_lock (s4->cond_mutex);
 
 	while (!g_cond_timed_wait (s4->cond, s4->cond_mutex, &tv)) {
-		sync_db (s4);
+		s4be_sync (s4);
 		g_get_current_time (&tv);
 		g_time_val_add (&tv, 60*1000);
 	}
@@ -225,15 +226,16 @@ static gpointer sync_thread (gpointer be)
 
 	return NULL;
 }
+#endif
 
 
-s4be_t *be_open (const char *filename, int recover)
+s4be_t *s4be_open (const char *filename)
 {
 	s4be_t* s4 = malloc (sizeof(s4be_t));
 	memset (s4, 0, sizeof (s4be_t));
 #ifdef _WIN32
 	s4->fd = CreateFile (filename, GENERIC_READ | GENERIC_WRITE,
-			0, NULL, (recover)?OPEN_EXISTING:OPEN_ALWAYS,
+			0, NULL, OPEN_ALWAYS,
 			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
 			NULL);
 
@@ -245,10 +247,6 @@ s4be_t *be_open (const char *filename, int recover)
 #else
 	struct stat stat_buf;
 	int flags = O_RDWR | O_CREAT;
-
-	if (recover) {
-		flags |= O_EXCL;
-	}
 
 	s4->fd = open (filename, flags, 0644);
 	if (s4->fd == -1) {
@@ -282,13 +280,14 @@ s4be_t *be_open (const char *filename, int recover)
 }
 
 
+#if 0
 /**
  * Open an s4 database
  *
  * @param filename The file to open
  * @return A pointer to an s4 structure, or NULL on error
  */
-s4be_t *s4be_open (const char* filename)
+s4be_t *s4be_open (const char* filename, int *need_recovery)
 {
 	s4be_t *ret, *rec;
 	header_t *header;
@@ -328,7 +327,7 @@ s4be_t *s4be_open (const char* filename)
 	ret->s_thread = g_thread_create (sync_thread, ret, TRUE, NULL);
 	return ret;
 }
-
+#endif
 
 /**
  * Close an open s4 database
@@ -342,6 +341,7 @@ int s4be_close (s4be_t* s4)
 
 	printf ("free %i\n", header->free);
 
+#if 0
 	if (s4->cond_mutex != NULL) {
 		g_mutex_lock (s4->cond_mutex);
 		g_cond_signal (s4->cond);
@@ -353,9 +353,9 @@ int s4be_close (s4be_t* s4)
 		g_cond_free (s4->cond);
 	}
 
+#endif
 	g_static_rw_lock_free (&s4->rwlock);
-
-	sync_db (s4);
+	s4be_sync (s4);
 	map_unmap (s4);
 
 #ifdef _WIN32
@@ -366,6 +366,37 @@ int s4be_close (s4be_t* s4)
 	free (s4);
 
 	return 0;
+}
+
+int s4be_recover (s4be_t *old, s4be_t *rec)
+{
+	_st_recover (old, rec);
+	_ip_recover (old, rec);
+
+	return 1;
+}
+
+/**
+ * Check that the database is consistent
+ *
+ * @param be The database to check
+ * @param thorough Set to 0 to just do a quick check, 1 to do a full check.
+ * @return 1 if the database is good, 0 otherwise
+ */
+int s4be_verify (s4be_t *be, int thorough)
+{
+	int ret = 1;
+	header_t *hdr;
+
+	if (thorough) {
+		ret = _st_verify (be) && _ip_verify (be);
+	}
+
+	hdr = be->map;
+
+	ret = ret && hdr != NULL && hdr->sync_state == CLEAN;
+
+	return ret;
 }
 
 

@@ -22,6 +22,7 @@ int32_t pat_insert (s4be_t *s4, int32_t trie, pat_key_t *key);
 int     pat_remove (s4be_t *s4, int32_t trie, pat_key_t *key);
 int32_t pat_node_to_key (s4be_t *s4, int32_t node);
 int32_t pat_first (s4be_t *s4, int32_t trie);
-int32_t pat_next (s4be_t *s4, int32_t node);
+int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node);
+int     pat_verify (s4be_t *be, int32_t trie);
 
 #endif /* _PAT_H */

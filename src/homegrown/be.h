@@ -21,9 +21,11 @@ struct s4be_St {
 	void *map;
 	int size;
 	GStaticRWLock rwlock;
+#if 0
 	GThread *s_thread;
 	GCond *cond;
 	GMutex *cond_mutex;
+#endif
 };
 
 
@@ -44,5 +46,8 @@ void be_wunlock (s4be_t *s4);
 
 int _st_recover (s4be_t *old, s4be_t *rec);
 int _ip_recover (s4be_t *old, s4be_t *rec);
+
+int _st_verify (s4be_t *be);
+int _ip_verify (s4be_t *be);
 
 #endif /* _BE_H */

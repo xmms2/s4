@@ -274,6 +274,11 @@ int _ip_recover (s4be_t *old, s4be_t *rec)
 	return 0;
 }
 
+int _ip_verify (s4be_t *be)
+{
+	return bpt_verify (be, S4_INT_STORE) || bpt_verify (be, S4_REV_STORE);
+}
+
 /**
  * @}
  */

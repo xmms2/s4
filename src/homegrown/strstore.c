@@ -236,10 +236,15 @@ int _st_recover (s4be_t *old, s4be_t *rec)
 			pat_insert (rec, S4_STRING_STORE, &pkey);
 		}
 
-		node = pat_next (old, node);
+		node = pat_next (old, S4_STRING_STORE, node);
 	}
 
 	return 0;
+}
+
+int _st_verify (s4be_t *be)
+{
+	return pat_verify (be, S4_STRING_STORE);
 }
 
 /**
@@ -271,7 +276,7 @@ GList *s4be_st_regexp (s4be_t *be, const char *pat)
 			ret = g_list_prepend (ret, strdup (str));
 		}
 
-		node = pat_next (be, node);
+		node = pat_next (be, S4_STRING_STORE, node);
 	}
 
 	be_runlock (be);

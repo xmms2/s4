@@ -142,7 +142,10 @@ CASE (entry_fillin) {
 	entry->val_i = entry->key_i;
 	s4_entry_fillin (s4, entry);
 
-	CU_ASSERT_STRING_EQUAL (entry->val_s, entry->key_s);
+	CU_ASSERT_PTR_NOT_NULL (entry->val_s);
+
+	if (entry->val_s != NULL)
+		CU_ASSERT_STRING_EQUAL (entry->val_s, entry->key_s);
 
 	s4_entry_free (entry);
 	s4_entry_free (prop);

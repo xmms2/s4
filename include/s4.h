@@ -1,6 +1,8 @@
 #ifndef _S4_H
 #define _S4_H
 
+#include <glib.h>
+
 #define ENTRY_INT 0
 #define ENTRY_STR 1
 
@@ -24,6 +26,10 @@ typedef struct s4be_St s4be_t;
 
 struct s4_St {
 	s4be_t *be;
+	GStaticRWLock rwlock;
+	GThread *s_thread;
+	GCond *cond;
+	GMutex *cond_mutex;
 };
 typedef struct s4_St s4_t;
 

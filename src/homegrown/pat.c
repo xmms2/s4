@@ -13,18 +13,20 @@
  * @{
  */
 
+#define PAT_LEAF 0xf007ba11
+#define PAT_INT  0xdaceca5e
+
 
 /* The structure used for the patricie trie nodes */
 typedef union pat_node_St {
+	int32_t magic;
 	struct {
 		uint32_t pos;
-		int32_t magic;
 		int32_t left, right;
 	} internal;
 	struct {
 		uint32_t len;
 		int32_t key;
-		int32_t prev, next;
 		int32_t data_len;
 	} leaf;
 } pat_node_t;
@@ -45,6 +47,7 @@ static void set_root (s4be_t *s4, int32_t t,  int32_t root)
 	trie->root = root;
 }
 
+/*
 static void add_to_list (s4be_t *s4, int32_t trie, int32_t node)
 {
 	pat_trie_t *ptrie = S4_PNT(s4, trie, pat_trie_t);
@@ -82,11 +85,11 @@ static void del_from_list (s4be_t *s4, int32_t trie, int32_t node)
 		ptrie->list_end = pnode->leaf.prev;
 	}
 }
-
+*/
 
 static inline int is_leaf (pat_node_t *pn)
 {
-	return pn->internal.magic != -1;
+	return pn->magic == PAT_LEAF;
 }
 
 
@@ -197,7 +200,7 @@ static void insert_internal (s4be_t *s4, int32_t trie, pat_key_t *key,
 		set_root(s4, trie, internal);
 		prev = cur;
 	} else {
-		pn = S4_PNT(s4, prev, pat_node_t); 
+		pn = S4_PNT(s4, prev, pat_node_t);
 		if (bit_set (key, pn->internal.pos)) {
 			prev = pn->internal.right;
 			pn->internal.right = internal;
@@ -210,7 +213,7 @@ static void insert_internal (s4be_t *s4, int32_t trie, pat_key_t *key,
 	/* Add the leaf to the internal node */
 	pn = S4_PNT(s4, internal, pat_node_t);
 	pn->internal.pos = pos;
-	pn->internal.magic = -1;
+	pn->magic = PAT_INT;
 	if (bit_set (key, pos)) {
 		pn->internal.right = node;
 		pn->internal.left = prev;
@@ -270,10 +273,8 @@ int32_t pat_insert (s4be_t *s4, int32_t trie, pat_key_t *key_s)
 	pn = S4_PNT(s4, node, pat_node_t);
 	pn->leaf.key = key;
 	pn->leaf.len = key_s->key_len;
-	pn->leaf.prev = pn->leaf.next = -1;
 	pn->leaf.data_len = key_s->data_len;
-
-	add_to_list (s4, trie, node);
+	pn->magic = PAT_LEAF;
 
 	/* If there is no root, we are the root */
 	if (comp == -1) {
@@ -339,8 +340,6 @@ int pat_remove (s4be_t *s4, int32_t trie, pat_key_t *key)
 		}
 	}
 
-	del_from_list (s4, trie, node);
-
 	return 0;
 }
 
@@ -369,9 +368,15 @@ int32_t pat_node_to_key (s4be_t *s4, int32_t node)
  */
 int32_t pat_first (s4be_t *s4, int32_t trie)
 {
-	pat_trie_t *ptrie = S4_PNT(s4, trie, pat_trie_t);
+	int32_t cur = get_root (s4, trie);
+	pat_node_t *pnode = S4_PNT (s4, cur, pat_node_t);
 
-	return ptrie->list_start;
+	while (cur != -1 && pnode->magic == PAT_INT) {
+		cur = pnode->internal.left;
+		pnode = S4_PNT (s4, cur, pat_node_t);
+	}
+
+	return cur;
 }
 
 
@@ -382,14 +387,43 @@ int32_t pat_first (s4be_t *s4, int32_t trie)
  * @param node The node to find the next one of
  * @return The node after node.
  */
-int32_t pat_next (s4be_t *s4, int32_t node)
+int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node)
 {
 	pat_node_t *pnode = S4_PNT(s4, node, pat_node_t);
+	pat_node_t *plast = NULL;
+	pat_key_t key;
+	int32_t last = -1;
 
 	if (node == -1)
 		return -1;
 
-	return pnode->leaf.next;
+	key.data = S4_PNT (s4, pnode->leaf.key, void*);
+	key.key_len = pnode->leaf.len;
+
+	node = get_root(s4, trie);
+	pnode = S4_PNT (s4, node, pat_node_t);
+
+	while (node != -1 && pnode->magic == PAT_INT) {
+		if (bit_set (&key, pnode->internal.pos)) {
+			node = pnode->internal.right;
+		} else {
+			last = node;
+			node = pnode->internal.left;
+		}
+
+		pnode = S4_PNT (s4, node, pat_node_t);
+	}
+
+	while (plast != NULL && plast->magic == PAT_INT) {
+		last = plast->internal.left;
+		plast = S4_PNT (s4, last, pat_node_t);
+	}
+
+	return last;
+}
+
+int pat_verify (s4be_t *be, int32_t trie)
+{
 }
 
 /**

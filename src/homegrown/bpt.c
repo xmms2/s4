@@ -750,6 +750,11 @@ void bpt_recover (s4be_t *old, s4be_t *rec, int32_t bpt,
 	}
 }
 
+
+int bpt_verify (s4be_t *be, int32_t bpt)
+{
+}
+
 /**
  * @}
  */
