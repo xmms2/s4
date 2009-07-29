@@ -1,4 +1,5 @@
 #include "pat.h"
+#include "log.h"
 #include <string.h>
 
 #define MAX(a, b) (((a) > (b))?((a)):((b)))
@@ -426,8 +427,51 @@ int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node)
 	return last;
 }
 
+static int verify_helper (s4be_t *be, int32_t trie, int32_t node)
+{
+	pat_node_t *pnode = S4_PNT (be, node, pat_node_t);
+	int ret = 0;
+
+	if (node < 0 || node > (be->size - sizeof (pat_node_t))) {
+		S4_ERROR ("Found a patricia node outside the database");
+	} else if (pnode->magic == PAT_INT) {
+		ret = verify_helper (be, trie, pnode->u.internal.left) &&
+			verify_helper (be, trie, pnode->u.internal.right);
+	} else if (pnode->magic == PAT_LEAF) {
+		if (pnode->u.leaf.key < 0 ||
+				pnode->u.leaf.key > (be->size - pnode->u.leaf.data_len)) {
+			S4_ERROR ("One of the leafs point to a key outside the database");
+		} else {
+			pat_key_t key;
+			key.data = S4_PNT (be, pnode->u.leaf.key, void*);
+			key.key_len = pnode->u.leaf.len;
+
+			if (trie_walk (be, trie, &key) != node) {
+				S4_ERROR ("The key in a leaf doesn't lead to the leaf");
+			} else {
+				ret = 1;
+			}
+		}
+	} else {
+		S4_ERROR ("A patricia node without a valid magic number");
+	}
+
+	return ret;
+}
+
+/**
+ * Check if the patricia trie is consistent
+ *
+ * @param be The database to check
+ * @param trie The trie to check
+ * @return 1 if everything's good, 0 otherwise
+ *
+ */
 int pat_verify (s4be_t *be, int32_t trie)
 {
+	int32_t node = get_root (be, trie);
+
+	return node == -1 || verify_helper (be, trie, node);
 }
 
 /**
