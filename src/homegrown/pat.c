@@ -387,6 +387,7 @@ int32_t pat_first (s4be_t *s4, int32_t trie)
  * Return the node after this one
  *
  * @param s4 The database handle
+ * @param trie The trie the node is in
  * @param node The node to find the next one of
  * @return The node after node.
  */
@@ -427,33 +428,41 @@ int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node)
 	return last;
 }
 
-static int verify_helper (s4be_t *be, int32_t trie, int32_t node)
+struct verify_info {
+	int node_outside;
+	int key_outside;
+	int key_error;
+	int magic_error;
+};
+
+static int verify_helper (s4be_t *be, int32_t trie, int32_t node,
+		struct verify_info *info)
 {
 	pat_node_t *pnode = S4_PNT (be, node, pat_node_t);
 	int ret = 0;
 
 	if (node < 0 || node > (be->size - sizeof (pat_node_t))) {
-		S4_ERROR ("Found a patricia node outside the database");
+		info->node_outside++;
 	} else if (pnode->magic == PAT_INT) {
-		ret = verify_helper (be, trie, pnode->u.internal.left) &&
-			verify_helper (be, trie, pnode->u.internal.right);
+		ret = verify_helper (be, trie, pnode->u.internal.left, info) &
+			verify_helper (be, trie, pnode->u.internal.right, info);
 	} else if (pnode->magic == PAT_LEAF) {
 		if (pnode->u.leaf.key < 0 ||
 				pnode->u.leaf.key > (be->size - pnode->u.leaf.data_len)) {
-			S4_ERROR ("One of the leafs point to a key outside the database");
+			info->key_outside++;
 		} else {
 			pat_key_t key;
 			key.data = S4_PNT (be, pnode->u.leaf.key, void*);
 			key.key_len = pnode->u.leaf.len;
 
 			if (trie_walk (be, trie, &key) != node) {
-				S4_ERROR ("The key in a leaf doesn't lead to the leaf");
+				info->key_error++;
 			} else {
 				ret = 1;
 			}
 		}
 	} else {
-		S4_ERROR ("A patricia node without a valid magic number");
+		info->magic_error++;
 	}
 
 	return ret;
@@ -470,8 +479,24 @@ static int verify_helper (s4be_t *be, int32_t trie, int32_t node)
 int pat_verify (s4be_t *be, int32_t trie)
 {
 	int32_t node = get_root (be, trie);
+	struct verify_info info;
+	int ret = 1;
 
-	return node == -1 || verify_helper (be, trie, node);
+	memset (&info, 0, sizeof (struct verify_info));
+
+	if (node != -1) {
+		ret = verify_helper (be, trie, node, &info);
+
+		if (ret == 0) {
+			S4_ERROR ("Patricia trie inconsistent!");
+			S4_ERROR ("%i pointers pointing outside", info.node_outside);
+			S4_ERROR ("%i keys pointing outside ", info.key_outside);
+			S4_ERROR ("%i keys not leading to the node", info.key_error);
+			S4_ERROR ("%i nodes with wrong magic number", info.magic_error);
+		}
+	}
+
+	return ret;
 }
 
 /**
