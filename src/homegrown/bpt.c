@@ -4,8 +4,10 @@
 
 #include "be.h"
 #include "bpt.h"
+#include "log.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 
 #define LEAF_MAGIC 0x12345678
@@ -112,7 +114,7 @@ static int32_t _bpt_create_leaf (s4be_t *be)
 	p->magic = LEAF_MAGIC;
 	p->key_count = 0;
 	p->next = -1;
-	
+
 	return ret;
 }
 
@@ -128,7 +130,7 @@ static int32_t _bpt_create_internal (s4be_t *be)
 	p->magic = INT_MAGIC;
 	p->key_count = 0;
 	p->next = -1;
-	
+
 	return ret;
 }
 
@@ -750,9 +752,108 @@ void bpt_recover (s4be_t *old, s4be_t *rec, int32_t bpt,
 	}
 }
 
+struct verify_info {
+	int outside;
+	int magic;
+	int key_small;
+	int key_great;
+	int key_order;
+	int diff_height;
+};
 
+/* Helper function for bpt_verify, return 0 if it's invalid,
+ * the height if it's okay
+ */
+static int _bpt_verify (s4be_t *be, int32_t node,
+		bpt_record_t lo, bpt_record_t hi,
+		struct verify_info *info)
+{
+	bpt_node_t *pnode = S4_PNT (be, node, bpt_node_t);
+	int i;
+	int ret = 1;
+	int height = 0;
+	bpt_record_t a, b;
+
+	if (node < 0 || node > (be->size + sizeof (bpt_node_t))) {
+		info->outside++;
+		return 0;
+	}
+
+	if (pnode->magic != INT_MAGIC && pnode->magic != LEAF_MAGIC) {
+		info->magic++;
+		return 0;
+	}
+
+	for (i = 0; i < pnode->key_count; i++) {
+		if (_bpt_comp (lo, pnode->keys[i]) > 0) {
+			info->key_small++;
+			ret = 0;
+		} else if (_bpt_comp (hi, pnode->keys[i]) <= 0) {
+			info->key_great++;
+			ret = 0;
+		} else if (i > 0 && _bpt_comp (pnode->keys[i -1], pnode->keys[i]) >= 0) {
+			info->key_order++;
+			ret = 0;
+		}
+	}
+
+	for (i = 0, a = lo, b = pnode->keys[0]
+			; i <= pnode->key_count && pnode->magic == INT_MAGIC
+			; i++) {
+		int tmp = _bpt_verify (be, pnode->pointers[i], a, b, info);
+
+		if (tmp == 0) {
+			ret = 0;
+		} else if (i == 0) {
+			height = tmp;
+		} else if (tmp != height) {
+			info->diff_height++;
+			ret = 0;
+		}
+
+		a = b;
+
+		if ((i + 1) >= pnode->key_count)
+			b = hi;
+		else
+			b = pnode->keys[i + 1];
+	}
+
+	return (ret)?(height + 1):0;
+}
+
+/**
+ * Check the given tree for inconsistenties.
+ *
+ * @param be The database the tree is in
+ * @param bpt The tree
+ * @return 1 if everything is okay, 0 otherwise
+ *
+ */
 int bpt_verify (s4be_t *be, int32_t bpt)
 {
+	bpt_record_t lo, hi;
+	struct verify_info info;
+	int ret;
+
+	memset (&info, 0, sizeof (struct verify_info));
+
+	lo.key_a = lo.key_b = lo.val_a = lo.key_a = lo.src = INT32_MIN;
+	hi.key_a = hi.key_b = hi.val_a = hi.key_a = hi.src = INT32_MAX;
+
+	ret = !!_bpt_verify (be, _bpt_get_root (be, bpt), lo, hi, &info);
+
+	if (!ret) {
+		S4_ERROR ("B+ tree inconsistent!");
+		S4_ERROR ("%i pointers point outside the database", info.outside);
+		S4_ERROR ("%i nodes have wrong magic numbers", info.magic);
+		S4_ERROR ("%i keys are too small", info.key_small);
+		S4_ERROR ("%i keys are too big", info.key_great);
+		S4_ERROR ("%i keys are in the wrong order", info.key_order);
+		S4_ERROR ("%i subtrees have different height", info.diff_height);
+	}
+
+	return ret;
 }
 
 /**
