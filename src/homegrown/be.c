@@ -392,7 +392,7 @@ int s4be_verify (s4be_t *be, int thorough)
 	header_t *hdr;
 
 	if (thorough) {
-		ret = _st_verify (be) && _ip_verify (be);
+		ret = _st_verify (be) & _ip_verify (be);
 	}
 
 	hdr = be->map;

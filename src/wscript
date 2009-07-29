@@ -8,13 +8,20 @@ backend = 'homegrown'
 
 def build(bld):
     bld.add_subdirs(backend)
-    obj = bld.new_task_gen('cc', 'staticlib')
-    obj.source = "entry.c s4.c set.c".split()
-    obj.includes = '../include'
-    obj.target = 's4'
-    obj.install_path = 0
-    obj.uselib_local = 's4_backend'
-    obj.uselib = 'xmmstypes'
+    s4 = bld.new_task_gen('cc', 'staticlib')
+    s4.source = ['entry.c', 's4.c', 'set.c']
+    s4.includes = '../include'
+    s4.target = 's4'
+    s4.install_path = 0
+    s4.add_objects = "s4_backend"
+    s4.uselib = "glib2"
+    s4.export_incdirs = '../include'
+
+    verify = bld.new_task_gen('cc', 'program')
+    verify.source = ["s4_verify.c", "log.c"]
+    verify.target = "s4_verify"
+    verify.install_path = 0
+    verify.uselib_local = 's4'
 
 def configure(conf):
     return True

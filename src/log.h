@@ -19,4 +19,6 @@
 #define S4_FATAL g_error
 #endif /* DEBUG */
 
+void log_init();
+
 #endif  /* _S4_LOG_H */
