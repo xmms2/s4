@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 
-s4be_t *s4be_open (const char *filename);
+s4be_t *s4be_open (const char *filename, int flags);
 int s4be_close (s4be_t *be);
 int s4be_verify (s4be_t *be, int thorough);
 int s4be_recover (s4be_t *old, s4be_t *rec);

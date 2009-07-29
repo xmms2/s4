@@ -13,7 +13,7 @@ SETUP (s4_intpair) {
 	if (!g_thread_get_initialized ())
 		g_thread_init (NULL);
 	name = tmpnam (NULL);
-	be = s4be_open (name);
+	be = s4be_open (name, S4_NEW);
 	return be == NULL;
 }
 

@@ -6,6 +6,14 @@
 #define ENTRY_INT 0
 #define ENTRY_STR 1
 
+/* Flags */
+#define S4_RECOVER          1 << 0
+#define S4_VERIFY           1 << 1
+#define S4_VERIFY_THOROUGH  1 << 2
+#define S4_VERIFY_REFCOUNT  1 << 3
+#define S4_VERIFY_MASK      (S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT)
+#define S4_NEW              1 << 4
+
 typedef struct s4_entry_St {
 	int type;
 	char *key_s;
@@ -34,8 +42,10 @@ struct s4_St {
 typedef struct s4_St s4_t;
 
 /* s4.c */
-s4_t *s4_open (const char *name);
+s4_t *s4_open (const char *name, int flags);
 int s4_close (s4_t *s4);
+int s4_verify (s4_t *s4, int flags);
+int s4_recover (s4_t *s4, const char *name);
 
 /* set.c */
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b);

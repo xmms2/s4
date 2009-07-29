@@ -11,7 +11,7 @@ SETUP (s4_entry) {
 		g_thread_init (NULL);
 
 	name = tmpnam (NULL);
-	s4 = s4_open (name);
+	s4 = s4_open (name, S4_VERIFY);
 
 	return s4 == NULL;
 }
