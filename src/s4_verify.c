@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	}
 
 	for (i = 1; i < argc; i++) {
-		switch (*(argv[i])) {
+		switch (*argv[i]) {
 			case '+':
 				flags |= get_flags (argv[i] + 1);
 				break;
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 
 	log_init();
 
-	s4 = s4_open (argv[1], 0);
+	s4 = s4_open (filename, 0);
 
 	if (s4 == NULL) {
 		exit (0);
