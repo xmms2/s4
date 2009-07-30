@@ -93,9 +93,95 @@ int s4_close (s4_t *s4)
 	return ret;
 }
 
+static int treecmp (gconstpointer pa, gconstpointer pb, gpointer foo)
+{
+	int a, b;
+
+	a = *(int*)pa;
+	b = *(int*)pb;
+
+	if (a < b)
+		return -1;
+	if (a > b)
+		return 1;
+
+	return 0;
+}
+
+static void inc_tree (GTree *tree, int32_t str)
+{
+	int *val = g_tree_lookup (tree, &str);
+	int *key = malloc (sizeof (int));
+	int *new = malloc (sizeof (int));
+
+	*key = str;
+	if (val == NULL) {
+		*new = 1;
+	} else {
+		*new = *val + 1;
+	}
+	g_tree_insert (tree, key, new);
+}
+
+struct check_struct {
+	s4be_t *be;
+	GTree *tree;
+	int errors;
+};
+
+static void check_refs (int32_t node, void *u)
+{
+	struct check_struct *info = u;
+	int count = s4be_st_refcount (info->be, node);
+	int *val = g_tree_lookup (info->tree, &node);
+
+	if (*val != count) {
+		info->errors++;
+		S4_ERROR ("Wrong ref count on %s (%i) - is %i, should be %i",
+				s4be_st_reverse (info->be, node),node,  count, *val);
+	}
+}
+
+static void count_refs (s4_entry_t *e, s4_entry_t *p, void *u)
+{
+	GTree *t = u;
+
+	if (e->type == ENTRY_INT) {
+		inc_tree (t, -e->key_i);
+	} else {
+		inc_tree (t, e->key_i);
+		inc_tree (t, e->val_i);
+	}
+	if (p->type == ENTRY_INT) {
+		inc_tree (t, -p->key_i);
+	} else {
+		inc_tree (t, p->key_i);
+		inc_tree (t, p->val_i);
+	}
+	inc_tree (t, p->src_i);
+}
+
 static int verify_refcount (s4_t *s4)
 {
-	return 1;
+	GTree *tree;
+	struct check_struct info;
+
+	tree = g_tree_new_full (treecmp, NULL, free, free);
+
+	info.tree = tree;
+	info.be = s4->be;
+	info.errors = 0;
+
+	s4be_ip_foreach (s4->be, count_refs, tree);
+	s4be_st_foreach (s4->be, check_refs, &info);
+
+	if (info.errors) {
+		S4_ERROR ("Found %i errors in the refcounting!", info.errors);
+	}
+
+	g_tree_destroy (tree);
+
+	return info.errors != 0;
 }
 
 /**
@@ -113,7 +199,7 @@ int s4_verify (s4_t *s4, int flags) {
 	int ret = s4be_verify (s4->be, flags & S4_VERIFY_THOROUGH);
 
 	if (flags & S4_VERIFY_REFCOUNT) {
-		ret = ret && verify_refcount (s4);
+		ret &= verify_refcount (s4);
 	}
 
 	return ret;

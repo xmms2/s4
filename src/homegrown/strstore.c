@@ -57,6 +57,27 @@ int32_t s4be_st_lookup (s4be_t *s4, const char *str)
 	return ret;
 }
 
+int s4be_st_refcount (s4be_t *s4, int32_t node)
+{
+	int ret;
+	char *data;
+	str_info_t *info;
+
+	be_rlock (s4);
+	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
+	while (*data++);
+	data++;
+	while (*data++);
+	data++;
+
+	info = (str_info_t*)data;
+	ret = info->refs;
+
+	be_runlock (s4);
+
+	return ret;
+}
+
 static char *s4be_st_get_str (s4be_t *s4, int32_t node)
 {
 	char *ret = S4_PNT (s4, pat_node_to_key (s4, node), char);
@@ -283,6 +304,18 @@ GList *s4be_st_regexp (s4be_t *be, const char *pat)
 	g_regex_unref (regex);
 
 	return ret;
+}
+
+void s4be_st_foreach (s4be_t *be,
+		void (*func) (int32_t node, void *userdata),
+		void *userdata)
+{
+	int32_t node = pat_first (be, S4_STRING_STORE);
+
+	while (node != -1) {
+		func (node, userdata);
+		node = pat_next (be, S4_STRING_STORE, node);
+	}
 }
 
 /**

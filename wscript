@@ -220,6 +220,6 @@ def shutdown():
     if Options.options.build_lcov:
         cd = os.getcwd()
         os.chdir(blddir)
-        os.system("lcov -c -b . -d . -o xmms.info")
-        os.system("genhtml -o ../coverage xmms.info")
+        os.system("lcov -c -b . -d . -o s4.info")
+        os.system("genhtml -o ../coverage s4.info")
         os.chdir(cd)

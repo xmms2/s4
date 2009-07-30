@@ -211,43 +211,51 @@ s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry)
 	return ret;
 }
 
+struct recovery_info {
+	int32_t bpt;
+	s4be_t *old;
+	s4be_t *new;
+};
 
-static int _fix_key (s4be_t *old, s4be_t *new, int32_t bpt, bpt_record_t key)
+
+static void _fix_key (bpt_record_t key, void *userdata)
 {
 	bpt_record_t nkey, rkey;
+	struct recovery_info *info = userdata;
+
 	if (key.key_a < 0) {
-		nkey.key_a = -s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, -key.key_a), char));
+		nkey.key_a = -s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_a), char));
 		nkey.val_a = key.val_a;
 	} else {
-		nkey.key_a = s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, key.key_a), char));
-		nkey.val_a = s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, key.val_a), char));
+		nkey.key_a = s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, key.key_a), char));
+		nkey.val_a = s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, key.val_a), char));
 
 		if (nkey.val_a == 0)
-			return -1;
+			return;
 	}
 	if (key.key_b < 0) {
-		nkey.key_b = -s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, -key.key_b), char));
+		nkey.key_b = -s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_b), char));
 		nkey.val_b = key.val_b;
 	} else {
-		nkey.key_b = s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, key.key_b), char));
-		nkey.val_b = s4be_st_lookup (new,
-				S4_PNT (old, pat_node_to_key (old, key.val_b), char));
+		nkey.key_b = s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, key.key_b), char));
+		nkey.val_b = s4be_st_lookup (info->new,
+				S4_PNT (info->old, pat_node_to_key (info->old, key.val_b), char));
 
 		if (nkey.val_b == 0)
-			return -1;
+			return;
 	}
 
-	nkey.src = s4be_st_lookup (new,
-			S4_PNT (old, pat_node_to_key (old, key.src), char));
+	nkey.src = s4be_st_lookup (info->new,
+			S4_PNT (info->old, pat_node_to_key (info->old, key.src), char));
 
 
 	if (nkey.key_a == 0 || nkey.key_b == 0 || nkey.src == 0)
-		return -1;
+		return;
 
 	rkey.key_a = nkey.key_b;
 	rkey.val_a = nkey.val_b;
@@ -255,28 +263,62 @@ static int _fix_key (s4be_t *old, s4be_t *new, int32_t bpt, bpt_record_t key)
 	rkey.val_b = nkey.val_a;
 	rkey.src = nkey.src;
 
-	if (bpt == S4_INT_STORE) {
-		bpt_insert (new, S4_INT_STORE, nkey);
-		bpt_insert (new, S4_REV_STORE, rkey);
+	if (info->bpt == S4_INT_STORE) {
+		bpt_insert (info->new, S4_INT_STORE, nkey);
+		bpt_insert (info->new, S4_REV_STORE, rkey);
 	} else {
-		bpt_insert (new, S4_INT_STORE, rkey);
-		bpt_insert (new, S4_REV_STORE, nkey);
+		bpt_insert (info->new, S4_INT_STORE, rkey);
+		bpt_insert (info->new, S4_REV_STORE, nkey);
 	}
-
-	return 0;
 }
 
 /* Try to recover the database */
 int _ip_recover (s4be_t *old, s4be_t *rec)
 {
-	bpt_recover (old, rec, S4_INT_STORE, _fix_key);
-	bpt_recover (old, rec, S4_REV_STORE, _fix_key);
+	struct recovery_info info;
+	info.old = old;
+	info.new = rec;
+
+	info.bpt = S4_INT_STORE;
+	bpt_foreach (old, S4_INT_STORE, _fix_key, &info);
+	info.bpt = S4_REV_STORE;
+	bpt_foreach (old, S4_REV_STORE, _fix_key, &info);
 	return 0;
 }
 
 int _ip_verify (s4be_t *be)
 {
-	return bpt_verify (be, S4_INT_STORE) || bpt_verify (be, S4_REV_STORE);
+	return bpt_verify (be, S4_INT_STORE) & bpt_verify (be, S4_REV_STORE);
+}
+
+struct foreach_info {
+	void (*func) (s4_entry_t *e, s4_entry_t *p, void *userdata);
+	void *userdata;
+};
+
+static void _foreach_helper (bpt_record_t rec, void *userdata)
+{
+	struct foreach_info *info = userdata;
+	s4_entry_t e, p;
+
+	e.key_i = rec.key_a;
+	e.val_i = rec.val_a;
+	p.key_i = rec.key_b;
+	p.val_i = rec.val_b;
+	p.src_i = rec.src;
+
+	info->func (&e, &p, info->userdata);
+}
+
+void s4be_ip_foreach (s4be_t *be,
+		void (*func) (s4_entry_t *e, s4_entry_t *p, void *userdata),
+		void *userdata)
+{
+	struct foreach_info info;
+	info.func = func;
+	info.userdata = userdata;
+
+	bpt_foreach (be, S4_INT_STORE, _foreach_helper, &info);
 }
 
 /**

@@ -736,19 +736,20 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
  * @param bpt The tree to recover
  * @param func The function to call. The arguments are (old, rec, bpt, entry).
  */
-void bpt_recover (s4be_t *old, s4be_t *rec, int32_t bpt,
-		int (*func)(s4be_t*, s4be_t*, int32_t, bpt_record_t))
+void bpt_foreach (s4be_t *be, int32_t bpt,
+		void (*func)(bpt_record_t, void *userdata),
+		void *userdata)
 {
-	int32_t leaf = _bpt_get_leaves (old, bpt);
-	bpt_node_t *node = S4_PNT (old, leaf, bpt_node_t);
+	int32_t leaf = _bpt_get_leaves (be, bpt);
+	bpt_node_t *node = S4_PNT (be, leaf, bpt_node_t);
 
 	while (leaf != -1 && node->magic == LEAF_MAGIC) {
 		int i;
 		for (i = 0; i < node->key_count; i++)
-			func (old, rec, bpt, node->keys[i]);
+			func (node->keys[i], userdata);
 
 		leaf = node->next;
-		node = S4_PNT (old, leaf, bpt_node_t);
+		node = S4_PNT (be, leaf, bpt_node_t);
 	}
 }
 
