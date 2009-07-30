@@ -66,9 +66,7 @@ int s4be_st_refcount (s4be_t *s4, int32_t node)
 	be_rlock (s4);
 	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
 	while (*data++);
-	data++;
 	while (*data++);
-	data++;
 
 	info = (str_info_t*)data;
 	ret = info->refs;

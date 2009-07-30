@@ -307,6 +307,9 @@ static void _foreach_helper (bpt_record_t rec, void *userdata)
 	p.val_i = rec.val_b;
 	p.src_i = rec.src;
 
+	e.type = (e.key_i < 0)?ENTRY_INT:ENTRY_STR;
+	p.type = (p.key_i < 0)?ENTRY_INT:ENTRY_STR;
+
 	info->func (&e, &p, info->userdata);
 }
 

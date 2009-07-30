@@ -181,7 +181,7 @@ static int verify_refcount (s4_t *s4)
 
 	g_tree_destroy (tree);
 
-	return info.errors != 0;
+	return info.errors == 0;
 }
 
 /**
