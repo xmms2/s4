@@ -23,6 +23,13 @@ def build(bld):
     verify.install_path = 0
     verify.uselib_local = 's4'
 
+    imp = bld.new_task_gen('cc', 'program')
+    imp.source = ["s4_import.c"]
+    imp.target = "s4_import"
+    imp.install_path = 0
+    imp.uselib_local = "s4"
+    imp.uselib = "sqlite3"
+
 def configure(conf):
     return True
 
