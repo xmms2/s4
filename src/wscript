@@ -2,7 +2,8 @@
 #
 # WAF build scripts for XMMS2
 # Copyright (C) 2006-2009 XMMS2 Team
-#
+
+import Options
 
 backend = 'homegrown'
 
@@ -17,28 +18,36 @@ def build(bld):
     s4.uselib = "glib2"
     s4.export_incdirs = '../include'
 
-    verify = bld.new_task_gen('cc', 'program')
-    verify.source = ["s4_verify.c", "log.c"]
-    verify.target = "s4_verify"
-    verify.install_path = 0
-    verify.uselib_local = 's4'
+    if bld.env['BUILD_TOOLS']:
+        verify = bld.new_task_gen('cc', 'program')
+        verify.source = ["s4_verify.c", "log.c"]
+        verify.target = "s4_verify"
+        verify.install_path = 0
+        verify.uselib_local = 's4'
 
-    imp = bld.new_task_gen('cc', 'program')
-    imp.source = ["s4_import.c"]
-    imp.target = "s4_import"
-    imp.install_path = 0
-    imp.uselib_local = "s4"
-    imp.uselib = "sqlite3"
+        imp = bld.new_task_gen('cc', 'program')
+        imp.source = ["s4_import.c"]
+        imp.target = "s4_import"
+        imp.install_path = 0
+        imp.uselib_local = "s4"
+        imp.uselib = "sqlite3"
 
-    recover = bld.new_task_gen('cc', 'program')
-    recover.source = ["s4_recover.c"]
-    recover.target = "s4_recover"
-    recover.install_path = 0
-    recover.uselib_local = "s4"
-    recover.uselib = "glib2"
+        recover = bld.new_task_gen('cc', 'program')
+        recover.source = ["s4_recover.c"]
+        recover.target = "s4_recover"
+        recover.install_path = 0
+        recover.uselib_local = "s4"
+        recover.uselib = "glib2"
 
 def configure(conf):
+    if Options.options.build_tools:
+        conf.check_cfg(package='sqlite3', atleast_version='3.5', uselib_store='sqlite3', args='--cflags --libs', mandatory=1)
+        conf.env['BUILD_TOOLS'] = True
+    else:
+        conf.env['BUILD_TOOLS'] = False
     return True
 
 def set_options(opt):
-    pass
+    opt.add_option("--build-tools", action="store_true", default=False,
+                    dest="build_tools",
+                    help="Build S4 tools to verify, recover and import databases.")

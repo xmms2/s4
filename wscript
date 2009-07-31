@@ -149,7 +149,6 @@ def configure(conf):
     # assume its presence.
     conf.check_cfg(package='glib-2.0', atleast_version='2.8.0', uselib_store='glib2', args='--cflags --libs', mandatory=1)
     conf.check_cfg(package='gthread-2.0', atleast_version='2.6.0', uselib_store='gthread2', args='--cflags --libs')
-    conf.check_cfg(package='sqlite3', atleast_version='3.5', uselib_store='sqlite3', args='--cflags --libs', mandatory=1)
 
     subdirs = conf.env["S4_SUBDIRS"]
 
@@ -206,6 +205,8 @@ def set_options(opt):
                    dest='enable_gcov', help="Enable code coverage analysis")
     opt.add_option('--lcov-report', action="store_true", default=False,
                    dest='build_lcov', help="Builds an lcov report")
+
+    opt.sub_options("src")
 
 def shutdown():
     if Options.commands['install'] and os.geteuid() == 0:
