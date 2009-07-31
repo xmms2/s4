@@ -1,4 +1,5 @@
 #include "pat.h"
+#include "log.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -283,7 +284,7 @@ GList *s4be_st_regexp (s4be_t *be, const char *pat)
 	GList *ret = NULL;
 
 	if (regex == NULL) {
-		printf ("Regex error: %s\n", error->message);
+		S4_ERROR ("Regex error: %s\n", error->message);
 		return NULL;
 	}
 
