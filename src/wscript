@@ -30,6 +30,13 @@ def build(bld):
     imp.uselib_local = "s4"
     imp.uselib = "sqlite3"
 
+    recover = bld.new_task_gen('cc', 'program')
+    recover.source = ["s4_recover.c"]
+    recover.target = "s4_recover"
+    recover.install_path = 0
+    recover.uselib_local = "s4"
+    recover.uselib = "glib2"
+
 def configure(conf):
     return True
 
