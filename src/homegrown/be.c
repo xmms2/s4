@@ -235,8 +235,14 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 	s4be_t* s4 = malloc (sizeof(s4be_t));
 	memset (s4, 0, sizeof (s4be_t));
 #ifdef _WIN32
+	int flags = OPEN_ALWAYS;
+	if (open_flags & S4_NEW)
+		flags = CREATE_NEW;
+	if (open_flags & S4_EXISTS)
+		flags = OPEN_EXISTING;
+
 	s4->fd = CreateFile (filename, GENERIC_READ | GENERIC_WRITE,
-			0, NULL, (open_flags & S4_NEW)?OPEN_EXISTING:OPEN_ALWAYS,
+			0, NULL, flags,
 			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS,
 			NULL);
 
@@ -247,8 +253,10 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 	}
 #else
 	struct stat stat_buf;
-	int flags = O_RDWR | O_CREAT;
+	int flags = O_RDWR;
 
+	if (!(open_flags & S4_EXISTS))
+		flags |= O_CREAT;
 	if (open_flags & S4_NEW)
 		flags |= O_EXCL;
 

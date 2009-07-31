@@ -23,8 +23,10 @@
  * recover it, otherwise it will return NULL. If S4_RECOVERY is set but
  * S4_VERIFY is not, it will try to recover the database without checking
  * if it is actually necessary. For the verify flags see s4_verify.
- * If S4_NEW makes sure it creates a new file, if he file already exists
- * it returns NULL.
+ * If S4_NEW is set it will create a new file is one does not exist and
+ * fail is one exists. If S4_EXISTS is set it will open a file if one exists
+ * and fail is one does not exist. If you set both S4_NEW and S4_EXISTS the
+ * result is unspecified.
  * @return A pointer to an s4_t, or NULL if something went wrong.
  */
 s4_t *s4_open (const char *filename, int flags)

@@ -13,6 +13,7 @@
 #define S4_VERIFY_REFCOUNT  1 << 3
 #define S4_VERIFY_MASK      (S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT)
 #define S4_NEW              1 << 4
+#define S4_EXISTS           1 << 5
 
 typedef struct s4_entry_St {
 	int type;
