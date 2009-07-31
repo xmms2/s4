@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 
 	log_init();
 
-	s4 = s4_open (filename, 0);
+	s4 = s4_open (filename, S4_EXISTS);
 
 	if (s4 == NULL) {
 		exit (0);
