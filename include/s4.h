@@ -14,6 +14,7 @@
 #define S4_VERIFY_MASK      (S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT)
 #define S4_NEW              1 << 4
 #define S4_EXISTS           1 << 5
+#define S4_SYNC_THREAD      1 << 6
 
 typedef struct s4_entry_St {
 	int type;
@@ -35,7 +36,6 @@ typedef struct s4be_St s4be_t;
 
 struct s4_St {
 	s4be_t *be;
-	GStaticRWLock rwlock;
 	GThread *s_thread;
 	GCond *cond;
 	GMutex *cond_mutex;
@@ -47,6 +47,9 @@ s4_t *s4_open (const char *name, int flags);
 int s4_close (s4_t *s4);
 int s4_verify (s4_t *s4, int flags);
 int s4_recover (s4_t *s4, const char *name);
+void s4_sync (s4_t *s4);
+int s4_start_sync_thread (s4_t *s4);
+int s4_stop_sync_thread (s4_t *s4);
 
 /* set.c */
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b);

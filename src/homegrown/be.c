@@ -204,32 +204,14 @@ static void mark_dirty (s4be_t *s4)
 	}
 }
 
-
-#if 0
-/* The loop for the sync thread */
-static gpointer sync_thread (gpointer be)
-{
-	s4be_t *s4 = be;
-	GTimeVal tv;
-
-	g_get_current_time (&tv);
-	g_time_val_add (&tv, 60*1000);
-
-	g_mutex_lock (s4->cond_mutex);
-
-	while (!g_cond_timed_wait (s4->cond, s4->cond_mutex, &tv)) {
-		s4be_sync (s4);
-		g_get_current_time (&tv);
-		g_time_val_add (&tv, 60*1000);
-	}
-
-	g_mutex_unlock (s4->cond_mutex);
-
-	return NULL;
-}
-#endif
-
-
+/**
+ * Open an S4 backend database.
+ *
+ * @param filename The file to open
+ * @paran open_flags Flags to use
+ * @return A pointer to an s4be_t, or NULL on error.
+ *
+ */
 s4be_t *s4be_open (const char *filename, int open_flags)
 {
 	s4be_t* s4 = malloc (sizeof(s4be_t));
@@ -290,56 +272,6 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 	return s4;
 }
 
-
-#if 0
-/**
- * Open an s4 database
- *
- * @param filename The file to open
- * @return A pointer to an s4 structure, or NULL on error
- */
-s4be_t *s4be_open (const char* filename, int *need_recovery)
-{
-	s4be_t *ret, *rec;
-	header_t *header;
-
-	ret = be_open (filename, 0);
-
-	if (ret == NULL)
-		return NULL;
-
-	header = ret->map;
-
-	if (header->sync_state != CLEAN) {
-		char buf[4096];
-		strcpy (buf, filename);
-		strcat (buf, ".rec");
-
-		rec = be_open (buf, 1);
-
-		if (rec == NULL)
-			return NULL;
-
-		_st_recover (ret, rec);
-		_ip_recover (ret, rec);
-
-		s4be_close (ret);
-		s4be_close (rec);
-
-		g_unlink (filename);
-		g_rename (buf, filename);
-
-		ret = be_open (filename, 0);
-	}
-
-	ret->cond = g_cond_new ();
-	ret->cond_mutex = g_mutex_new ();
-
-	ret->s_thread = g_thread_create (sync_thread, ret, TRUE, NULL);
-	return ret;
-}
-#endif
-
 /**
  * Close an open s4 database
  *
@@ -352,19 +284,6 @@ int s4be_close (s4be_t* s4)
 
 	S4_DBG ("Free %i\n", header->free);
 
-#if 0
-	if (s4->cond_mutex != NULL) {
-		g_mutex_lock (s4->cond_mutex);
-		g_cond_signal (s4->cond);
-		g_mutex_unlock (s4->cond_mutex);
-
-		g_thread_join (s4->s_thread);
-
-		g_mutex_free (s4->cond_mutex);
-		g_cond_free (s4->cond);
-	}
-
-#endif
 	g_static_rw_lock_free (&s4->rwlock);
 	s4be_sync (s4);
 	map_unmap (s4);

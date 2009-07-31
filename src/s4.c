@@ -26,7 +26,8 @@
  * If S4_NEW is set it will create a new file is one does not exist and
  * fail is one exists. If S4_EXISTS is set it will open a file if one exists
  * and fail is one does not exist. If you set both S4_NEW and S4_EXISTS the
- * result is unspecified.
+ * result is unspecified. If S4_SYNC_THREAD is set it will try to start the
+ * sync thread, if it doesn't succeed it will return NULL.
  * @return A pointer to an s4_t, or NULL if something went wrong.
  */
 s4_t *s4_open (const char *filename, int flags)
@@ -79,20 +80,116 @@ s4_t *s4_open (const char *filename, int flags)
 		}
 	}
 
-	s4 = malloc (sizeof (s4_t));
+	s4 = calloc (1, sizeof (s4_t));
 	s4->be = be;
+
+	if (flags & S4_SYNC_THREAD) {
+		if (!s4_start_sync_thread (s4)) {
+			s4_close (s4);
+			return NULL;
+		}
+	}
 
 	return s4;
 }
 
-
+/**
+ * Close an open S4 database
+ *
+ * @param s4 The database to close
+ *
+ */
 int s4_close (s4_t *s4)
 {
-	int ret = s4be_close (s4->be);
+	int ret;
+
+	s4_stop_sync_thread (s4);
+	ret = s4be_close (s4->be);
 
 	free (s4);
 
 	return ret;
+}
+
+/**
+ * Write all changes to disk
+ *
+ * @param s4 The database to sync
+ *
+ */
+void s4_sync (s4_t *s4)
+{
+	s4be_sync (s4->be);
+}
+
+/* The loop for the sync thread */
+static gpointer sync_thread (gpointer ptr)
+{
+	s4_t *s4 = ptr;
+	GTimeVal tv;
+
+	g_get_current_time (&tv);
+	g_time_val_add (&tv, 60*1000);
+
+	g_mutex_lock (s4->cond_mutex);
+
+	while (!g_cond_timed_wait (s4->cond, s4->cond_mutex, &tv)) {
+		s4_sync (s4);
+		g_get_current_time (&tv);
+		g_time_val_add (&tv, 60*1000);
+	}
+
+	g_mutex_unlock (s4->cond_mutex);
+
+	return NULL;
+}
+
+/**
+ * Start the synchronisation thread
+ *
+ * @param s4 The database to run the sync thread on
+ * @return 1 if everything went okay, 0 otherwise.
+ */
+int s4_start_sync_thread (s4_t *s4)
+{
+	if (s4->cond != NULL || s4->cond_mutex != NULL || s4->s_thread != NULL)
+		return 0;
+
+	s4->cond = g_cond_new ();
+	s4->cond_mutex = g_mutex_new ();
+	s4->s_thread = g_thread_create (sync_thread, s4, TRUE, NULL);
+
+	if (s_thread == NULL) {
+		g_mutex_free (s4->cond_mutex);
+		g_cond_free (s4->cond);
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Stop the synchronisation thread
+ *
+ * @param s4 The database to stop the sync thread in
+ * @return 1 if everything went okay, 0 otherwise.
+ *
+ */
+int s4_stop_sync_thread (s4_t *s4)
+{
+	if (s4->cond == NULL || s4->cond_mutex == NULL || s4->s_thread == NULL)
+		return 0;
+
+	g_mutex_lock (s4->cond_mutex);
+	g_cond_signal (s4->cond);
+	g_mutex_unlock (s4->cond_mutex);
+
+	g_thread_join (s4->s_thread);
+
+	g_mutex_free (s4->cond_mutex);
+	g_cond_free (s4->cond);
+
+	return 1;
 }
 
 static int treecmp (gconstpointer pa, gconstpointer pb, gpointer foo)
