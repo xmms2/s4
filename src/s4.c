@@ -159,7 +159,7 @@ int s4_start_sync_thread (s4_t *s4)
 	s4->cond_mutex = g_mutex_new ();
 	s4->s_thread = g_thread_create (sync_thread, s4, TRUE, NULL);
 
-	if (s_thread == NULL) {
+	if (s4->s_thread == NULL) {
 		g_mutex_free (s4->cond_mutex);
 		g_cond_free (s4->cond);
 		return 0;
