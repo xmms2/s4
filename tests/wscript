@@ -1,4 +1,4 @@
-s4_suite = ["s4/t_set.c", "s4/t_intpair.c", "s4/t_strstore.c", "s4/t_entry.c"]
+s4_suite = ["s4/t_set.c", "s4/t_intpair.c", "s4/t_strstore.c", "s4/t_entry.c", "s4/t_s4.c"]
 
 def configure(conf):
     if not conf.check_cc(header_name="CUnit/CUnit.h"):
