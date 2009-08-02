@@ -231,7 +231,7 @@ struct check_struct {
 static void check_refs (int32_t node, void *u)
 {
 	struct check_struct *info = u;
-	int count = s4be_st_refcount (info->be, node);
+	int count = s4be_st_get_refcount (info->be, node);
 	int *val = g_tree_lookup (info->tree, &node);
 
 	if (*val != count) {
@@ -304,15 +304,39 @@ int s4_verify (s4_t *s4, int flags) {
 	return ret;
 }
 
+static void set_refs (int32_t node, void *u)
+{
+	struct check_struct *info = u;
+	int *val = g_tree_lookup (info->tree, &node);
+
+	if (val == NULL) {
+		char *str = s4be_st_reverse (info->be, node);
+		S4_DBG ("Found no references to %s, removing it", str);
+		s4be_st_remove (info->be, str);
+		free (str);
+	} else {
+		s4be_st_set_refcount (info->be, node, *val);
+	}
+}
+
+void fix_refcount (s4be_t *be)
+{
+	GTree *tree;
+	struct check_struct info;
+
+	tree = g_tree_new_full (treecmp, NULL, free, free);
+
+	info.tree = tree;
+	info.be = be;
+
+	s4be_ip_foreach (be, count_refs, tree);
+	s4be_st_foreach (be, set_refs, &info);
+}
+
 int s4_recover (s4_t *s4, const char *name)
 {
 	s4be_t *rec;
 	int ret = 1;
-
-	if (g_file_test (name, G_FILE_TEST_EXISTS)) {
-		S4_ERROR ("%s already exists, can't recover", name);
-		return 0;
-	}
 
 	rec = s4be_open (name, S4_NEW);
 
@@ -321,6 +345,9 @@ int s4_recover (s4_t *s4, const char *name)
 	}
 
 	ret = s4be_recover (s4->be, rec);
+
+	fix_refcount (rec);
+
 	s4be_close (rec);
 
 	return ret;

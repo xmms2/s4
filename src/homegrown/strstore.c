@@ -31,6 +31,17 @@ static char *collate_key (const char *key)
 	return ret;
 }
 
+static str_info_t *get_info (s4be_t *s4, int32_t node)
+{
+	char *data;
+
+	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
+	while (*data++);
+	while (*data++);
+
+	return (str_info_t*)data;
+}
+
 /**
  * Look up a string and return the associated int
  *
@@ -58,18 +69,22 @@ int32_t s4be_st_lookup (s4be_t *s4, const char *str)
 	return ret;
 }
 
-int s4be_st_refcount (s4be_t *s4, int32_t node)
+/**
+ * Return the refcount of the given node
+ *
+ * @param s4 The database handle
+ * @param node The node to find the refcount of
+ * @return The refcount
+ *
+ */
+int s4be_st_get_refcount (s4be_t *s4, int32_t node)
 {
 	int ret;
-	char *data;
 	str_info_t *info;
 
 	be_rlock (s4);
-	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
-	while (*data++);
-	while (*data++);
 
-	info = (str_info_t*)data;
+	info = get_info (s4, node);
 	ret = info->refs;
 
 	be_runlock (s4);
@@ -77,10 +92,62 @@ int s4be_st_refcount (s4be_t *s4, int32_t node)
 	return ret;
 }
 
+/**
+ * Set the refcount of a node. Only use this if you know what you're doing!
+ *
+ * @param s4 The database handle
+ * @param node The node to set the refcount of
+ * @param refcount The new refcount
+ * @return 1 on success, 0 on error.
+ *
+ */
+int s4be_st_set_refcount (s4be_t *s4, int32_t node, int refcount)
+{
+	int ret = 1;
+	str_info_t *info;
+
+	be_wlock (s4);
+
+	info = get_info (s4, node);
+
+	if (info->magic != STR_MAGIC)
+		ret = 0;
+	else
+		info->refs = refcount;
+
+	be_wunlock (s4);
+
+	return ret;
+}
+
+
 static char *s4be_st_get_str (s4be_t *s4, int32_t node)
 {
 	char *ret = S4_PNT (s4, pat_node_to_key (s4, node), char);
 	ret += strlen (ret) + 1;
+
+	return ret;
+}
+
+/**
+ * Remove the string
+ *
+ * @param s4 The database handle
+ * @param str The string to remove
+ * @return 1 if everything went okay, 0 otherwise
+ *
+ */
+int s4be_st_remove (s4be_t *s4, const char *str)
+{
+	pat_key_t key;
+	int ret;
+
+	key.data = collate_key (str);
+	key.key_len = strlen (key.data) * 8;
+
+	ret = !pat_remove (s4, S4_STRING_STORE, &key);
+
+	g_free (key.data);
 
 	return ret;
 }

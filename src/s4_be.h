@@ -15,7 +15,9 @@ void s4be_sync (s4be_t *be);
 int s4be_st_ref (s4be_t *be, const char *str);
 int s4be_st_unref (s4be_t *be, const char *str);
 int s4be_st_lookup (s4be_t *be, const char *str);
-int s4be_st_refcount (s4be_t *be, int32_t node);
+int s4be_st_get_refcount (s4be_t *be, int32_t node);
+int s4be_st_set_refcount (s4be_t *be, int32_t node, int refcount);
+int s4be_st_remove (s4be_t *be, const char* str);
 char *s4be_st_reverse (s4be_t *be, int str_id);
 GList *s4be_st_regexp (s4be_t *be, const char *pat);
 void s4be_st_foreach (s4be_t *be,
