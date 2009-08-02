@@ -1,6 +1,7 @@
 #include "s4_be.h"
 #include "be.h"
 #include "bpt.h"
+#include "log.h"
 #include <stdlib.h>
 
 
@@ -286,9 +287,64 @@ int _ip_recover (s4be_t *old, s4be_t *rec)
 	return 0;
 }
 
+struct verification_info {
+	s4be_t *be;
+	int32_t bpt;
+	int missing;
+};
+
+void _verification_helper (bpt_record_t rec, void *u)
+{
+	struct verification_info *info = u;
+	bpt_record_t start, stop;
+	s4_set_t *set;
+
+	start.key_a = rec.key_b;
+	start.val_a = rec.val_b;
+	start.key_b = rec.key_a;
+	start.val_b = rec.val_a;
+	start.src = rec.src;
+
+	stop = start;
+	stop.src++;
+
+	set = bpt_find (info->be, info->bpt, start, stop);
+
+	if (set == NULL)
+		info->missing++;
+	else
+		s4_set_free (set);
+}
+
 int _ip_verify (s4be_t *be)
 {
-	return bpt_verify (be, S4_INT_STORE) & bpt_verify (be, S4_REV_STORE);
+	int ret;
+	struct verification_info info;
+
+	info.be = be;
+
+	ret = bpt_verify (be, S4_INT_STORE) & bpt_verify (be, S4_REV_STORE);
+
+	info.missing = 0;
+	info.bpt = S4_REV_STORE;
+	bpt_foreach (be, S4_INT_STORE, _verification_helper, &info);
+	if (info.missing) {
+		S4_ERROR ("Found %i keys in S4_INT_STORE not in S4_REV_STORE",
+				info.missing);
+		ret = 0;
+	}
+
+	info.missing = 0;
+	info.bpt = S4_INT_STORE;
+	bpt_foreach (be, S4_REV_STORE, _verification_helper, &info);
+	if (info.missing) {
+		S4_ERROR ("Found %i keys in S4_REV_STORE not in S4_INT_STORE",
+				info.missing);
+		ret = 0;
+	}
+
+
+	return ret;
 }
 
 struct foreach_info {
