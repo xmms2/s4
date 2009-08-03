@@ -14,44 +14,45 @@ CLEANUP () {
 
 s4_set_t *create_set (int *values)
 {
-	s4_set_t *ret, *tmp;
+	s4_set_t *ret = s4_set_new (0);
+	s4_entry_t entry;
 	int i;
 
-	ret = tmp = NULL;
-
 	for (i = 0; values[i] != -1; i++) {
-		if (tmp == NULL) {
-			ret = tmp = malloc (sizeof (s4_set_t));
-		}
-		else {
-			tmp->next = malloc (sizeof (s4_set_t));
-			tmp = tmp->next;
-		}
+		entry.key_i = entry.val_i = entry.src_i = values[i];
+		entry.key_s = entry.val_s = entry.src_s = NULL;
 
-		tmp->entry.key_i = tmp->entry.val_i = tmp->entry.src_i = values[i];
-		tmp->entry.key_s = tmp->entry.val_s = tmp->entry.src_s = NULL;
+		s4_set_insert (ret, &entry);
 	}
-
-	if (tmp != NULL)
-		tmp->next = NULL;
 
 	return ret;
 }
 
 static void test_set (s4_set_t *set, int *values)
 {
-	while (set != NULL && *values != -1) {
-		CU_ASSERT_EQUAL (set->entry.key_i, *values);
-		CU_ASSERT_EQUAL (set->entry.val_i, *values);
-		CU_ASSERT_EQUAL (set->entry.src_i, *values);
-		set = s4_set_next (set);
+	s4_entry_t *entry;
+
+	if (set != NULL)
+		s4_set_reset (set);
+
+	if (set != NULL)
+		entry = s4_set_next (set);
+	else
+		entry = NULL;
+
+	while (entry != NULL && *values != -1) {
+		CU_ASSERT_EQUAL (entry->key_i, *values);
+		CU_ASSERT_EQUAL (entry->val_i, *values);
+		CU_ASSERT_EQUAL (entry->src_i, *values);
+		entry = s4_set_next (set);
 		values++;
 	}
 
 	CU_ASSERT_EQUAL (*values, -1);
-	CU_ASSERT_PTR_NULL (set);
+	CU_ASSERT_PTR_NULL (entry);
 
-	s4_set_free (set);
+	if (set != NULL)
+		s4_set_free (set);
 }
 
 CASE (test_set_intersection) {
@@ -91,4 +92,20 @@ CASE (test_set_next) {
 	s4_set_t *s = create_set (s1);
 
 	test_set (s, s1);
+}
+
+CASE (test_set_get) {
+	int s[] = {1, 2, 3, 4, 5, 6, 7, 8, -1};
+	s4_set_t *set = create_set (s);
+	int i, size;
+
+	for (i = 0, size = s4_set_size (set); i < size; i++) {
+		s4_entry_t *entry = s4_set_get (set, i);
+
+		CU_ASSERT_EQUAL (entry->key_i, s[i]);
+		CU_ASSERT_EQUAL (entry->val_i, s[i]);
+		CU_ASSERT_EQUAL (entry->src_i, s[i]);
+	}
+
+	CU_ASSERT_EQUAL (-1, s[i]);
 }

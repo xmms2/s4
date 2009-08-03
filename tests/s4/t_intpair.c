@@ -96,16 +96,18 @@ CASE (test_ip_add_del) {
 
 static void test_set (s4_set_t *set, int *values, int src)
 {
+	s4_set_reset (set);
+	s4_entry_t *entry = s4_set_next (set);
 	while (set != NULL && *values != -1) {
-		CU_ASSERT_EQUAL (set->entry.key_i, *values);
-		CU_ASSERT_EQUAL (set->entry.val_i, *values);
-		CU_ASSERT_EQUAL (set->entry.src_i, (src==-1)?(*values):(src));
-		set = s4_set_next (set);
+		CU_ASSERT_EQUAL (entry->key_i, *values);
+		CU_ASSERT_EQUAL (entry->val_i, *values);
+		CU_ASSERT_EQUAL (entry->src_i, (src==-1)?(*values):(src));
+		entry = s4_set_next (set);
 		values++;
 	}
 
 	CU_ASSERT_EQUAL (*values, -1);
-	CU_ASSERT_PTR_NULL (set);
+	CU_ASSERT_PTR_NULL (entry);
 
 	s4_set_free (set);
 }

@@ -26,10 +26,8 @@ typedef struct s4_entry_St {
 	int src_i;
 } s4_entry_t;
 
-typedef struct s4_set_St {
-	struct s4_set_St *next;
-	s4_entry_t entry;
-} s4_set_t;
+struct s4_set_St;
+typedef struct s4_set_St s4_set_t;
 
 struct s4be_St;
 typedef struct s4be_St s4be_t;
@@ -52,10 +50,15 @@ int s4_start_sync_thread (s4_t *s4);
 int s4_stop_sync_thread (s4_t *s4);
 
 /* set.c */
+s4_set_t *s4_set_new (int size);
+void s4_set_free (s4_set_t *set);
+int s4_set_size (s4_set_t *set);
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b);
 s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b);
-s4_set_t *s4_set_next (s4_set_t *set);
-void s4_set_free (s4_set_t *set);
+s4_entry_t *s4_set_get (s4_set_t *set, int index);
+s4_entry_t *s4_set_next (s4_set_t *set);
+void s4_set_reset (s4_set_t *set);
+int s4_set_insert (s4_set_t *set, s4_entry_t *entry);
 
 /* entry.c */
 s4_entry_t *s4_entry_get_s (s4_t *s4, const char *key, const char *val);

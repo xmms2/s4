@@ -47,19 +47,22 @@ CASE (entry_get_i) {
 
 static void test_set (s4_set_t *set, int *values)
 {
+	s4_set_reset (set);
+	s4_entry_t *entry = s4_set_next (set);
+
 	while (set != NULL && *values != -1) {
-		s4_entry_fillin (s4, &set->entry);
+		s4_entry_fillin (s4, entry);
 
-		CU_ASSERT_STRING_EQUAL (set->entry.key_s, "prop");
-		CU_ASSERT_EQUAL (set->entry.val_i, *values);
-		CU_ASSERT_STRING_EQUAL (set->entry.src_s, "testcase");
+		CU_ASSERT_STRING_EQUAL (entry->key_s, "prop");
+		CU_ASSERT_EQUAL (entry->val_i, *values);
+		CU_ASSERT_STRING_EQUAL (entry->src_s, "testcase");
 
-		set = s4_set_next (set);
+		entry = s4_set_next (set);
 		values++;
 	}
 
 	CU_ASSERT_EQUAL (*values, -1);
-	CU_ASSERT_PTR_NULL (set);
+	CU_ASSERT_PTR_NULL (entry);
 
 	s4_set_free (set);
 }

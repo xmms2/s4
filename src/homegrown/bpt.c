@@ -667,12 +667,11 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t record)
  */
 s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t stop)
 {
-	s4_set_t *prev, *root, *cur;
+	s4_set_t *set = NULL;
+	s4_entry_t entry;
 	int index;
 	int32_t leaf, val;
 	bpt_node_t *pl;
-
-	prev = root = cur = NULL;
 
 	val = start.val_a;
 
@@ -684,37 +683,22 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
 		index--;
 
 	while (leaf != -1 && _bpt_comp (stop, pl->keys[index]) > 0) {
-		/* Only add this record if it's higher or equal to start and the
-		 * previous entry didn't have the same value and key as this
-		 * (this might happen if two sources set the same property to
-		 * the same value, it wont matter which source we pick).
-		 */
-		if (_bpt_comp (start, pl->keys[index]) <= 0 &&
-				!(cur &&
-					cur->entry.key_i == pl->keys[index].key_b &&
-					cur->entry.val_i == pl->keys[index].val_b)) {
-			if (pl->keys[index].val_a != val) {
-				prev = s4_set_union (prev, root);
-				cur = root = NULL;
-				val = pl->keys[index].val_a;
+		/* Only add this record if it's higher or equal to start */
+		if (_bpt_comp (start, pl->keys[index]) <= 0) {
+			if (set == NULL) {
+				set = s4_set_new (0);
 			}
 
-			if (cur == NULL) {
-				root = cur = malloc (sizeof (s4_set_t));
-			} else {
-				cur->next = malloc (sizeof (s4_set_t));
-				cur = cur->next;
-			}
-
-			cur->next = NULL;
-			cur->entry.src_s = cur->entry.key_s = cur->entry.val_s = NULL;
-			cur->entry.key_i = pl->keys[index].key_b;
-			cur->entry.val_i = pl->keys[index].val_b;
-			cur->entry.src_i = pl->keys[index].src;
-			if (cur->entry.key_i < 0)
-				cur->entry.type = ENTRY_INT;
+			entry.src_s = entry.key_s = entry.val_s = NULL;
+			entry.key_i = pl->keys[index].key_b;
+			entry.val_i = pl->keys[index].val_b;
+			entry.src_i = pl->keys[index].src;
+			if (entry.key_i < 0)
+				entry.type = ENTRY_INT;
 			else
-				cur->entry.type = ENTRY_STR;
+				entry.type = ENTRY_STR;
+
+			s4_set_insert (set, &entry);
 		}
 
 		if (++index >= pl->key_count) {
@@ -724,7 +708,7 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
 		}
 	}
 
-	return s4_set_union (root, prev);
+	return set;
 }
 
 

@@ -54,7 +54,7 @@ static void create_db (struct db_struct *db)
 
 static void check_db (struct db_struct *db)
 {
-	s4_entry_t *entry;
+	s4_entry_t *entry, *se;
 	s4_set_t *set;
 	int i, j;
 
@@ -65,15 +65,16 @@ static void check_db (struct db_struct *db)
 		entry = s4_entry_get_s (s4, "entry", db[i].name);
 		set = s4_entry_contains (s4, entry);
 
-		for (; set != NULL; set = s4_set_next (set)) {
-
-			s4_entry_fillin (s4, &set->entry);
+		for (se = s4_set_next (set); se != NULL; se = s4_set_next (set)) {
+			s4_entry_fillin (s4, se);
 			for (j = 0; args[j] != NULL &&
-					strcmp (args[j], set->entry.val_s); j++);
+					strcmp (args[j], se->val_s); j++);
 			CU_ASSERT_PTR_NOT_NULL (args[j]);
 			memmove (args + j, args + j + 1,
 					(ARG_SIZE - j - 1) * sizeof (char*));
 		}
+
+		s4_set_free (set);
 
 		CU_ASSERT_PTR_NULL (args[0]);
 

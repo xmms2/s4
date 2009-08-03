@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <s4.h>
 
 
@@ -11,150 +12,288 @@
  * @{
  */
 
-static int set_compare (s4_set_t *a, s4_set_t *b)
+#define MIN(a, b) (((a) < (b))?(a):(b))
+
+struct s4_set_St {
+	int size;
+	int alloc;
+	int pos;
+	s4_entry_t *entries;
+};
+
+
+static int align2 (int i)
 {
-	int ret;
-	if (a == NULL)
-		return 1;
-	if (b == NULL)
-		return -1;
+	int ret = 1;
 
-	ret = (a->entry.key_i < b->entry.key_i)?-1:
-		(a->entry.key_i > b->entry.key_i);
-
-	if (!ret)
-		ret = (a->entry.val_i < b->entry.val_i)?-1:
-			(a->entry.val_i > b->entry.val_i);
+	while (i > (ret <<= 1));
 
 	return ret;
 }
 
-static void _set_free (s4_set_t *set)
+static int comp (s4_entry_t *a, s4_entry_t *b)
 {
-	s4_entry_free_strings (&set->entry);
+	int ret = 0;
 
+	ret = (a->key_i < b->key_i)?-1:(a->key_i > b->key_i);
+	if (!ret)
+		ret = (a->val_i < b->val_i)?-1:(a->val_i > b->val_i);
+
+	return ret;
+}
+
+/* Find the first entry equal to or bigger than entry */
+static int search (s4_set_t *set, s4_entry_t *entry, int *equal)
+{
+	int lower, upper;
+	lower = 0;
+	upper = set->size;
+
+	while (lower != upper) {
+		int gap = (upper - lower) / 2;
+		int c = comp (entry, set->entries + lower + gap);
+
+		if (c < 0) {
+			upper = lower + gap;
+		} else if (c > 0) {
+			lower += gap + 1;
+		} else {
+			*equal = 1;
+			return lower + gap;
+		}
+	}
+
+	*equal = 0;
+	return upper;
+}
+
+static void expand (s4_set_t *set)
+{
+	set->alloc <<= 1;
+
+	set->entries = realloc (set->entries, set->alloc * sizeof (s4_entry_t));
+}
+
+static s4_set_t *copy_set (s4_set_t *set)
+{
+	s4_set_t *ret = malloc (sizeof (s4_set_t));
+
+	ret->size = set->size;
+	ret->alloc = align2 (ret->size);
+	ret->entries = malloc (sizeof (s4_entry_t) * ret->alloc);
+	ret->pos = 0;
+
+	memcpy (ret->entries, set->entries, sizeof (s4_entry_t) * ret->size);
+
+	return ret;
+}
+
+/**
+ * Create a new set.
+ *
+ * @param size Optional size if you know how many entries you will insert.
+ * This might save some reallocs. If you don't know the size pass 0.
+ * @return A new set.
+ *
+ */
+s4_set_t *s4_set_new (int size)
+{
+	s4_set_t *set;
+
+	if (size == 0)
+		size = 8;
+	else
+		size = align2 (size);
+
+	set = malloc (sizeof (s4_set_t));
+	set->entries = malloc (sizeof (s4_entry_t) * size);
+	set->alloc = size;
+	set->size = 0;
+	set->pos = 0;
+
+	return set;
+}
+
+/**
+ * Free the given set
+ */
+void s4_set_free (s4_set_t *set)
+{
+	int i;
+
+	for (i = 0; i < set->size; i++) {
+		s4_entry_free_strings (set->entries + i);
+	}
+
+	free (set->entries);
 	free (set);
 }
 
+/**
+ * Return the size of the set
+ */
+int s4_set_size (s4_set_t *set)
+{
+	return set->size;
+}
 
 /**
- * Return the intersection of a and b.
- * It will free the parts of a and b not used, you can in other words
- * NOT refer to a and b after calling s4_set_intersection.
+ * Find the intersection of the two sets
  *
- * @param a One of the two sets
- * @param b The other of the two sets
+ * @param a One of the sets
+ * @param b The other set
  * @return The intersection of a and b
+ *
  */
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b)
 {
-	s4_set_t *ret, *cur, *tmp;
-	int c;
+	s4_set_t *min, *max, *ret;
+	int i, j, equal, size;
 
-	cur = ret = NULL;
+	if (a == NULL || b == NULL)
+		return NULL;
 
-	while (a != NULL && b != NULL) {
-		c = set_compare (a, b);
+	size = MIN (a->size, b->size);
+	min = a->size == size?a:b;
+	max = a->size == size?b:a;
+	ret = s4_set_new (size);
 
-		if (c > 0) {
-			tmp = b;
-			b = b->next;
-			_set_free (tmp);
-		} else if (c < 0) {
-			tmp = a;
-			a = a->next;
-			_set_free (tmp);
-		} else {
-			if (cur == NULL) {
-				ret = cur = a;
-			} else {
-				cur->next = a;
-				cur = cur->next;
-			}
+	for (i = j = 0; i < size; i++) {
+		search (max, min->entries + i, &equal);
 
-			a = a->next;
-			tmp = b;
-			b = b->next;
-			_set_free (tmp);
-		}
+		if (equal)
+			ret->entries[j++] = min->entries[i];
 	}
 
-	if (cur != NULL)
-		cur->next = NULL;
+	if (j == 0) {
+		s4_set_free (ret);
+		ret = NULL;
+	} else {
+		ret->size = j;
+	}
 
 	return ret;
 }
 
-
 /**
- * Return the union of two sets.
- * Note: It will free the two sets a and b
+ * Find the union of two sets
  *
- * @param a One of the two sets
- * @param b The other of the two sets
- * @return A new set that's the union of a and b
+ * @param a One of the sets
+ * @param b The other set
+ * @return The union of a and b
+ *
  */
 s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
 {
-	s4_set_t *ret, *cur, *tmp;
-	int c;
+	s4_set_t *ret;
+	int i, j, k, size;
 
-	cur = ret = NULL;
+	if (a == NULL && b != NULL) {
+		return copy_set (b);
+	} else if (b == NULL && a != NULL) {
+		return copy_set (a);
+	} else if (a == NULL) {
+		return NULL;
+	}
 
-	while (a != NULL || b != NULL) {
-		c = set_compare (a, b);
+	size = a->size + b->size;
+	ret = s4_set_new (size);
 
-		if (c > 0) {
-			tmp = b;
-			b = b->next;
-		} else if (c < 0) {
-			tmp = a;
-			a = a->next;
+	for (i = j = k = 0; i < a->size || j < b->size;) {
+		int c = (j >= b->size)?-1:
+			((i >= a->size)?1:
+			 comp (a->entries + i, b->entries + j));
+		if (c < 0) {
+			ret->entries[k++] = a->entries[i++];
+		} else if (c > 0) {
+			ret->entries[k++] = b->entries[j++];
 		} else {
-			tmp = b;
-			b = b->next;
-			_set_free (tmp);
-
-			tmp = a;
-			a = a->next;
-		}
-
-		if (ret == NULL)
-			ret = cur = tmp;
-		else {
-			cur->next = tmp;
-			cur = cur->next;
+			ret->entries[k++] = a->entries[i++];
+			j++;
 		}
 	}
 
-	if (cur != NULL)
-		cur->next = NULL;
-
-	return ret;
-}
-
-
-s4_set_t *s4_set_next (s4_set_t *set)
-{
-	s4_set_t *ret = NULL;
-
-	if (set != NULL) {
-		ret = set->next;
-		_set_free (set);
+	if (k == 0) {
+		s4_set_free (ret);
+		ret = NULL;
+	} else {
+		ret->size = k;
 	}
 
 	return ret;
 }
 
-
-void s4_set_free (s4_set_t *set)
+/**
+ * Return the entry at the given index.
+ *
+ * @param set The set to find the entry in.
+ * @param index The index of the entry.
+ * @return The entry, or NULL if the index is outside the boundries.
+ *
+ */
+s4_entry_t *s4_set_get (s4_set_t *set, int index)
 {
-	s4_set_t *tmp;
-	while (set != NULL) {
-		tmp = set->next;
-		_set_free (set);
-		set = tmp;
+	if (index < 0 || index >= set->size)
+		return NULL;
+
+	return set->entries + index;
+}
+
+/**
+ * Return the next entry into the set.
+ *
+ * @param set The set to find the next entry in.
+ * @return The next entry, or NULL if you're at the end.
+ *
+ */
+s4_entry_t *s4_set_next (s4_set_t *set)
+{
+	if (set->pos >= set->size)
+		return NULL;
+
+	return set->entries + set->pos++;
+}
+
+/**
+ * Reset the position pointer of the set so you can use s4_set_next again.
+ *
+ * @param set The set to reset
+ *
+ */
+void s4_set_reset (s4_set_t *set)
+{
+	set->pos = 0;
+}
+
+/**
+ * Insert the given entry into the set
+ *
+ * @param set The set to insert into
+ * @param entry The entry to insert
+ * @return 1 on success, 0 if it already is in the set
+ *
+ */
+int s4_set_insert (s4_set_t *set, s4_entry_t *entry)
+{
+	int equal;
+	int index = search (set, entry, &equal);
+	int i;
+
+	if (equal)
+		return 0;
+
+	if ((set->size + 1) >= set->alloc) {
+		expand (set);
 	}
+
+	for (i = set->size; i > index; i--) {
+		set->entries[i] = set->entries[i - 1];
+	}
+
+	set->entries[i] = *entry;
+	set->size++;
+
+	return 1;
 }
 
 /**
