@@ -98,7 +98,7 @@ static void test_set (s4_set_t *set, int *values, int src)
 {
 	s4_set_reset (set);
 	s4_entry_t *entry = s4_set_next (set);
-	while (set != NULL && *values != -1) {
+	while (entry != NULL && *values != -1) {
 		CU_ASSERT_EQUAL (entry->key_i, *values);
 		CU_ASSERT_EQUAL (entry->val_i, *values);
 		CU_ASSERT_EQUAL (entry->src_i, (src==-1)?(*values):(src));

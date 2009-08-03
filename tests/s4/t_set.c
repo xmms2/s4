@@ -32,13 +32,9 @@ static void test_set (s4_set_t *set, int *values)
 {
 	s4_entry_t *entry;
 
-	if (set != NULL)
-		s4_set_reset (set);
+	s4_set_reset (set);
 
-	if (set != NULL)
-		entry = s4_set_next (set);
-	else
-		entry = NULL;
+	entry = s4_set_next (set);
 
 	while (entry != NULL && *values != -1) {
 		CU_ASSERT_EQUAL (entry->key_i, *values);
@@ -51,8 +47,7 @@ static void test_set (s4_set_t *set, int *values)
 	CU_ASSERT_EQUAL (*values, -1);
 	CU_ASSERT_PTR_NULL (entry);
 
-	if (set != NULL)
-		s4_set_free (set);
+	s4_set_free (set);
 }
 
 CASE (test_set_intersection) {
