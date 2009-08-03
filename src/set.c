@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <s4.h>
+#include "log.h"
 
 
 /**
@@ -121,6 +122,11 @@ void s4_set_free (s4_set_t *set)
 {
 	int i;
 
+	if (set == NULL) {
+		S4_DBG ("s4_set_free called with NULL\n");
+		return;
+	}
+
 	for (i = 0; i < set->size; i++) {
 		s4_entry_free_strings (set->entries + i);
 	}
@@ -134,6 +140,9 @@ void s4_set_free (s4_set_t *set)
  */
 int s4_set_size (s4_set_t *set)
 {
+	if (set == NULL)
+		return 0;
+
 	return set->size;
 }
 
@@ -233,7 +242,7 @@ s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
  */
 s4_entry_t *s4_set_get (s4_set_t *set, int index)
 {
-	if (index < 0 || index >= set->size)
+	if (set == NULL || index < 0 || index >= set->size)
 		return NULL;
 
 	return set->entries + index;
@@ -248,7 +257,7 @@ s4_entry_t *s4_set_get (s4_set_t *set, int index)
  */
 s4_entry_t *s4_set_next (s4_set_t *set)
 {
-	if (set->pos >= set->size)
+	if (set == NULL || set->pos >= set->size)
 		return NULL;
 
 	return set->entries + set->pos++;
@@ -262,7 +271,8 @@ s4_entry_t *s4_set_next (s4_set_t *set)
  */
 void s4_set_reset (s4_set_t *set)
 {
-	set->pos = 0;
+	if (set != NULL)
+		set->pos = 0;
 }
 
 /**
@@ -276,8 +286,13 @@ void s4_set_reset (s4_set_t *set)
 int s4_set_insert (s4_set_t *set, s4_entry_t *entry)
 {
 	int equal;
-	int index = search (set, entry, &equal);
+	int index;
 	int i;
+
+	if (set == NULL)
+		return 0;
+
+	index = search (set, entry, &equal);
 
 	if (equal)
 		return 0;
