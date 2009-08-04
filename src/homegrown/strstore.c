@@ -70,6 +70,32 @@ int32_t s4be_st_lookup (s4be_t *s4, const char *str)
 }
 
 /**
+ * Look up a string that's already made ready to be collated.
+ *
+ * @param s4 The database handle
+ * @param str The string to look up
+ * @return The int, or 0 if it can't be found.
+ *
+ */
+int32_t s4be_st_lookup_collated (s4be_t *s4, const char *str)
+{
+	int32_t ret;
+	pat_key_t key;
+
+	key.data = str;
+	key.key_len = (strlen (str) + 1) * 8;
+
+	be_rlock (s4);
+	ret = pat_lookup (s4, S4_STRING_STORE, &key);
+	be_runlock (s4);
+
+	if (ret == -1)
+		ret = 0;
+
+	return ret;
+}
+
+/**
  * Return the refcount of the given node
  *
  * @param s4 The database handle

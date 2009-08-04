@@ -225,33 +225,33 @@ static void _fix_key (bpt_record_t key, void *userdata)
 	struct recovery_info *info = userdata;
 
 	if (key.key_a < 0) {
-		nkey.key_a = -s4be_st_lookup (info->new,
+		nkey.key_a = -s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_a), char));
 		nkey.val_a = key.val_a;
 	} else {
-		nkey.key_a = s4be_st_lookup (info->new,
+		nkey.key_a = s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, key.key_a), char));
-		nkey.val_a = s4be_st_lookup (info->new,
+		nkey.val_a = s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, key.val_a), char));
 
 		if (nkey.val_a == 0)
 			return;
 	}
 	if (key.key_b < 0) {
-		nkey.key_b = -s4be_st_lookup (info->new,
+		nkey.key_b = -s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_b), char));
 		nkey.val_b = key.val_b;
 	} else {
-		nkey.key_b = s4be_st_lookup (info->new,
+		nkey.key_b = s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, key.key_b), char));
-		nkey.val_b = s4be_st_lookup (info->new,
+		nkey.val_b = s4be_st_lookup_collated (info->new,
 				S4_PNT (info->old, pat_node_to_key (info->old, key.val_b), char));
 
 		if (nkey.val_b == 0)
 			return;
 	}
 
-	nkey.src = s4be_st_lookup (info->new,
+	nkey.src = s4be_st_lookup_collated (info->new,
 			S4_PNT (info->old, pat_node_to_key (info->old, key.src), char));
 
 
