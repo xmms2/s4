@@ -80,7 +80,7 @@ int s4be_ip_del (s4be_t *be, s4_entry_t *entry, s4_entry_t *prop)
  */
 s4_set_t *s4be_ip_get (s4be_t *be, s4_entry_t *entry, int32_t key)
 {
-	s4_set_t *a, *b;
+	s4_set_t *a, *b, *ret;
 	bpt_record_t start, stop;
 
 	start.key_a = entry->key_i;
@@ -104,7 +104,11 @@ s4_set_t *s4be_ip_get (s4be_t *be, s4_entry_t *entry, int32_t key)
 	b = bpt_find (be, S4_INT_STORE, start, stop);
 	be_runlock (be);
 
-	return s4_set_union (a, b);
+	ret = s4_set_union (a, b);
+	s4_set_free (a);
+	s4_set_free (b);
+
+	return ret;
 }
 
 
