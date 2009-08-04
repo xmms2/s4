@@ -715,10 +715,11 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
 /**
  * Calls func for all the entries it find.
  *
- * @param old A pointer to the old database (the one we're recovering from)
- * @param rec A pointer to the new database (the one we're recovering to)
- * @param bpt The tree to recover
- * @param func The function to call. The arguments are (old, rec, bpt, entry).
+ * @param be The database to search through.
+ * @param bpt The tree to go through.
+ * @param func The function to call.
+ * @param userdata Userdata passed to the function.
+ *
  */
 void bpt_foreach (s4be_t *be, int32_t bpt,
 		void (*func)(bpt_record_t, void *userdata),

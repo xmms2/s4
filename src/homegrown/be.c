@@ -208,7 +208,7 @@ static void mark_dirty (s4be_t *s4)
  * Open an S4 backend database.
  *
  * @param filename The file to open
- * @paran open_flags Flags to use
+ * @param open_flags Flags to use
  * @return A pointer to an s4be_t, or NULL on error.
  *
  */
