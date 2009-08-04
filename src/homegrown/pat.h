@@ -24,5 +24,8 @@ int32_t pat_node_to_key (s4be_t *s4, int32_t node);
 int32_t pat_first (s4be_t *s4, int32_t trie);
 int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node);
 int     pat_verify (s4be_t *be, int32_t trie);
+void    pat_recover (s4be_t *be,
+		void (*func) (int32_t node, void *userdata),
+		void *userdata);
 
 #endif /* _PAT_H */

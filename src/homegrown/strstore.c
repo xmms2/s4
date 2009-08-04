@@ -305,26 +305,34 @@ static int _copy_key (s4be_t *db, int32_t key, pat_key_t *pkey)
 	return 1;
 }
 
+struct recovery_info {
+	s4be_t *old, *new;
+	int32_t trie;
+};
 
-/* Called when the database is recovering. We walk through all
- * the nodes in the string-trie and check if the key makes sense.
- * If it does we insert it into the new db.
- */
-int _st_recover (s4be_t *old, s4be_t *rec)
+void recovery_helper (int32_t node, void *u)
 {
-	int32_t node = pat_first (old, S4_STRING_STORE);
+	struct recovery_info *info = u;
 	int32_t key;
 	pat_key_t pkey;
 
-	while (node != -1) {
-		key = pat_node_to_key (old, node);
+	key = pat_node_to_key (info->old, node);
 
-		if (_copy_key (old, key, &pkey)) {
-			pat_insert (rec, S4_STRING_STORE, &pkey);
-		}
-
-		node = pat_next (old, S4_STRING_STORE, node);
+	if (_copy_key (info->old, key, &pkey)) {
+		pat_insert (info->new, info->trie, &pkey);
 	}
+}
+
+/* Called when the database needs to be recovered. */
+int _st_recover (s4be_t *old, s4be_t *rec)
+{
+	struct recovery_info info;
+
+	info.old = old;
+	info.new = rec;
+	info.trie = S4_STRING_STORE;
+
+	pat_recover (old, recovery_helper, &info);
 
 	return 0;
 }

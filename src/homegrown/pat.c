@@ -500,5 +500,26 @@ int pat_verify (s4be_t *be, int32_t trie)
 }
 
 /**
+ * Try to recover as many leafs as possible. It does this by looking for
+ * the magic number for patricia leafs.
+ *
+ * @param be The database to recover
+ * @param func The function to call with the found nodes
+ * @param u The userdata to pass to the function
+ *
+ */
+void pat_recover (s4be_t *be, void (*func) (int32_t, void*), void *u)
+{
+	int32_t *p = S4_PNT (be, 0, int32_t);
+	int i;
+
+	for (i = 0; i < (be->size / sizeof (int32_t)); i++) {
+		if (p[i] == PAT_LEAF) {
+			func (i * sizeof (int32_t), u);
+		}
+	}
+}
+
+/**
  * @}
  */
