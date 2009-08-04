@@ -104,3 +104,22 @@ CASE (test_set_get) {
 
 	CU_ASSERT_EQUAL (-1, s[i]);
 }
+
+/* This test relies on create_set using s4_set_insert! */
+CASE (test_set_insert) {
+	int s1[] = {9, 8, 7, 6, 5, 4, 3, 2, 1, -1};
+	int s1_r[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, -1};
+	int s2[] = {1, 1, 1, 5, 5, 4, 3, 4, 4, -1};
+	int s2_r[] = {1, 2, 3, 4, 5, -1};
+	s4_set_t *set = create_set (s2);
+	s4_entry_t entry;
+
+	entry.key_i = entry.val_i = entry.src_i = 2;
+	entry.key_s = entry.val_s = entry.src_s = NULL;
+	CU_ASSERT_EQUAL (1, s4_set_insert (set, &entry));
+	CU_ASSERT_EQUAL (0, s4_set_insert (set, &entry));
+	CU_ASSERT_EQUAL (0, s4_set_insert (NULL, &entry));
+
+	test_set (create_set (s1), s1_r);
+	test_set (create_set (s2), s2_r);
+}
