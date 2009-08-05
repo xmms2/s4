@@ -134,5 +134,5 @@ CASE (test_set_insert) {
 	CU_ASSERT_EQUAL (0, s4_set_insert (NULL, &entry));
 
 	test_set (create_set (s1), s1_r);
-	test_set (create_set (s2), s2_r);
+	test_set (set, s2_r);
 }
