@@ -834,8 +834,8 @@ int bpt_verify (s4be_t *be, int32_t bpt)
 
 	memset (&info, 0, sizeof (struct verify_info));
 
-	lo.key_a = lo.key_b = lo.val_a = lo.key_a = lo.src = INT32_MIN;
-	hi.key_a = hi.key_b = hi.val_a = hi.key_a = hi.src = INT32_MAX;
+	lo.key_a = lo.key_b = lo.val_a = lo.val_b = lo.src = INT32_MIN;
+	hi.key_a = hi.key_b = hi.val_a = hi.val_b = hi.src = INT32_MAX;
 
 	ret = !!_bpt_verify (be, _bpt_get_root (be, bpt), lo, hi, &info);
 
