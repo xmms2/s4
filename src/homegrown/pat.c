@@ -44,6 +44,7 @@ typedef struct pat_node_St {
 			uint32_t len;
 			int32_t key;
 			int32_t data_len;
+			int32_t next, prev;
 		} leaf;
 	} u;
 } pat_node_t;
@@ -64,7 +65,6 @@ static void set_root (s4be_t *s4, int32_t t,  int32_t root)
 	trie->root = root;
 }
 
-/*
 static void add_to_list (s4be_t *s4, int32_t trie, int32_t node)
 {
 	pat_trie_t *ptrie = S4_PNT(s4, trie, pat_trie_t);
@@ -102,7 +102,6 @@ static void del_from_list (s4be_t *s4, int32_t trie, int32_t node)
 		ptrie->list_end = pnode->u.leaf.prev;
 	}
 }
-*/
 
 static inline int is_leaf (pat_node_t *pn)
 {
@@ -293,6 +292,8 @@ int32_t pat_insert (s4be_t *s4, int32_t trie, pat_key_t *key_s)
 	pn->u.leaf.data_len = key_s->data_len;
 	pn->magic = PAT_LEAF;
 
+	add_to_list (s4, trie, node);
+
 	/* If there is no root, we are the root */
 	if (comp == -1) {
 		set_root(s4, trie, node);
@@ -333,6 +334,8 @@ int pat_remove (s4be_t *s4, int32_t trie, pat_key_t *key)
 	if (node == -1 || !nodes_equal (s4, key, node)) {
 		return -1;
 	}
+
+	del_from_list (s4, trie, node);
 
 	pn = S4_PNT (s4, node, pat_node_t);
 	be_free (s4, pn->u.leaf.key, pn->u.leaf.data_len);
@@ -385,15 +388,9 @@ int32_t pat_node_to_key (s4be_t *s4, int32_t node)
  */
 int32_t pat_first (s4be_t *s4, int32_t trie)
 {
-	int32_t cur = get_root (s4, trie);
-	pat_node_t *pnode = S4_PNT (s4, cur, pat_node_t);
+	pat_trie_t *ptrie = S4_PNT (s4, trie, pat_trie_t);
 
-	while (cur != -1 && pnode->magic == PAT_INT) {
-		cur = pnode->u.internal.left;
-		pnode = S4_PNT (s4, cur, pat_node_t);
-	}
-
-	return cur;
+	return ptrie->list_start;
 }
 
 
@@ -408,38 +405,11 @@ int32_t pat_first (s4be_t *s4, int32_t trie)
 int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node)
 {
 	pat_node_t *pnode = S4_PNT(s4, node, pat_node_t);
-	pat_node_t *plast = NULL;
-	pat_key_t key;
-	int32_t last = -1;
 
 	if (node == -1)
 		return -1;
 
-	key.data = S4_PNT (s4, pnode->u.leaf.key, void*);
-	key.key_len = pnode->u.leaf.len;
-
-	node = get_root(s4, trie);
-	pnode = S4_PNT (s4, node, pat_node_t);
-
-	while (node != -1 && pnode->magic == PAT_INT) {
-		if (bit_set (&key, pnode->u.internal.pos)) {
-			node = pnode->u.internal.right;
-		} else {
-			last = pnode->u.internal.right;
-			node = pnode->u.internal.left;
-		}
-
-		pnode = S4_PNT (s4, node, pat_node_t);
-	}
-
-	plast = S4_PNT (s4, last, pat_node_t);
-
-	while (last != -1 && plast->magic == PAT_INT) {
-		last = plast->u.internal.left;
-		plast = S4_PNT (s4, last, pat_node_t);
-	}
-
-	return last;
+	return pnode->u.leaf.next;
 }
 
 struct verify_info {
