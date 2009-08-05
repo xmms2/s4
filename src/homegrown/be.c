@@ -244,7 +244,7 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 
 	if (s4->fd == INVALID_HANDLE_VALUE) {
 		free (s4);
-		S4_ERROR ("Could not open %s\n", filename);
+		S4_ERROR ("Could not open %s", filename);
 		return NULL;
 	}
 #else
@@ -259,7 +259,7 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 	s4->fd = open (filename, flags, 0644);
 	if (s4->fd == -1) {
 		free (s4);
-		S4_ERROR ("Could not open %s : %s\n", filename, strerror (errno));
+		S4_ERROR ("Could not open %s : %s", filename, strerror (errno));
 		return NULL;
 	}
 #endif
@@ -278,7 +278,7 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 	else {
 		map_file (s4);
 		if (s4->map == NULL) {
-			S4_ERROR ("Could not map %s\n", filename);
+			S4_ERROR ("Could not map %s", filename);
 			return NULL;
 		}
 	}
@@ -296,7 +296,7 @@ int s4be_close (s4be_t* s4)
 {
 	header_t *header = s4->map;
 
-	S4_DBG ("Free %i\n", header->free);
+	S4_DBG ("Free %i", header->free);
 
 	g_static_rw_lock_free (&s4->rwlock);
 	s4be_sync (s4);
@@ -362,7 +362,7 @@ int32_t be_alloc (s4be_t* s4, int n)
 		l = 0;
 
 	if (l >= BIGGEST_CHUNK) {
-		S4_ERROR ("Trying to allocate a bigger chunk than we allow!\n");
+		S4_ERROR ("Trying to allocate a bigger chunk than we allow!");
 		return -1;
 	}
 

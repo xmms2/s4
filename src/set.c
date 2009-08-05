@@ -137,7 +137,7 @@ void s4_set_free (s4_set_t *set)
 	int i;
 
 	if (set == NULL) {
-		S4_DBG ("s4_set_free called with NULL\n");
+		S4_DBG ("s4_set_free called with NULL");
 		return;
 	}
 
