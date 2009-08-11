@@ -13,6 +13,7 @@
  */
 
 #include <glib.h>
+#include <stdio.h>
 
 void log_handler (const gchar *log_domain,
 		GLogLevelFlags log_level,

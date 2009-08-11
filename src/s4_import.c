@@ -55,7 +55,7 @@ s4_t *s4;
 static int media_callback (void *u, int argc, char *argv[], char *col[])
 {
 	GTree *sources = u;
-	int id, src_id, val_i, i;
+	int id, src_id, i;
 	char *key, *val, *src;
 	s4_entry_t *entry, *prop;
 

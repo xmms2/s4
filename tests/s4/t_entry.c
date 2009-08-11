@@ -16,6 +16,7 @@
 #include "s4.h"
 #include <stdio.h>
 #include <glib.h>
+#include <glib/gstdio.h>
 
 s4_t *s4;
 char *name;
@@ -32,7 +33,7 @@ SETUP (s4_entry) {
 
 CLEANUP () {
 	s4_close (s4);
-	unlink (name);
+	g_unlink (name);
 
 	return 0;
 }
@@ -118,7 +119,6 @@ CASE (entry_smaller_greater) {
 	int properties[] = {1, 2, 3, 4, 5, 6, 7, -1};
 	int smaller[] = {1, 2, 3, -1};
 	int greater[] = {5, 6, 7, -1};
-	int expect[] = {1, -1};
 	int i;
 
 
