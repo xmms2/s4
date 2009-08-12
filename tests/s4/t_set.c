@@ -136,3 +136,27 @@ CASE (test_set_insert) {
 	test_set (create_set (s1), s1_r);
 	test_set (set, s2_r);
 }
+
+/* Check that the entries can handle NULL sets without segfaulting */
+CASE (test_set_null) {
+	s4_set_t *set;
+	s4_entry_t entry;
+
+	s4_set_free (NULL);
+	s4_set_reset (NULL);
+
+	CU_ASSERT_EQUAL (s4_set_size (NULL), 0);
+
+	set = s4_set_union (NULL, NULL);
+	CU_ASSERT_EQUAL (s4_set_size (set), 0);
+	s4_set_free (set);
+
+	set = s4_set_intersection (NULL, NULL);
+	CU_ASSERT_EQUAL (s4_set_size (set), 0);
+	s4_set_free (set);
+
+	CU_ASSERT_PTR_NULL (s4_set_get (NULL, 0));
+	CU_ASSERT_EQUAL (s4_set_insert (NULL, &entry), 0);
+
+	CU_ASSERT_PTR_NULL (s4_set_next (NULL));
+}
