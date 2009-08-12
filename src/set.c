@@ -220,12 +220,15 @@ s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
 	s4_set_t *ret;
 	int i, j, k, size;
 
-	if (a == NULL && b != NULL) {
-		return copy_set (b);
-	} else if (b == NULL && a != NULL) {
-		return copy_set (a);
-	} else if (a == NULL) {
+	i = s4_set_size (a);
+	j = s4_set_size (b);
+
+	if (i == 0 && j == 0) {
 		return NULL;
+	} else if (i == 0) {
+		return copy_set (b);
+	} else if (j == 0) {
+		return copy_set (a);
 	}
 
 	size = a->size + b->size;
@@ -245,12 +248,7 @@ s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
 		}
 	}
 
-	if (k == 0) {
-		s4_set_free (ret);
-		ret = NULL;
-	} else {
-		ret->size = k;
-	}
+	ret->size = k;
 
 	return ret;
 }
