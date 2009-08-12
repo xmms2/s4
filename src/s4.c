@@ -31,17 +31,36 @@
 /**
  * Open an S4 database
  *
+ * @b The different flags you can pass:
+ * <P>
+ * @b S4_VERIFY
+ * <BR>
+ * 		S4 will check the database. If it is inconsistent and
+ *		if S4_RECOVERYis set it will try to recover it.
+ * </P><P>
+ * @b S4_RECOVERY
+ * <BR>
+ * 		If S4_VERIFY is set the database will be recovered if it
+ * 		is inconsistent. If S4_VERIFY is not set it will try to
+ * 		recover the database anyway.
+ * </P><P>
+ * @b S4_NEW
+ * <BR>
+ * 		It will create a new file if one does not already exists.
+ * 		If one exists it will fail and return NULL.
+ * </P><P>
+ * @b S4_EXISTS
+ * <BR>
+ * 		If the file does not exists it will fail and return NULL.
+ * </P><P>
+ * @b S4_SYNC_THREAD
+ * <BR>
+ * 		It will start a synchronisation thread that will flush the
+ * 		database to disk in regular intervals.
+ * </P>
+ *
  * @param filename The name of the file containing the database
- * @param flags Define some options. S4_VERIFY will verify the file after
- * opening it, if it is corrupted and S4_RECOVER is set it will try to
- * recover it, otherwise it will return NULL. If S4_RECOVERY is set but
- * S4_VERIFY is not, it will try to recover the database without checking
- * if it is actually necessary. For the verify flags see s4_verify.
- * If S4_NEW is set it will create a new file is one does not exist and
- * fail is one exists. If S4_EXISTS is set it will open a file if one exists
- * and fail is one does not exist. If you set both S4_NEW and S4_EXISTS the
- * result is unspecified. If S4_SYNC_THREAD is set it will try to start the
- * sync thread, if it doesn't succeed it will return NULL.
+ * @param flags Zero or more of the flags bitwise-or'd.
  * @return A pointer to an s4_t, or NULL if something went wrong.
  */
 s4_t *s4_open (const char *filename, int flags)

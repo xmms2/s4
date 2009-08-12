@@ -36,7 +36,7 @@ struct s4_set_St {
 	s4_entry_t *entries;
 };
 
-
+/* Return the first power of two bigger or equal to i */
 static int align2 (int i)
 {
 	int ret = 1;
@@ -46,6 +46,7 @@ static int align2 (int i)
 	return ret;
 }
 
+/* Compare to entries, return <0 if a<b, 0 if a=b and >0 if a>b */
 static int comp (s4_entry_t *a, s4_entry_t *b)
 {
 	int ret = 0;
@@ -82,6 +83,7 @@ static int search (s4_set_t *set, s4_entry_t *entry, int *equal)
 	return upper;
 }
 
+/* Expand the set to make space for twice as many entries */
 static void expand (s4_set_t *set)
 {
 	set->alloc <<= 1;
@@ -89,6 +91,7 @@ static void expand (s4_set_t *set)
 	set->entries = realloc (set->entries, set->alloc * sizeof (s4_entry_t));
 }
 
+/* Makes a copy of set */
 static s4_set_t *copy_set (s4_set_t *set)
 {
 	s4_set_t *ret = malloc (sizeof (s4_set_t));
@@ -106,9 +109,10 @@ static s4_set_t *copy_set (s4_set_t *set)
 /**
  * Create a new set.
  *
- * @param size Optional size if you know how many entries you will insert.
- * This might save some reallocs. If you don't know the size pass 0.
- * @return A new set.
+ * @param size The size of the new set. Setting this to something other than 0
+ * will create a set with space enough for atleast size entries. This might
+ * save some reallocs.
+ * @return A new set. It must be freed with ::s4_set_free when you're done with it.
  *
  */
 s4_set_t *s4_set_new (int size)
@@ -130,7 +134,9 @@ s4_set_t *s4_set_new (int size)
 }
 
 /**
- * Free the given set
+ * Free the given set.
+ *
+ * @param set The set to free.
  */
 void s4_set_free (s4_set_t *set)
 {
@@ -150,7 +156,10 @@ void s4_set_free (s4_set_t *set)
 }
 
 /**
- * Return the size of the set
+ * Return the size of the set.
+ *
+ * @param set The set to find the size of.
+ * @return The number of entries in the set.
  */
 int s4_set_size (s4_set_t *set)
 {
@@ -161,11 +170,11 @@ int s4_set_size (s4_set_t *set)
 }
 
 /**
- * Find the intersection of the two sets
+ * Find the intersection of the two sets.
  *
- * @param a One of the sets
- * @param b The other set
- * @return The intersection of a and b
+ * @param a One of the sets.
+ * @param b The other set.
+ * @return The intersection of a and b. Must be freed with ::s4_set_free.
  *
  */
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b)
@@ -199,11 +208,11 @@ s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b)
 }
 
 /**
- * Find the union of two sets
+ * Find the union of two sets.
  *
- * @param a One of the sets
- * @param b The other set
- * @return The union of a and b
+ * @param a One of the sets.
+ * @param b The other set.
+ * @return The union of a and b. Must be freed with ::s4_set_free.
  *
  */
 s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
@@ -251,7 +260,7 @@ s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
  *
  * @param set The set to find the entry in.
  * @param index The index of the entry.
- * @return The entry, or NULL if the index is outside the boundries.
+ * @return The entry, or NULL if the index is outside the boundries or set is NULL.
  *
  */
 s4_entry_t *s4_set_get (s4_set_t *set, int index)
@@ -266,7 +275,7 @@ s4_entry_t *s4_set_get (s4_set_t *set, int index)
  * Return the next entry into the set.
  *
  * @param set The set to find the next entry in.
- * @return The next entry, or NULL if you're at the end.
+ * @return The next entry, or NULL if set is NULL or you're at the end.
  *
  */
 s4_entry_t *s4_set_next (s4_set_t *set)
@@ -278,9 +287,10 @@ s4_entry_t *s4_set_next (s4_set_t *set)
 }
 
 /**
- * Reset the position pointer of the set so you can use s4_set_next again.
+ * Reset the position pointer so the next call to ::s4_set_next will
+ * return the first entry.
  *
- * @param set The set to reset
+ * @param set The set to reset.
  *
  */
 void s4_set_reset (s4_set_t *set)
@@ -290,11 +300,11 @@ void s4_set_reset (s4_set_t *set)
 }
 
 /**
- * Insert the given entry into the set
+ * Insert the given entry into the set.
  *
- * @param set The set to insert into
- * @param entry The entry to insert
- * @return 1 on success, 0 if it already is in the set
+ * @param set The set to insert into.
+ * @param entry The entry to insert.
+ * @return 1 on success, 0 if set is NULL or entry already is in the set.
  *
  */
 int s4_set_insert (s4_set_t *set, s4_entry_t *entry)

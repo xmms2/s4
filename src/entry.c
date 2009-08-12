@@ -23,6 +23,35 @@
  * @ingroup S4
  * @brief Entries is what you insert and retrive
  *
+ * Entries are essentially just a key-value pair, where the key is a string
+ * and the value can be either a string or an int.
+ *
+ * Examples of entries (key, value):
+ *  - String entry: ("title", "Foobar")
+ *  - Integer entry: ("tracknr", 10)
+ *
+ * Entries can have other entries as properties. We can look at it
+ * hierarchialy like in this graph.
+ *
+ * @dot
+ * 	digraph entries {
+ * 		node [color=lightblue2, style=filled, fontsize=12];
+ * 		"\"album_id\", 1" -> "\"song_id\", 1"
+ * 		"\"album_id\", 1" -> "\"album\", \"Some Album\"";
+ * 		"\"album_id\", 1" -> "\"artist\", \"Some Artist\"";
+ * 		"\"album_id\", 1" -> ".. other songs .."
+ *
+ * 		"\"song_id\", 1" -> "\"title\", \"Some Song\""
+ * 		"\"song_id\", 1" -> "\"artist\", \"Some Artist\""
+ * 		"\"song_id\", 1" -> "\"album\", \"Some Album\""
+ * 		"\"song_id\", 1" -> "\"date\", 1999"
+ * 		"\"song_id\", 1" -> "\"tracknr\", 1"
+ * 	}
+ * @enddot
+ *
+ * The top layer with a separate entry for albums are currently not used by
+ * XMMS2, but there's nothing stopping us from doing it.
+ *
  * @{
  */
 
@@ -112,7 +141,7 @@ static void _entry_unref (s4_t *s4, s4_entry_t *entry)
 
 
 /* Lookup the strings in entry and fill in the int fields.
- * If ref != 0 and the strings doesn't exist yet they're made
+ * If ref != 0 and the strings doesn't exist yet they're created.
  * The return value has bit 1 set if they key was refed and
  * bit 2 set if the val was refed.
  * All other bits are 0.

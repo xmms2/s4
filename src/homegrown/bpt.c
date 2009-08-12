@@ -36,6 +36,10 @@
  * @ingroup Homegrown
  * @brief A B+ tree for the homegrown backend
  *
+ * For more information on B+ trees I recommend
+ * <a href=http://en.wikipedia.org/wiki/B+_tree>http://en.wikipedia.org/wiki/B+_tree</a> or
+ * <a href=http://www.cecs.csulb.edu/~monge/classes/share/B+TreeIndexes.html>http://www.cecs.csulb.edu/~monge/classes/share/B+TreeIndexes.html</a>
+ *
  * @{
  */
 

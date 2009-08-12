@@ -350,7 +350,7 @@ struct recovery_info {
 	int32_t trie;
 };
 
-void recovery_helper (int32_t node, void *u)
+static void recovery_helper (int32_t node, void *u)
 {
 	struct recovery_info *info = u;
 	int32_t key;
