@@ -656,7 +656,7 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t *record)
 	pl->key_count--;
 	if (index < pl->key_count) {
 		memmove (pl->keys + index, pl->keys + index + 1,
-				(pl->key_count - index - 1) * sizeof (bpt_record_t));
+				(pl->key_count - index) * sizeof (bpt_record_t));
 	}
 
 	/* Check for underflow emptiness (if we're the root) */
