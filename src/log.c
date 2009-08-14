@@ -15,15 +15,21 @@
 #include <glib.h>
 #include <stdio.h>
 
+GLogLevelFlags log_level;
+
 void log_handler (const gchar *log_domain,
-		GLogLevelFlags log_level,
+		GLogLevelFlags log_lev,
 		const gchar *message,
 		gpointer user_data)
 {
+	if (!(log_level & log_lev))
+		return;
+
 	printf ("%s\n", message);
 }
 
-void log_init ()
+void log_init (GLogLevelFlags log_lev)
 {
+	log_level = log_lev;
 	g_log_set_handler (NULL, G_LOG_LEVEL_MASK, log_handler, NULL);
 }

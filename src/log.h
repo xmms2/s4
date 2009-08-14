@@ -33,6 +33,6 @@
 #define S4_FATAL g_error
 #endif /* DEBUG */
 
-void log_init();
+void log_init (GLogLevelFlags log_lev);
 
 #endif  /* _S4_LOG_H */

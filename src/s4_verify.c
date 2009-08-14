@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		exit (0);
 	}
 
-	log_init();
+	log_init(G_LOG_LEVEL_MASK);
 
 	s4 = s4_open (filename, S4_EXISTS);
 

@@ -39,6 +39,13 @@ def build(bld):
         recover.uselib_local = "s4"
         recover.uselib = "glib2"
 
+        bench = bld.new_task_gen('cc', 'program')
+        bench.source = ["s4_bench.c", "log.c"]
+        bench.target = "s4_bench"
+        bench.install_path = 0
+        bench.uselib_local = "s4"
+        bench.uselib = "glib2"
+
 def configure(conf):
     if Options.options.build_tools:
         conf.check_cfg(package='sqlite3', atleast_version='3.5', uselib_store='sqlite3', args='--cflags --libs', mandatory=1)
