@@ -151,32 +151,32 @@ static int32_t _bpt_create_internal (s4be_t *be)
 /* Compare to records,
  * return <0 if a<b, 0 if a=b and >0 if a>b
  */
-static int _bpt_comp (bpt_record_t a, bpt_record_t b)
+static int _bpt_comp (bpt_record_t *a, bpt_record_t *b)
 {
 	int ret = 0;
-	ret = (a.key_a < b.key_a)?-1:(a.key_a > b.key_a);
+	ret = (a->key_a < b->key_a)?-1:(a->key_a > b->key_a);
 	if (!ret)
-		ret = (a.val_a < b.val_a)?-1:(a.val_a > b.val_a);
+		ret = (a->val_a < b->val_a)?-1:(a->val_a > b->val_a);
 	if (!ret)
-		ret = (a.key_b < b.key_b)?-1:(a.key_b > b.key_b);
+		ret = (a->key_b < b->key_b)?-1:(a->key_b > b->key_b);
 	if (!ret)
-		ret = (a.val_b < b.val_b)?-1:(a.val_b > b.val_b);
+		ret = (a->val_b < b->val_b)?-1:(a->val_b > b->val_b);
 	if (!ret)
-		ret = (a.src < b.src)?-1:(a.src > b.src);
+		ret = (a->src < b->src)?-1:(a->src > b->src);
 
 	return ret;
 }
 
 
 /* Search the node n for the first key bigger than r */
-static int _bpt_search (bpt_node_t *n, bpt_record_t r)
+static int _bpt_search (bpt_node_t *n, bpt_record_t *r)
 {
 	int lower = 0;
 	int upper = n->key_count;
 
 	while ((upper - lower) > 0) {
 		int gap = (upper - lower) / 2;
-		int c = _bpt_comp (r, n->keys[lower + gap]);
+		int c = _bpt_comp (r, &n->keys[lower + gap]);
 
 		if (c < 0) {
 			upper = lower + gap;
@@ -192,7 +192,7 @@ static int _bpt_search (bpt_node_t *n, bpt_record_t r)
 
 
 /* Searches for the leaf that might contain record */
-static int32_t _bpt_find_leaf (s4be_t *be, int32_t bpt, bpt_record_t record)
+static int32_t _bpt_find_leaf (s4be_t *be, int32_t bpt, bpt_record_t *record)
 {
 	int32_t cur = _bpt_get_root(be, bpt);
 	bpt_node_t *i = S4_PNT (be, cur, bpt_node_t);
@@ -283,10 +283,10 @@ static int32_t _bpt_split (s4be_t *be, int32_t node,
 	int leaf = child == -1;
 
 	pl = S4_PNT (be, node, bpt_node_t);
-	index = _bpt_search (pl, record);
+	index = _bpt_search (pl, &record);
 
 	/* If the key is already in the leaf we can't insert it */
-	if (index > 0 && _bpt_comp (pl->keys[index - 1], record) == 0) {
+	if (index > 0 && _bpt_comp (&pl->keys[index - 1], &record) == 0) {
 		return -1;
 	}
 
@@ -326,7 +326,7 @@ static int32_t _bpt_insert_internal (s4be_t *be, int32_t node,
 	int ret = 0;
 
 	if (pn->key_count < SIZE) {
-		int index = _bpt_search (pn, record);
+		int index = _bpt_search (pn, &record);
 		int i;
 
 		for (i = pn->key_count; i > index; i--) {
@@ -351,7 +351,7 @@ static int32_t _bpt_insert_internal (s4be_t *be, int32_t node,
 
 /* A helper function for _bpt_left_sibling */
 static int32_t _bpt_left_helper (s4be_t *be, int depth,
-		int32_t node, bpt_record_t key, int down)
+		int32_t node, bpt_record_t *key, int down)
 {
 	if (node == -1)
 		return -1;
@@ -379,7 +379,7 @@ static int32_t _bpt_left_helper (s4be_t *be, int depth,
 static int32_t _bpt_left_sibling (s4be_t *be, int32_t node)
 {
 	bpt_node_t *pnode = S4_PNT (be, node, bpt_node_t);
-	return _bpt_left_helper (be, 0, pnode->parent, pnode->keys[0], 0);
+	return _bpt_left_helper (be, 0, pnode->parent, &pnode->keys[0], 0);
 }
 
 
@@ -394,7 +394,7 @@ static bpt_record_t _bpt_update_parent (s4be_t *be, int32_t parent,
 	if (parent == -1)
 		return old;
 
-	index = _bpt_search (node, old) - 1;
+	index = _bpt_search (node, &old) - 1;
 
 	if (index < 0) {
 		ret = _bpt_update_parent (be, node->parent, old, new);
@@ -412,7 +412,7 @@ static bpt_record_t _bpt_remove_internal (s4be_t *be, int32_t bpt,
 		int32_t node, bpt_record_t key)
 {
 	bpt_node_t *pnode = S4_PNT (be, node, bpt_node_t);
-	int index = _bpt_search (pnode, key) - 1;
+	int index = _bpt_search (pnode, &key) - 1;
 	bpt_record_t ret;
 	int i;
 
@@ -585,7 +585,7 @@ static void _bpt_underflow (s4be_t *be, int32_t bpt, int32_t node)
  * @param record The record to insert
  * @return 0 on success, -1 on error
  */
-int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t record)
+int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t *record)
 {
 	int32_t leaf = _bpt_find_leaf (be, bpt, record);
 	bpt_node_t *pl = S4_PNT (be, leaf, bpt_node_t);
@@ -595,7 +595,7 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t record)
 		leaf = _bpt_create_leaf (be);
 		pl = S4_PNT (be, leaf, bpt_node_t);
 		pl->key_count = 1;
-		pl->keys[0] = record;
+		pl->keys[0] = *record;
 		_bpt_set_root (be, bpt, leaf);
 		_bpt_set_leaves (be, bpt, leaf);
 	} else if (pl->key_count < SIZE) {
@@ -604,18 +604,18 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t record)
 		int i;
 
 		/* Check if it already exists */
-		if (index > 0 && _bpt_comp (pl->keys[index - 1], record) == 0) {
+		if (index > 0 && _bpt_comp (&pl->keys[index - 1], record) == 0) {
 			return -1;
 		}
 
 		for (i = pl->key_count; i > index; i--)
 			pl->keys[i] = pl->keys[i - 1];
 
-		pl->keys[index] = record;
+		pl->keys[index] = *record;
 		pl->key_count++;
 	} else {
 		/* The leaf is full, we need to split it */
-		if ((leaf = _bpt_split (be, leaf, record, -1)) != 0) {
+		if ((leaf = _bpt_split (be, leaf, *record, -1)) != 0) {
 			if (leaf == -1) {
 				return -1;
 			}
@@ -635,7 +635,7 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t record)
  * @param record The record to remove
  * @return 0 on success, -1 on error.
  */
-int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t record)
+int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t *record)
 {
 	int leaf = _bpt_find_leaf (be, bpt, record);
 	bpt_node_t *pl = S4_PNT (be, leaf, bpt_node_t);
@@ -647,7 +647,7 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t record)
 	index = _bpt_search (pl, record) - 1;
 
 	/* Bail if the node doesn't exist */
-	if (index < 0 || _bpt_comp (pl->keys[index], record) != 0)
+	if (index < 0 || _bpt_comp (&pl->keys[index], record) != 0)
 		return -1;
 
 	if (index == 0)
@@ -679,7 +679,7 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t record)
  * @param stop Where to stop the search
  * @return A set with all entries between start and stop
  */
-s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t stop)
+s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t *start, bpt_record_t *stop)
 {
 	s4_set_t *set = NULL;
 	s4_entry_t entry;
@@ -687,7 +687,7 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
 	int32_t leaf, val;
 	bpt_node_t *pl;
 
-	val = start.val_a;
+	val = start->val_a;
 
 	leaf = _bpt_find_leaf (be, bpt, start);
 	pl = S4_PNT (be, leaf, bpt_node_t);
@@ -696,9 +696,9 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t start, bpt_record_t st
 	if (index > 0)
 		index--;
 
-	while (leaf != -1 && _bpt_comp (stop, pl->keys[index]) > 0) {
+	while (leaf != -1 && _bpt_comp (stop, &pl->keys[index]) > 0) {
 		/* Only add this record if it's higher or equal to start */
-		if (_bpt_comp (start, pl->keys[index]) <= 0) {
+		if (_bpt_comp (start, &pl->keys[index]) <= 0) {
 			if (set == NULL) {
 				set = s4_set_new (0);
 			}
@@ -765,14 +765,14 @@ struct verify_info {
  * the height if it's okay
  */
 static int _bpt_verify (s4be_t *be, int32_t node,
-		bpt_record_t lo, bpt_record_t hi,
+		bpt_record_t *lo, bpt_record_t *hi,
 		struct verify_info *info)
 {
 	bpt_node_t *pnode = S4_PNT (be, node, bpt_node_t);
 	int i;
 	int ret = 1;
 	int height = 0;
-	bpt_record_t a, b;
+	bpt_record_t *a, *b;
 
 	if (node < 0 || node > (be->size + sizeof (bpt_node_t))) {
 		info->outside++;
@@ -785,19 +785,19 @@ static int _bpt_verify (s4be_t *be, int32_t node,
 	}
 
 	for (i = 0; i < pnode->key_count; i++) {
-		if (_bpt_comp (lo, pnode->keys[i]) > 0) {
+		if (_bpt_comp (lo, &pnode->keys[i]) > 0) {
 			info->key_small++;
 			ret = 0;
-		} else if (_bpt_comp (hi, pnode->keys[i]) <= 0) {
+		} else if (_bpt_comp (hi, &pnode->keys[i]) <= 0) {
 			info->key_great++;
 			ret = 0;
-		} else if (i > 0 && _bpt_comp (pnode->keys[i -1], pnode->keys[i]) >= 0) {
+		} else if (i > 0 && _bpt_comp (&pnode->keys[i -1], &pnode->keys[i]) >= 0) {
 			info->key_order++;
 			ret = 0;
 		}
 	}
 
-	for (i = 0, a = lo, b = pnode->keys[0]
+	for (i = 0, a = lo, b = &pnode->keys[0]
 			; i <= pnode->key_count && pnode->magic == INT_MAGIC
 			; i++) {
 		int tmp = _bpt_verify (be, pnode->pointers[i], a, b, info);
@@ -816,7 +816,7 @@ static int _bpt_verify (s4be_t *be, int32_t node,
 		if ((i + 1) >= pnode->key_count)
 			b = hi;
 		else
-			b = pnode->keys[i + 1];
+			b = &pnode->keys[i + 1];
 	}
 
 	return (ret)?(height + 1):0;
@@ -841,7 +841,7 @@ int bpt_verify (s4be_t *be, int32_t bpt)
 	lo.key_a = lo.key_b = lo.val_a = lo.val_b = lo.src = INT32_MIN;
 	hi.key_a = hi.key_b = hi.val_a = hi.val_b = hi.src = INT32_MAX;
 
-	ret = !!_bpt_verify (be, _bpt_get_root (be, bpt), lo, hi, &info);
+	ret = !!_bpt_verify (be, _bpt_get_root (be, bpt), &lo, &hi, &info);
 
 	if (!ret) {
 		S4_ERROR ("B+ tree inconsistent!");

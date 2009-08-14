@@ -48,9 +48,9 @@ int s4be_ip_add (s4be_t *be, s4_entry_t *entry, s4_entry_t *prop)
 
 	be_wlock (be);
 
-	ret = bpt_insert (be, S4_INT_STORE, a);
+	ret = bpt_insert (be, S4_INT_STORE, &a);
 	if (!ret)
-		ret = bpt_insert (be, S4_REV_STORE, b);
+		ret = bpt_insert (be, S4_REV_STORE, &b);
 
 	be_wunlock (be);
 
@@ -79,9 +79,9 @@ int s4be_ip_del (s4be_t *be, s4_entry_t *entry, s4_entry_t *prop)
 
 	be_wlock (be);
 
-	ret = bpt_remove (be, S4_INT_STORE, a);
+	ret = bpt_remove (be, S4_INT_STORE, &a);
 	if (!ret)
-		ret = bpt_remove (be, S4_REV_STORE, b);
+		ret = bpt_remove (be, S4_REV_STORE, &b);
 
 	be_wunlock (be);
 
@@ -110,12 +110,12 @@ s4_set_t *s4be_ip_get (s4be_t *be, s4_entry_t *entry, int32_t key)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	a = bpt_find (be, S4_INT_STORE, start, stop);
+	a = bpt_find (be, S4_INT_STORE, &start, &stop);
 
 	start.key_b = -start.key_b;
 	stop.key_b = start.key_b + 1;
 
-	b = bpt_find (be, S4_INT_STORE, start, stop);
+	b = bpt_find (be, S4_INT_STORE, &start, &stop);
 	be_runlock (be);
 
 	ret = s4_set_union (a, b);
@@ -149,7 +149,7 @@ s4_set_t *s4be_ip_has_this (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, start, stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
 	be_runlock (be);
 
 	return ret;
@@ -179,7 +179,7 @@ s4_set_t *s4be_ip_this_has (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_INT_STORE, start, stop);
+	ret = bpt_find (be, S4_INT_STORE, &start, &stop);
 	be_runlock (be);
 	return ret;
 }
@@ -201,7 +201,7 @@ s4_set_t *s4be_ip_smaller (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, start, stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
 	be_runlock (be);
 
 	return ret;
@@ -224,7 +224,7 @@ s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, start, stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
 	be_runlock (be);
 
 	return ret;
@@ -283,11 +283,11 @@ static void _fix_key (bpt_record_t key, void *userdata)
 	rkey.src = nkey.src;
 
 	if (info->bpt == S4_INT_STORE) {
-		bpt_insert (info->new, S4_INT_STORE, nkey);
-		bpt_insert (info->new, S4_REV_STORE, rkey);
+		bpt_insert (info->new, S4_INT_STORE, &nkey);
+		bpt_insert (info->new, S4_REV_STORE, &rkey);
 	} else {
-		bpt_insert (info->new, S4_INT_STORE, rkey);
-		bpt_insert (info->new, S4_REV_STORE, nkey);
+		bpt_insert (info->new, S4_INT_STORE, &rkey);
+		bpt_insert (info->new, S4_REV_STORE, &nkey);
 	}
 }
 
@@ -326,7 +326,7 @@ void _verification_helper (bpt_record_t rec, void *u)
 	stop = start;
 	stop.src++;
 
-	set = bpt_find (info->be, info->bpt, start, stop);
+	set = bpt_find (info->be, info->bpt, &start, &stop);
 
 	if (set == NULL)
 		info->missing++;
