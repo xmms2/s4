@@ -608,8 +608,8 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t *record)
 			return -1;
 		}
 
-		memmove (pl->keys + index + 1, pl->keys + index,
-				(pl->key_count - index) * sizeof (bpt_record_t));
+		for (i = pl->key_count; i > index; i--)
+			pl->keys[i] = pl->keys[i - 1];
 
 		pl->keys[index] = *record;
 		pl->key_count++;
