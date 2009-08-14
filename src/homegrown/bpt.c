@@ -174,16 +174,16 @@ static int _bpt_search (bpt_node_t *n, bpt_record_t *r)
 	int lower = 0;
 	int upper = n->key_count;
 
-	while ((upper - lower) > 0) {
-		int gap = (upper - lower) / 2;
-		int c = _bpt_comp (r, &n->keys[lower + gap]);
+	while (upper > lower) {
+		int middle = (lower + upper) / 2;
+		int c = _bpt_comp (r, &n->keys[middle]);
 
 		if (c < 0) {
-			upper = lower + gap;
+			upper = middle;
 		} else if (c > 0) {
-			lower += gap + 1;
+			lower = middle + 1;
 		} else {
-			return (lower + gap + 1);
+			return middle + 1;
 		}
 	}
 
@@ -608,8 +608,8 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t *record)
 			return -1;
 		}
 
-		for (i = pl->key_count; i > index; i--)
-			pl->keys[i] = pl->keys[i - 1];
+		memmove (pl->keys + index + 1, pl->keys + index,
+				(pl->key_count - index) * sizeof (bpt_record_t));
 
 		pl->keys[index] = *record;
 		pl->key_count++;
@@ -654,8 +654,10 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t *record)
 		_bpt_update_parent (be, pl->parent, pl->keys[0], pl->keys[1]);
 
 	pl->key_count--;
-	for (i = index; i < pl->key_count; i++)
-		pl->keys[i] = pl->keys[i + 1];
+	if (index < pl->key_count) {
+		memmove (pl->keys + index, pl->keys + index + 1,
+				(pl->key_count - index - 1) * sizeof (bpt_record_t));
+	}
 
 	/* Check for underflow emptiness (if we're the root) */
 	if (pl->key_count <= SIZE / 2 && pl->parent != -1)
