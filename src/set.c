@@ -27,7 +27,9 @@
  * @{
  */
 
+#ifndef MIN
 #define MIN(a, b) (((a) < (b))?(a):(b))
+#endif
 
 struct s4_set_St {
 	int size;

@@ -601,7 +601,6 @@ int bpt_insert (s4be_t *be, int32_t bpt, bpt_record_t *record)
 	} else if (pl->key_count < SIZE) {
 		/* There's room for more keys in this leaf, we simpy add it */
 		int index = _bpt_search (pl, record);
-		int i;
 
 		/* Check if it already exists */
 		if (index > 0 && _bpt_comp (&pl->keys[index - 1], record) == 0) {
@@ -639,7 +638,7 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t *record)
 {
 	int leaf = _bpt_find_leaf (be, bpt, record);
 	bpt_node_t *pl = S4_PNT (be, leaf, bpt_node_t);
-	int index, i;
+	int index;
 
 	if (leaf == -1)
 		return -1;
