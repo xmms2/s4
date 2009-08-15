@@ -6,6 +6,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
+#define ENTRIES 1000000
 
 long timediff (GTimeVal *prev, GTimeVal *cur)
 {
@@ -47,7 +48,7 @@ int main (int argc, char *argv[])
 
 	take_time ("s4_open took", &prev, &cur);
 
-	for (i = 0; i < 1000000; i++) {
+	for (i = 0; i < ENTRIES; i++) {
 		s4_entry_t entry;
 		entry.key_i = entry.val_i = entry.src_i = i;
 
@@ -56,7 +57,7 @@ int main (int argc, char *argv[])
 
 	take_time ("s4be_ip_add took", &prev, &cur);
 
-	for (i = 0; i < 1000000; i++) {
+	for (i = 0; i < ENTRIES; i++) {
 		s4_entry_t entry;
 		entry.key_i = entry.val_i = entry.src_i = i;
 
@@ -64,6 +65,42 @@ int main (int argc, char *argv[])
 	}
 
 	take_time ("s4be_ip_del took", &prev, &cur);
+
+	for (i = 0; i < ENTRIES; i++) {
+		s4_entry_t entry;
+		entry.key_i = entry.val_i = entry.src_i = i;
+
+		s4be_ip_add (s4->be, &entry, &entry);
+	}
+
+	take_time ("s4be_ip_add took", &prev, &cur);
+
+	for (i = 0; i < ENTRIES; i++) {
+		s4_entry_t entry;
+		entry.key_i = entry.val_i = entry.src_i = i;
+
+		s4be_ip_del (s4->be, &entry, &entry);
+	}
+
+	take_time ("s4be_ip_del took", &prev, &cur);
+
+	for (i = ENTRIES; i > 0; i--) {
+		s4_entry_t entry;
+		entry.key_i = entry.val_i = entry.src_i = i;
+
+		s4be_ip_add (s4->be, &entry, &entry);
+	}
+
+	take_time ("s4be_ip_add (backwards) took", &prev, &cur);
+
+	for (i = ENTRIES; i > 0; i--) {
+		s4_entry_t entry;
+		entry.key_i = entry.val_i = entry.src_i = i;
+
+		s4be_ip_del (s4->be, &entry, &entry);
+	}
+
+	take_time ("s4be_ip_del (backwards) took", &prev, &cur);
 
 	s4_close (s4);
 
