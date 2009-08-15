@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <glib.h>
+#include <glib/gstdio.h>
 
 s4be_t *be;
 char *name;
@@ -33,7 +34,7 @@ SETUP (s4_intpair) {
 
 CLEANUP () {
 	s4be_close (be);
-	unlink (name);
+	g_unlink (name);
 	return 0;
 }
 

@@ -15,8 +15,9 @@
 #include "xcu.h"
 #include "s4.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <glib.h>
-#include <unistd.h>
+#include <glib/gstdio.h>
 
 SETUP (s4) {
 	if (!g_thread_get_initialized ())
@@ -29,18 +30,19 @@ CLEANUP () {
 	return 0;
 }
 
-const char *name;
+char *name;
 s4_t *s4;
 
 static void _open ()
 {
-	name = tmpnam (NULL);
+	name = strdup (tmpnam (NULL));
 	s4 = s4_open (name, S4_VERIFY | S4_SYNC_THREAD);
 }
 static void _close ()
 {
 	s4_close (s4);
-	unlink (name);
+	g_unlink (name);
+	free (name);
 }
 
 #define ARG_SIZE 10
@@ -113,7 +115,7 @@ CASE (s4_verify) {
 }
 
 CASE (s4_recover) {
-	char *name;
+	char *filename;
 	s4_t *tmp;
 	struct db_struct db[] = {
 		{"a",  {"b", "c", NULL}},
@@ -124,16 +126,19 @@ CASE (s4_recover) {
 	create_db (db);
 	check_db (db);
 
-	name = tmpnam (NULL);
-	s4_recover (s4, name);
+	filename = tmpnam (NULL);
+	s4_recover (s4, filename);
 
 	tmp = s4;
-	s4 = s4_open (name, S4_EXISTS);
+	s4 = s4_open (filename, S4_EXISTS);
 	s4_sync (s4);
 	CU_ASSERT_TRUE (s4_verify (s4, S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT));
 	check_db (db);
 
 	s4_close (s4);
+
+	g_unlink (filename);
+
 	s4 = tmp;
 
 	_close();
