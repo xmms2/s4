@@ -69,6 +69,7 @@ void s4_set_free (s4_set_t *set);
 int s4_set_size (s4_set_t *set);
 s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b);
 s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b);
+s4_set_t *s4_set_complement (s4_set_t *a, s4_set_t *b);
 s4_entry_t *s4_set_get (s4_set_t *set, int index);
 s4_entry_t *s4_set_next (s4_set_t *set);
 void s4_set_reset (s4_set_t *set);
@@ -84,9 +85,11 @@ s4_set_t *s4_entry_contained(s4_t *s4, s4_entry_t *entry);
 int s4_entry_add (s4_t *s4, s4_entry_t *entry, s4_entry_t *prop, const char *src);
 int s4_entry_del (s4_t *s4, s4_entry_t *entry, s4_entry_t *prop, const char *src);
 void s4_entry_fillin (s4_t *s4, s4_entry_t *entry);
-s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry);
-s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry);
+s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry, int key);
+s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry, int key);
 s4_set_t *s4_entry_get_property (s4_t *s4, s4_entry_t *entry, const char *prop);
+s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case_sens);
+s4_set_t *s4_entry_get_entries (s4_t *s4, const char *key, const char *val);
 
 /* query.c */
 // s4_set_t *s4_query (s4_t *s4, xmms_coll_dag_t *dag, xmmsv_coll_t *coll);

@@ -110,12 +110,12 @@ s4_set_t *s4be_ip_get (s4be_t *be, s4_entry_t *entry, int32_t key)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	a = bpt_find (be, S4_INT_STORE, &start, &stop);
+	a = bpt_find (be, S4_INT_STORE, &start, &stop, 0);
 
 	start.key_b = -start.key_b;
 	stop.key_b = start.key_b + 1;
 
-	b = bpt_find (be, S4_INT_STORE, &start, &stop);
+	b = bpt_find (be, S4_INT_STORE, &start, &stop, 0);
 	be_runlock (be);
 
 	ret = s4_set_union (a, b);
@@ -149,7 +149,7 @@ s4_set_t *s4be_ip_has_this (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop, 0);
 	be_runlock (be);
 
 	return ret;
@@ -179,13 +179,13 @@ s4_set_t *s4be_ip_this_has (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_INT_STORE, &start, &stop);
+	ret = bpt_find (be, S4_INT_STORE, &start, &stop, 0);
 	be_runlock (be);
 	return ret;
 }
 
 
-s4_set_t *s4be_ip_smaller (s4be_t *be, s4_entry_t *entry)
+s4_set_t *s4be_ip_smaller (s4be_t *be, s4_entry_t *entry, int key)
 {
 	bpt_record_t start, stop;
 	s4_set_t *ret;
@@ -201,14 +201,14 @@ s4_set_t *s4be_ip_smaller (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop, key);
 	be_runlock (be);
 
 	return ret;
 }
 
 
-s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry)
+s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry, int key)
 {
 	bpt_record_t start, stop;
 	s4_set_t *ret;
@@ -224,7 +224,7 @@ s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry)
 	stop.src = INT32_MIN;
 
 	be_rlock (be);
-	ret = bpt_find (be, S4_REV_STORE, &start, &stop);
+	ret = bpt_find (be, S4_REV_STORE, &start, &stop, key);
 	be_runlock (be);
 
 	return ret;
@@ -243,35 +243,27 @@ static void _fix_key (bpt_record_t key, void *userdata)
 	struct recovery_info *info = userdata;
 
 	if (key.key_a < 0) {
-		nkey.key_a = -s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_a), char));
+		nkey.key_a = -s4be_st_lookup (info->new, s4be_st_reverse (info->old, -key.key_a));
 		nkey.val_a = key.val_a;
 	} else {
-		nkey.key_a = s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, key.key_a), char));
-		nkey.val_a = s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, key.val_a), char));
+		nkey.key_a = s4be_st_lookup (info->new, s4be_st_reverse (info->old, key.key_a));
+		nkey.val_a = s4be_st_lookup (info->new, s4be_st_reverse (info->old, key.val_a));
 
 		if (nkey.val_a == 0)
 			return;
 	}
 	if (key.key_b < 0) {
-		nkey.key_b = -s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, -key.key_b), char));
+		nkey.key_b = -s4be_st_lookup (info->new, s4be_st_reverse (info->old, -key.key_b));
 		nkey.val_b = key.val_b;
 	} else {
-		nkey.key_b = s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, key.key_b), char));
-		nkey.val_b = s4be_st_lookup_collated (info->new,
-				S4_PNT (info->old, pat_node_to_key (info->old, key.val_b), char));
+		nkey.key_b = s4be_st_lookup (info->new, s4be_st_reverse (info->old, key.key_b));
+		nkey.val_b = s4be_st_lookup (info->new, s4be_st_reverse (info->old, key.val_b));
 
 		if (nkey.val_b == 0)
 			return;
 	}
 
-	nkey.src = s4be_st_lookup_collated (info->new,
-			S4_PNT (info->old, pat_node_to_key (info->old, key.src), char));
-
+	nkey.src = s4be_st_lookup (info->new, s4be_st_reverse (info->old, key.src));
 
 	if (nkey.key_a == 0 || nkey.key_b == 0 || nkey.src == 0)
 		return;
@@ -311,7 +303,7 @@ struct verification_info {
 	int missing;
 };
 
-void _verification_helper (bpt_record_t rec, void *u)
+static void _verification_helper (bpt_record_t rec, void *u)
 {
 	struct verification_info *info = u;
 	bpt_record_t start, stop;
@@ -326,7 +318,7 @@ void _verification_helper (bpt_record_t rec, void *u)
 	stop = start;
 	stop.src++;
 
-	set = bpt_find (info->be, info->bpt, &start, &stop);
+	set = bpt_find (info->be, info->bpt, &start, &stop, 0);
 
 	if (set == NULL)
 		info->missing++;
@@ -377,12 +369,15 @@ static void _foreach_helper (bpt_record_t rec, void *userdata)
 
 	e.key_i = rec.key_a;
 	e.val_i = rec.val_a;
+	e.src_i = rec.src;
 	p.key_i = rec.key_b;
 	p.val_i = rec.val_b;
 	p.src_i = rec.src;
 
 	e.type = (e.key_i < 0)?ENTRY_INT:ENTRY_STR;
 	p.type = (p.key_i < 0)?ENTRY_INT:ENTRY_STR;
+
+	e.key_s = e.src_s = e.val_s = p.key_s = p.src_s = p.val_s = NULL;
 
 	info->func (&e, &p, info->userdata);
 }

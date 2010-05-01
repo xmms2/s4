@@ -323,10 +323,10 @@ s4_set_t *s4_entry_contained(s4_t *s4, s4_entry_t *entry)
  * @return A set will all the entries that is contained in an entry
  * that has a smaller value than this one (but same key).
  */
-s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry)
+s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry, int key)
 {
 	s4_entry_fillin (s4, entry);
-	return s4be_ip_smaller (s4->be, entry);
+	return s4be_ip_smaller (s4->be, entry, key);
 }
 
 
@@ -338,10 +338,10 @@ s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry)
  * @return A set will all the entries that is contained in an entry
  * that has a greater value than this one (but same key).
  */
-s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry)
+s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry, int key)
 {
 	s4_entry_fillin (s4, entry);
-	return s4be_ip_greater (s4->be, entry);
+	return s4be_ip_greater (s4->be, entry, key);
 }
 
 s4_set_t *s4_entry_get_property (s4_t *s4, s4_entry_t *entry, const char *prop)
@@ -349,6 +349,102 @@ s4_set_t *s4_entry_get_property (s4_t *s4, s4_entry_t *entry, const char *prop)
 	int32_t key = s4be_st_lookup (s4->be, prop);
 	s4_entry_fillin (s4, entry);
 	return s4be_ip_get (s4->be, entry, key);
+}
+
+/**
+ * Create a set of entries with key=key and value set to all the strings
+ * that match val when compared case insensitively.
+ *
+ * @param s4 The database handle
+ * @param key The key to give the entries
+ * @param val The value we want to find all case insensitively matches for
+ * @return A set with entries where key=key and value matches val (case insensitively)
+ */
+s4_set_t *s4_entry_get_entries (s4_t *s4, const char *key, const char *val)
+{
+	s4_set_t *ret = s4_set_new (0);
+	int32_t *vals = s4be_st_lookup_all (s4->be, val);
+	int i;
+
+	if (vals == NULL)
+		return ret;
+
+	for (i = 0; vals[i] != -1; i++) {
+		s4_entry_t entry;
+
+		entry.key_s = strdup (key);
+		entry.val_s = NULL;
+		entry.key_i = 0;
+		entry.val_i = vals[i];
+		entry.type = ENTRY_STR;
+		entry.src_s = NULL;
+		entry.src_i = 0;
+
+		s4_set_insert (ret, &entry);
+	}
+
+	free (vals);
+
+	return ret;
+}
+
+/**
+ * Get all entries that has a property in the set where the value
+ * matches pattern.
+ *
+ * @param s4 The database handle
+ * @param set The set of properties to check
+ * @param pattern The pattern to match against
+ * @param case_sens 1 if you want case sensitive matching,
+ * 0 for case insensitive
+ * @return A set with all the entries that has one of the properties
+ * in set that matches pattern.
+ */
+s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case_sens)
+{
+	GPatternSpec *spec;
+	char *str;
+	s4_entry_t *entry;
+	s4_set_t *ret, *tmp;
+	int i, j;
+
+	if (case_sens) {
+		spec = g_pattern_spec_new (pattern);
+	} else {
+		str = s4be_st_normalize (pattern);
+		spec = g_pattern_spec_new (str);
+		g_free (str);
+	}
+
+	entry = s4_set_get (set, 0);
+	ret = NULL;
+
+	for (i = 0; i < s4_set_size (set); i++, entry++) {
+		if (case_sens) {
+			str = s4be_st_reverse (s4->be, entry->val_i);
+		} else {
+			str = s4be_st_reverse_normalized (s4->be, entry->val_i);
+		}
+
+		if (g_pattern_match_string (spec, str)) {
+			tmp = s4_entry_contained (s4, entry);
+
+			if (ret == NULL) {
+				ret = tmp;
+			} else {
+				for (j = 0; j < s4_set_size (tmp); j++) {
+					s4_set_insert (ret, s4_set_get (tmp, j));
+				}
+
+				s4_set_free (tmp);
+			}
+		}
+
+		free (str);
+	}
+
+	g_pattern_spec_free (spec);
+	return ret;
 }
 
 /**

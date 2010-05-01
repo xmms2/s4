@@ -145,7 +145,6 @@ void s4_set_free (s4_set_t *set)
 	int i;
 
 	if (set == NULL) {
-		S4_DBG ("s4_set_free called with NULL");
 		return;
 	}
 
@@ -256,6 +255,48 @@ s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b)
 }
 
 /**
+ * Find the relative complement of a in b (b - a)
+ *
+ * @param a Set A
+ * @param a Set B
+ * @return The relative complement of A in B (B \ A). The returned set mus
+ * be freed with ::s4_set_free.
+ *
+ */
+s4_set_t *s4_set_complement (s4_set_t *a, s4_set_t *b)
+{
+	s4_set_t *ret;
+	int i, j, k;
+
+	i = s4_set_size (a);
+	j = s4_set_size (b);
+
+	if (j == 0) {
+		return NULL;
+	} else if (i == 0) {
+		return copy_set (b);
+	}
+
+	ret = s4_set_new (j);
+
+	for (i = j = k = 0; j < b->size;) {
+		int c =	(i >= a->size)?1:
+			 comp (a->entries + i, b->entries + j);
+		if (c < 0) {
+			i++;
+		} else if (c > 0) {
+			ret->entries[k++] = b->entries[j++];
+		} else {
+			i++;
+			j++;
+		}
+	}
+
+	ret->size = k;
+	return ret;
+}
+
+/**
  * Return the entry at the given index.
  *
  * @param set The set to find the entry in.
@@ -325,11 +366,10 @@ int s4_set_insert (s4_set_t *set, s4_entry_t *entry)
 		expand (set);
 	}
 
-	for (i = set->size; i > index; i--) {
-		set->entries[i] = set->entries[i - 1];
-	}
+	memmove (set->entries + index + 1, set->entries + index,
+			(set->size - index) * sizeof (s4_entry_t));
 
-	set->entries[i] = *entry;
+	set->entries[index] = *entry;
 	set->size++;
 
 	return 1;

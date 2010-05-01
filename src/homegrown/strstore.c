@@ -17,7 +17,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <glib.h>
 
 
 #define STR_MAGIC 0xafa7beef
@@ -35,25 +34,46 @@ typedef struct str_info_St {
 	int32_t refs;
 } str_info_t;
 
-static char *collate_key (const char *key)
+char *s4be_st_normalize (const char *key)
 {
 	char *tmp = g_utf8_casefold (key, -1);
-	char *ret = g_utf8_collate_key (tmp, -1);
+	char *ret = g_utf8_normalize (tmp, -1, G_NORMALIZE_DEFAULT);
 
-	g_free (tmp);
+	if (ret == NULL) {
+		ret = tmp;
+	} else {
+		g_free (tmp);
+	}
 
 	return ret;
 }
 
+
 static str_info_t *get_info (s4be_t *s4, int32_t node)
 {
-	char *data;
+	const char *data;
 
-	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
-	while (*data++);
-	while (*data++);
+	data = pat_node_to_str (s4, node);
 
 	return (str_info_t*)data;
+}
+
+
+static void fillin_key (pat_key_t *key, const char *str)
+{
+	key->common_key = s4be_st_normalize (str);
+	key->common_keylen = (strlen (key->common_key) + 1) * 8;
+	key->unique_keylen = strlen (str) + sizeof (str_info_t) + 1;
+	key->unique_key = malloc (key->unique_keylen);
+	key->unique_keyoff = sizeof (str_info_t);
+
+	strncpy (key->unique_key + key->unique_keyoff, str, strlen (str) + 1);
+}
+
+static void free_key (pat_key_t *key)
+{
+	g_free (key->common_key);
+	free (key->unique_key);
 }
 
 /**
@@ -68,14 +88,13 @@ int32_t s4be_st_lookup (s4be_t *s4, const char *str)
 	int32_t ret;
 	pat_key_t key;
 
-	key.data = collate_key (str);
-	key.key_len = (strlen(key.data) + 1) * 8;
+	fillin_key (&key, str);
 
 	be_rlock (s4);
 	ret = pat_lookup (s4, S4_STRING_STORE, &key);
 	be_runlock (s4);
 
-	g_free (key.data);
+	free_key (&key);
 
 	if (ret == -1)
 		ret = 0;
@@ -83,31 +102,45 @@ int32_t s4be_st_lookup (s4be_t *s4, const char *str)
 	return ret;
 }
 
-/**
- * Look up a string that's already made ready to be collated.
- *
- * @param s4 The database handle
- * @param str The string to look up
- * @return The int, or 0 if it can't be found.
- *
- */
-int32_t s4be_st_lookup_collated (s4be_t *s4, const char *str)
+int32_t *s4be_st_lookup_all (s4be_t *be, const char *str)
 {
-	int32_t ret;
 	pat_key_t key;
+	int32_t leaf, child;
+	int32_t *ret;
+	int count, i;
 
-	key.data = str;
-	key.key_len = (strlen (str) + 1) * 8;
+	fillin_key (&key, str);
+	be_rlock (be);
+	leaf = pat_lookup_parent (be, S4_STRING_STORE, &key);
+	free_key (&key);
 
-	be_rlock (s4);
-	ret = pat_lookup (s4, S4_STRING_STORE, &key);
-	be_runlock (s4);
+	if (leaf == -1) {
+		be_runlock (be);
+		return NULL;
+	}
 
-	if (ret == -1)
-		ret = 0;
+	count = pat_parent_key_count (be, leaf);
+	ret = malloc (sizeof(int32_t) * (count + 1));
+	child = pat_parent_first_key (be, leaf);
+
+	for (i = 0; i < count; i++) {
+		ret[i] = child;
+		child = pat_next (be, S4_STRING_STORE, child);
+	}
+	ret[count] = -1;
+
+	be_runlock (be);
 
 	return ret;
 }
+
+static int get_refcount (s4be_t* s4, int32_t node)
+{
+	str_info_t *info = get_info (s4, node);
+
+	return info->refs;
+}
+
 
 /**
  * Return the refcount of the given node
@@ -120,16 +153,23 @@ int32_t s4be_st_lookup_collated (s4be_t *s4, const char *str)
 int s4be_st_get_refcount (s4be_t *s4, int32_t node)
 {
 	int ret;
-	str_info_t *info;
 
 	be_rlock (s4);
-
-	info = get_info (s4, node);
-	ret = info->refs;
-
+	ret = get_refcount (s4, node);
 	be_runlock (s4);
 
 	return ret;
+}
+
+static int set_refcount (s4be_t *s4, int32_t node, int refcount)
+{
+	str_info_t *info = get_info (s4, node);
+
+	if (info->magic != STR_MAGIC)
+		return 0;
+
+	info->refs = refcount;
+	return 1;
 }
 
 /**
@@ -143,30 +183,24 @@ int s4be_st_get_refcount (s4be_t *s4, int32_t node)
  */
 int s4be_st_set_refcount (s4be_t *s4, int32_t node, int refcount)
 {
-	int ret = 1;
-	str_info_t *info;
+	int ret;
 
 	be_wlock (s4);
-
-	info = get_info (s4, node);
-
-	if (info->magic != STR_MAGIC)
-		ret = 0;
-	else
-		info->refs = refcount;
-
+	ret = set_refcount (s4, node, refcount);
 	be_wunlock (s4);
 
 	return ret;
 }
 
 
-static char *s4be_st_get_str (s4be_t *s4, int32_t node)
+static const char *s4be_st_get_str (s4be_t *s4, int32_t node)
 {
-	char *ret = S4_PNT (s4, pat_node_to_key (s4, node), char);
-	ret += strlen (ret) + 1;
+	return pat_node_to_str (s4, node) + sizeof (str_info_t);
+}
+static const char *s4be_st_get_normalized_str (s4be_t *s4, int32_t node)
+{
 
-	return ret;
+	return S4_PNT (s4, pat_node_to_key (s4, pat_parent (s4, node)), char);
 }
 
 /**
@@ -182,12 +216,13 @@ int s4be_st_remove (s4be_t *s4, const char *str)
 	pat_key_t key;
 	int ret;
 
-	key.data = collate_key (str);
-	key.key_len = strlen (key.data) * 8;
+	fillin_key (&key, str);
 
+	be_wlock (s4);
 	ret = !pat_remove (s4, S4_STRING_STORE, &key);
+	be_wunlock (s4);
 
-	g_free (key.data);
+	free_key (&key);
 
 	return ret;
 }
@@ -204,8 +239,25 @@ char *s4be_st_reverse (s4be_t *s4, int32_t node)
 	char *ret;
 	be_rlock (s4);
 
-	ret = s4be_st_get_str (s4, node);
-	ret = strdup (ret);
+	ret = strdup (s4be_st_get_str (s4, node));
+
+	be_runlock (s4);
+	return ret;
+}
+
+/**
+ * Find the normalized string associated with the int
+ *
+ * @param s4 The database handle
+ * @param node The int
+ * @return The normalized string
+ */
+char *s4be_st_reverse_normalized (s4be_t *s4, int32_t node)
+{
+	char *ret;
+	be_rlock (s4);
+
+	ret = strdup (s4be_st_get_normalized_str (s4, node));
 
 	be_runlock (s4);
 	return ret;
@@ -223,44 +275,31 @@ int s4be_st_ref (s4be_t *s4, const char *str)
 {
 	pat_key_t key;
 	int32_t node;
-	int lena = strlen (str) + 1;
-	int lenb;
 	str_info_t *info;
-	char *data, *cstr = collate_key(str);
 
-	lenb = strlen (cstr) + 1;
+	fillin_key(&key, str);
 
 	be_wlock (s4);
-
-	key.data = cstr;
-	key.key_len = lenb * 8;
 	node = pat_lookup (s4, S4_STRING_STORE, &key);
 
 	if (node != -1) {
-		data = S4_PNT (s4, pat_node_to_key (s4, node), char);
-		info = (str_info_t*)(data + lenb + lena);
-
-		info->refs++;
+		set_refcount (s4, node, get_refcount (s4, node) + 1);
 		be_wunlock (s4);
-		g_free (cstr);
+
+		free_key (&key);
+
 		return node;
 	}
 
-	data = malloc (lenb + lena + sizeof(str_info_t));
-	strcpy (data, key.data);
-	strcpy (data + lenb, str);
-	info = (str_info_t*)(data + lena + lenb);
+	info = (str_info_t*)key.unique_key;
 	info->magic = STR_MAGIC;
 	info->refs = 1;
 
-	key.data = data;
-	key.data_len = lenb + lena + sizeof(str_info_t);
 	node = pat_insert (s4, S4_STRING_STORE, &key);
 
 	be_wunlock (s4);
-	free (data);
 
-	g_free (cstr);
+	free_key (&key);
 
 	return node;
 }
@@ -276,39 +315,32 @@ int s4be_st_ref (s4be_t *s4, const char *str)
 int s4be_st_unref (s4be_t * s4, const char *str)
 {
 	int32_t node;
-	str_info_t *info;
-	char *data;
-	int lena = strlen (str) + 1;
-	int lenb;
 	pat_key_t key;
+	int count;
+
+	fillin_key (&key, str);
 
 	be_wlock (s4);
 
-	key.data = collate_key (str);
-	lenb = strlen (key.data) + 1;
-	key.key_len = lenb * 8;
 	node = pat_lookup (s4, S4_STRING_STORE, &key);
 
 	if (node == -1) {
 		be_wunlock (s4);
-		g_free (key.data);
+		free_key (&key);
 		return -1;
 	}
 
-	data = S4_PNT (s4, pat_node_to_key (s4, node), char);
-	info = (str_info_t*)(data + lena + lenb);
-	info->refs--;
+	count = get_refcount (s4, node) - 1;
 
-	if (info->refs == 0) {
+	if (count == 0) {
 		pat_remove (s4, S4_STRING_STORE, &key);
-		be_wunlock (s4);
-		g_free (key.data);
-		return 0;
+	} else {
+		set_refcount (s4, node, count);
 	}
 
 	be_wunlock (s4);
-	g_free (key.data);
-	return info->refs;
+	free_key (&key);
+	return count;
 }
 
 
@@ -317,30 +349,16 @@ int s4be_st_unref (s4be_t * s4, const char *str)
  */
 static int _copy_key (s4be_t *db, int32_t key, pat_key_t *pkey)
 {
-	int len;
-	char *data;
+	const char *data;
 	str_info_t *info;
 
-	if (key < 0 || key > db->size)
+	data = pat_node_to_str (db, key);
+	info = (str_info_t*)data;
+
+	if (key < 0 || key > (db->size - sizeof (str_info_t)) || info->magic != STR_MAGIC)
 		return 0;
 
-	data = S4_PNT (db, key, char);
-	for (len = 0; data[len] && len < (db->size - key); len++);
-	len++;
-
-	pkey->key_len = len * 8;
-
-	for (; data[len] && len < (db->size - key); len++);
-	len++;
-
-
-	info = S4_PNT (db, key + len, str_info_t);
-	if (len >= (db->size - key - sizeof (str_info_t)) ||
-			info->magic != STR_MAGIC)
-		return 0;
-
-	pkey->data = data;
-	pkey->data_len = len + sizeof (str_info_t);
+	fillin_key (pkey, data);
 
 	return 1;
 }
@@ -382,43 +400,6 @@ int _st_verify (s4be_t *be)
 	return pat_verify (be, S4_STRING_STORE);
 }
 
-/**
- * Return a list with all strings matching the regexp.
- *
- * @param be The database handle
- * @param pat The regexp
- * @return A list with all the strings that matched
- */
-GList *s4be_st_regexp (s4be_t *be, const char *pat)
-{
-	GError *error = NULL;
-	GRegex *regex = g_regex_new (pat,
-			G_REGEX_CASELESS | G_REGEX_OPTIMIZE, 0, &error);
-	int32_t node = pat_first (be, S4_STRING_STORE);
-	char *str;
-	GList *ret = NULL;
-
-	if (regex == NULL) {
-		S4_ERROR ("Regex error: %s\n", error->message);
-		return NULL;
-	}
-
-	be_rlock (be);
-
-	while (node != -1) {
-		str = s4be_st_get_str (be, node);
-		if (g_regex_match (regex, str, 0, NULL)) {
-			ret = g_list_prepend (ret, strdup (str));
-		}
-
-		node = pat_next (be, S4_STRING_STORE, node);
-	}
-
-	be_runlock (be);
-	g_regex_unref (regex);
-
-	return ret;
-}
 
 void s4be_st_foreach (s4be_t *be,
 		void (*func) (int32_t node, void *userdata),

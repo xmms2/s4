@@ -36,7 +36,7 @@
 #define DIRTY 1
 
 /* Define the biggest and smallest chunk size (exponents) */
-#define BIGGEST_CHUNK 12 /* 2^12 = 4096 */
+#define BIGGEST_CHUNK 16 /* 2^16 = 65536 */
 #define SMALLEST_CHUNK 4 /* 2^4  = 16 */
 
 /**
@@ -62,7 +62,7 @@ typedef struct chunk_St {
 } chunk_t;
 
 
-static inline long pagesize ()
+static inline long pagesize (void)
 {
 	static long ps = 0;
 
@@ -159,7 +159,7 @@ void s4be_sync (s4be_t *s4)
  */
 static void grow_db (s4be_t *s4, int n)
 {
-	n = S4_ALIGN (n, pagesize());
+	n = S4_ALIGN (n, pagesize ());
 
 	map_unmap (s4);
 	s4->size += n;
@@ -172,7 +172,7 @@ static void init_db (s4be_t *s4)
 {
 	header_t *header;
 
-	s4->size = pagesize();
+	s4->size = pagesize ();
 	map_file (s4);
 
 	header = s4->map;
@@ -191,9 +191,9 @@ static int32_t make_chunks (s4be_t *be, int exp)
 	int i;
 	chunk_t *chunk;
 
-	grow_db (be, 1);
+	grow_db (be, size);
 
-	for (i = 0; i < pagesize(); i += size) {
+	for (i = 0; i < S4_ALIGN(size, pagesize ()); i += size) {
 		chunk = S4_PNT (be, ret + i, chunk_t);
 		chunk->next = ret + i + size;
 	}
@@ -214,7 +214,7 @@ static void mark_dirty (s4be_t *s4)
 	/* This should be fairly cheap, a 4 byte write */
 	if (header->sync_state != DIRTY) {
 		header->sync_state = DIRTY;
-		map_sync (s4, pagesize());
+		map_sync (s4, pagesize ());
 	}
 }
 
@@ -361,7 +361,7 @@ int32_t be_alloc (s4be_t* s4, int n)
 	if (l < 0)
 		l = 0;
 
-	if (l >= BIGGEST_CHUNK) {
+	if (l > (BIGGEST_CHUNK - SMALLEST_CHUNK)) {
 		S4_ERROR ("Trying to allocate a bigger chunk than we allow!");
 		return -1;
 	}
@@ -370,7 +370,7 @@ int32_t be_alloc (s4be_t* s4, int n)
 		ret = make_chunks (s4, l);
 		header = s4->map;
 		header->free_lists[l] = ret;
-		header->free += pagesize();
+		header->free += S4_ALIGN(n, pagesize ());
 	}
 
 	ret = header->free_lists[l];
@@ -395,6 +395,9 @@ void be_free(s4be_t* s4, int32_t off, int size)
 	int32_t l = log2 (size) - SMALLEST_CHUNK;
 	header_t *header = s4->map;
 	chunk_t *chunk = S4_PNT (s4, off, chunk_t);
+
+	if (l < 0)
+		l = 0;
 
 	chunk->next = header->free_lists[l];
 	header->free_lists[l] = off;

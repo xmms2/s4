@@ -17,24 +17,34 @@
 
 #include "be.h"
 
+/**
+ * Structure used to lookup and insert things into the patricie trie
+ */
 typedef struct pat_key_St {
-	void *data;
-	int32_t key_len;
-	int32_t data_len;
+	void *common_key;
+	int32_t common_keylen; /* length in bits! */
+
+	void *unique_key;
+	int32_t unique_keylen; /* length in bytes */
+	int32_t unique_keyoff; /* the number of bytes to skip when comparing */
 } pat_key_t;
 
 
 typedef struct pat_trie_St {
 	int32_t root;
 	int32_t list_start;
-	int32_t list_end;
 } pat_trie_t;
 
 
 int32_t pat_lookup (s4be_t *s4, int32_t trie, pat_key_t *key);
+int32_t pat_lookup_parent (s4be_t *s4, int32_t trie, pat_key_t *key);
 int32_t pat_insert (s4be_t *s4, int32_t trie, pat_key_t *key);
 int     pat_remove (s4be_t *s4, int32_t trie, pat_key_t *key);
 int32_t pat_node_to_key (s4be_t *s4, int32_t node);
+int32_t pat_parent (s4be_t *s4, int32_t node);
+int32_t pat_parent_key_count (s4be_t *s4, int32_t parent);
+int32_t pat_parent_first_key (s4be_t *s4, int32_t parent);
+char   *pat_node_to_str (s4be_t *s4, int32_t node);
 int32_t pat_first (s4be_t *s4, int32_t trie);
 int32_t pat_next (s4be_t *s4, int32_t trie, int32_t node);
 int     pat_verify (s4be_t *be, int32_t trie);

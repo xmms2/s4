@@ -678,9 +678,10 @@ int bpt_remove (s4be_t *be, int32_t bpt, bpt_record_t *record)
  * @param bpt The B+ tree
  * @param start Where to start the search
  * @param stop Where to stop the search
+ * @param key Set to 1 if you want to save the index key instead of the key data.
  * @return A set with all entries between start and stop
  */
-s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t *start, bpt_record_t *stop)
+s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t *start, bpt_record_t *stop, int key)
 {
 	s4_set_t *set = NULL;
 	s4_entry_t entry;
@@ -705,8 +706,13 @@ s4_set_t *bpt_find (s4be_t *be, int32_t bpt, bpt_record_t *start, bpt_record_t *
 			}
 
 			entry.src_s = entry.key_s = entry.val_s = NULL;
-			entry.key_i = pl->keys[index].key_b;
-			entry.val_i = pl->keys[index].val_b;
+			if (key) {
+				entry.key_i = pl->keys[index].key_a;
+				entry.val_i = pl->keys[index].val_a;
+			} else {
+				entry.key_i = pl->keys[index].key_b;
+				entry.val_i = pl->keys[index].val_b;
+			}
 			entry.src_i = pl->keys[index].src;
 			if (entry.key_i < 0)
 				entry.type = ENTRY_INT;
