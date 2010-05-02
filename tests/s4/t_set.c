@@ -77,6 +77,9 @@ CASE (test_set_intersection) {
 
 	test_set (s4_set_intersection (create_set (s2_a), create_set (s2_b)), s2_r);
 	test_set (s4_set_intersection (create_set (s2_b), create_set (s2_a)), s2_r);
+
+	test_set (s4_set_intersection (create_set  (s1_a), NULL), s1_r);
+	test_set (s4_set_intersection (NULL, create_set  (s1_a)), s1_r);
 }
 
 CASE (test_set_union) {
@@ -93,6 +96,21 @@ CASE (test_set_union) {
 	test_set (s4_set_union (NULL, create_set (s2_a)), s2_a);
 
 	test_set (s4_set_union (create_set (s1_a), create_set (s1_a)), s1_a);
+}
+
+CASE (test_set_complement) {
+	int s1_a[] = {1, 2, 3, -1};
+	int s1_b[] = {1, 2, 3, 4, 5, 6, -1};
+	int s1_r[] = {4, 5, 6, -1};
+	int empty[] = {-1};
+	int s2_a[] = {1, 3, 5, -1};
+	int s2_b[] = {2, 4, 6, -1};
+	int s2_r[] = {2, 4, 6, -1};
+
+	test_set (s4_set_complement (create_set (s1_a), create_set (s1_b)), s1_r);
+	test_set (s4_set_complement (NULL, create_set (s1_b)), s1_b);
+	test_set (s4_set_complement (create_set (s1_a), NULL), empty);
+	test_set (s4_set_complement (create_set (s2_a), create_set (s2_b)), s2_r);
 }
 
 CASE (test_set_next) {
@@ -116,6 +134,8 @@ CASE (test_set_get) {
 	}
 
 	CU_ASSERT_EQUAL (-1, s[i]);
+	CU_ASSERT_PTR_NULL (s4_set_get (set, -1));
+	CU_ASSERT_PTR_NULL (s4_set_get (set, size));
 }
 
 /* This test relies on create_set using s4_set_insert! */

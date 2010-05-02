@@ -15,6 +15,7 @@
 #include "xcu.h"
 #include "s4.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <glib.h>
 #include <glib/gstdio.h>
 
@@ -130,8 +131,8 @@ CASE (entry_smaller_greater) {
 
 	entry = s4_entry_get_i (s4, "prop", 4);
 
-	test_set (s4_entry_smaller (s4, entry), smaller);
-	test_set (s4_entry_greater (s4, entry), greater);
+	test_set (s4_entry_smaller (s4, entry, 0), smaller);
+	test_set (s4_entry_greater (s4, entry, 0), greater);
 
 	entry = s4_entry_get_i (s4, "prop", 1);
 
@@ -173,4 +174,99 @@ CASE (entry_fillin) {
 
 	s4_entry_free (entry);
 	s4_entry_free (prop);
+}
+
+static void check_string_set (s4_set_t *set, const char **strs)
+{
+	int size, i;
+	int *found;
+	s4_entry_t *e;
+
+	for (i = 0; strs[i] != NULL; i++);
+	size = i;
+	found = calloc (sizeof (int) * size, 1);
+
+	CU_ASSERT_EQUAL (s4_set_size (set), size);
+
+
+	for (e = s4_set_next (set); e != NULL; e = s4_set_next (set)) {
+		s4_entry_fillin (s4, e);
+		for (i = 0; i < size; i++) {
+			if (!strcmp (strs[i], e->val_s)) {
+				CU_ASSERT_EQUAL (found[i], 0);
+				found[i] = 1;
+				break;
+			}
+		}
+	}
+
+	for (i = 0; i < size; i++) {
+		CU_ASSERT_EQUAL (found[i], 1);
+	}
+}
+
+CASE (entry_get_entries) {
+	s4_entry_t *e, *p;
+	s4_set_t *set;
+	const char *strings[] = {"bar", "Bar", "bAr", "BAR", NULL};
+
+	e = s4_entry_get_s (s4, "foo", "foo");
+	p = s4_entry_get_s (s4, "bar", "bar");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "get_entries"), 0);
+	p = s4_entry_get_s (s4, "bar", "bAr");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "get_entries"), 0);
+	p = s4_entry_get_s (s4, "Bar", "BAR");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "get_entries"), 0);
+
+	set = s4_entry_get_entries (s4, "bar", "bar");
+	CU_ASSERT_EQUAL (s4_set_size (set), 4);
+
+	check_string_set (set, strings);
+
+	set = s4_entry_get_entries (s4, "bar", "nosuchstring");
+	CU_ASSERT_EQUAL (s4_set_size (set), 0);
+}
+
+CASE (entry_match) {
+	s4_entry_t *e, *p;
+	s4_set_t *sa, *sb;
+	const char *res1[] = {"e", "b", "c", "d", NULL};
+	const char *res2[] = {"b", "c", NULL};
+	const char *res3[] = {"c", "f", NULL};
+
+	e = s4_entry_get_s (s4, "parent", "a");
+	p = s4_entry_get_s (s4, "match", "asdf");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "b");
+	p = s4_entry_get_s (s4, "match", "foo");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "c");
+	p = s4_entry_get_s (s4, "match", "foobar");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "d");
+	p = s4_entry_get_s (s4, "match", "Foo");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "e");
+	p = s4_entry_get_s (s4, "match", "Foobar");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "f");
+	p = s4_entry_get_s (s4, "match", "foibar");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+	e = s4_entry_get_s (s4, "parent", "g");
+	p = s4_entry_get_s (s4, "match", "fiobar");
+	CU_ASSERT_EQUAL (s4_entry_add (s4, e, p, "match"), 0);
+
+	e = s4_entry_get_i (s4, "match", -1);
+	s4_entry_fillin (s4, e);
+	e->key_i = -e->key_i;
+	sa = s4_entry_greater (s4, e, 1);
+
+	CU_ASSERT_EQUAL (s4_set_size (sa), 7);
+
+	sb = s4_entry_match (s4, sa, "foo*", 0);
+	check_string_set (sb, res1);
+	sb = s4_entry_match (s4, sa, "foo*", 1);
+	check_string_set (sb, res2);
+	sb = s4_entry_match (s4, sa, "fo?bar", 1);
+	check_string_set (sb, res3);
 }

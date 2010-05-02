@@ -57,6 +57,7 @@ CASE (test_st_ref) {
 	}
 }
 
+/*
 static void regexp_test (const char *pat, ...)
 {
 	va_list ap;
@@ -88,6 +89,7 @@ static void regexp_test (const char *pat, ...)
 
 	CU_ASSERT_PTR_NULL (start);
 }
+*/
 
 CASE (test_st_regexp) {
 	const char *strings[] = {"foo", "fooba", "10", "11", "FOOBAR", NULL};
@@ -96,7 +98,9 @@ CASE (test_st_regexp) {
 	for (i = 0; strings[i] != NULL; i++)
 		s4be_st_ref (be, strings[i]);
 
+	/*
 	regexp_test ("foo", "foo", "fooba", "FOOBAR", NULL);
 	regexp_test ("(?-i)FOO", "FOOBAR", NULL);
 	regexp_test ("1(1|0)", "10", "11", NULL);
+	*/
 }
