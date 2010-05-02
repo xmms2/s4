@@ -25,13 +25,6 @@ def build(bld):
         verify.install_path = 0
         verify.uselib_local = 's4'
 
-        imp = bld.new_task_gen('cc', 'program')
-        imp.source = ["s4_import.c"]
-        imp.target = "s4_import"
-        imp.install_path = 0
-        imp.uselib_local = "s4"
-        imp.uselib = "sqlite3"
-
         recover = bld.new_task_gen('cc', 'program')
         recover.source = ["s4_recover.c"]
         recover.target = "s4_recover"
@@ -48,7 +41,6 @@ def build(bld):
 
 def configure(conf):
     if Options.options.build_tools:
-        conf.check_cfg(package='sqlite3', atleast_version='3.5', uselib_store='sqlite3', args='--cflags --libs', mandatory=1)
         conf.env['BUILD_TOOLS'] = True
     else:
         conf.env['BUILD_TOOLS'] = False
@@ -57,4 +49,4 @@ def configure(conf):
 def set_options(opt):
     opt.add_option("--build-tools", action="store_true", default=False,
                     dest="build_tools",
-                    help="Build S4 tools to verify, recover and import databases.")
+                    help="Build S4 tools to verify and recover databases.")
