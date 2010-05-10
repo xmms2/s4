@@ -447,6 +447,25 @@ s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case
 	return ret;
 }
 
+s4_entry_t *s4_entry_copy (s4_entry_t *entry)
+{
+	s4_entry_t *ret = malloc (sizeof (s4_entry_t));
+
+	*ret = *entry;
+
+	if (entry->key_s != NULL) {
+		ret->key_s = strdup (entry->key_s);
+	}
+	if (entry->val_s != NULL) {
+		ret->val_s = strdup (entry->val_s);
+	}
+	if (entry->src_s != NULL) {
+		ret->src_s = strdup (entry->src_s);
+	}
+
+	return ret;
+}
+
 /**
  * @}
  */
