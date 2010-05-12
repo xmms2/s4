@@ -39,6 +39,9 @@
 #define BIGGEST_CHUNK 16 /* 2^16 = 65536 */
 #define SMALLEST_CHUNK 4 /* 2^4  = 16 */
 
+#define S4_MAGIC 0x54DABA5E
+#define S4_VERSION 1
+
 /**
  *
  * @defgroup Homegrown Homegrown
@@ -52,6 +55,8 @@ typedef struct header_St {
 	pat_trie_t string_store;
 	bpt_t int_store, int_rev;
 	int32_t sync_state;
+	int32_t magic;
+	int32_t version;
 
 	int32_t free_lists[BIGGEST_CHUNK - SMALLEST_CHUNK + 1];
 	int free;
@@ -179,6 +184,8 @@ static void init_db (s4be_t *s4)
 
 	memset (header, -1, sizeof (header_t));
 	header->sync_state = DIRTY;
+	header->magic = S4_MAGIC;
+	header->version = S4_VERSION;
 	header->free = 0;
 	s4be_sync (s4);
 }
@@ -216,6 +223,15 @@ static void mark_dirty (s4be_t *s4)
 		header->sync_state = DIRTY;
 		map_sync (s4, pagesize ());
 	}
+}
+
+static void close_file (s4be_t *s4)
+{
+#ifdef _WIN32
+	CloseHandle (s4->fd);
+#else
+	close (s4->fd);
+#endif
 }
 
 /**
@@ -287,6 +303,17 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 		map_file (s4);
 		if (s4->map == NULL) {
 			S4_ERROR ("Could not map %s", filename);
+			close_file (s4);
+			free (s4);
+			return NULL;
+		}
+
+		header_t *hdr = s4->map;
+		if (hdr->magic != S4_MAGIC) {
+			S4_ERROR ("Wrong magic number in %s", filename);
+			s4_set_errno (S4E_MAGIC);
+			close_file (s4);
+			free (s4);
 			return NULL;
 		}
 	}
@@ -310,11 +337,7 @@ int s4be_close (s4be_t* s4)
 	s4be_sync (s4);
 	map_unmap (s4);
 
-#ifdef _WIN32
-	CloseHandle (s4->fd);
-#else
-	close (s4->fd);
-#endif
+	close_file (s4);
 	free (s4);
 
 	return 0;
