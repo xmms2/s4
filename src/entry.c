@@ -420,6 +420,9 @@ s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case
 	ret = NULL;
 
 	for (i = 0; i < s4_set_size (set); i++, entry++) {
+		if (entry->type != ENTRY_STR || entry->val_i <= 0) {
+			continue;
+		}
 		if (case_sens) {
 			str = s4be_st_reverse (s4->be, entry->val_i);
 		} else {
