@@ -82,6 +82,9 @@ s4_t *s4_open (const char *filename, int flags)
 
 		if (verified == 0 && !(flags & S4_RECOVER)) {
 			s4be_close (be);
+
+			s4_set_errno (S4E_INCONS);
+
 			return NULL;
 		}
 	}
@@ -196,6 +199,9 @@ int s4_start_sync_thread (s4_t *s4)
 	if (s4->s_thread == NULL) {
 		g_mutex_free (s4->cond_mutex);
 		g_cond_free (s4->cond);
+
+		s4_set_errno (S4E_STHREAD);
+
 		return 0;
 	}
 

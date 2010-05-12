@@ -243,8 +243,8 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 			NULL);
 
 	if (s4->fd == INVALID_HANDLE_VALUE) {
-		free (s4);
 		S4_ERROR ("Could not open %s", filename);
+		free (s4);
 		return NULL;
 	}
 #else
@@ -258,8 +258,16 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 
 	s4->fd = open (filename, flags, 0644);
 	if (s4->fd == -1) {
-		free (s4);
+		int err = -1;
+		/* Try to convert some of the libc error codes to S4 error codes */
+		switch (errno) {
+			case EEXIST: err = S4E_EXISTS; break;
+			case ENOENT: err = S4E_NOENT; break;
+			default: err = S4E_OPEN; break;
+		}
+		s4_set_errno (err);
 		S4_ERROR ("Could not open %s : %s", filename, strerror (errno));
+		free (s4);
 		return NULL;
 	}
 #endif
