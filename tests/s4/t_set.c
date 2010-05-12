@@ -72,11 +72,15 @@ CASE (test_set_intersection) {
 	int s2_b[] = {1, 3, 5, -1};
 	int s2_r[] = {1, 3, -1};
 
+	int s3[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1};
+
 	test_set (s4_set_intersection (create_set (s1_a), create_set (s1_b)), s1_r);
 	test_set (s4_set_intersection (create_set (s1_b), create_set (s1_a)), s1_r);
 
 	test_set (s4_set_intersection (create_set (s2_a), create_set (s2_b)), s2_r);
 	test_set (s4_set_intersection (create_set (s2_b), create_set (s2_a)), s2_r);
+
+	test_set (s4_set_intersection (create_set (s3), create_set (s3)), s3);
 
 	test_set (s4_set_intersection (create_set  (s1_a), NULL), s1_r);
 	test_set (s4_set_intersection (NULL, create_set  (s1_a)), s1_r);
