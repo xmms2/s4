@@ -78,6 +78,7 @@ int s4_set_insert (s4_set_t *set, s4_entry_t *entry);
 /* entry.c */
 s4_entry_t *s4_entry_get_s (s4_t *s4, const char *key, const char *val);
 s4_entry_t *s4_entry_get_i (s4_t *s4, const char *key, int val);
+s4_entry_t *s4_entry_copy (s4_entry_t *entry);
 void s4_entry_free (s4_entry_t *entry);
 void s4_entry_free_strings (s4_entry_t *entry);
 s4_set_t *s4_entry_contains (s4_t *s4, s4_entry_t *entry);
