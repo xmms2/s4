@@ -36,6 +36,7 @@
 #define S4E_OPEN  3
 #define S4E_STHREAD 4
 #define S4E_INCONS 5
+#define S4E_MAGIC 6
 
 typedef struct s4_entry_St {
 	int type;
@@ -69,7 +70,7 @@ int s4_recover (s4_t *s4, const char *name);
 void s4_sync (s4_t *s4);
 int s4_start_sync_thread (s4_t *s4);
 int s4_stop_sync_thread (s4_t *s4);
-int s4_errno ();
+int s4_errno (void);
 
 /* set.c */
 s4_set_t *s4_set_new (int size);
