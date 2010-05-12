@@ -143,3 +143,11 @@ CASE (s4_recover) {
 
 	_close();
 }
+
+CASE (s4_open) {
+	name = strdup (tmpnam (NULL));
+	s4 = s4_open (name, S4_VERIFY | S4_EXISTS);
+
+	CU_ASSERT_PTR_NULL (s4);
+	CU_ASSERT_EQUAL (s4_errno(), S4E_NOENT);
+}
