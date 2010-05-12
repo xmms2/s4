@@ -18,6 +18,7 @@
 #include <s4.h>
 #include <stdint.h>
 
+void s4_set_errno (int err);
 
 s4be_t *s4be_open (const char *filename, int flags);
 int s4be_close (s4be_t *be);

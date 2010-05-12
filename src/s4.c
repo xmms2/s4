@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <glib/gstdio.h>
 
+static GStaticPrivate errno = G_STATIC_PRIVATE_INIT;
 
 /**
  *
@@ -384,6 +385,39 @@ int s4_recover (s4_t *s4, const char *name)
 	s4be_close (rec);
 
 	return ret;
+}
+
+
+/**
+ * Return the last error number set.
+ * This function is thread safe, error numbers set in one thread
+ * will NOT be seen in another thread.
+ *
+ * @return The last error number set, or 0 if none has been set
+ */
+int s4_errno()
+{
+	int *i = g_static_private_get (&errno);
+	if (i == NULL) {
+		return 0;
+	}
+	return *i;
+}
+
+/**
+ * Set errno to the given error number
+ *
+ * @param err The error number to set
+ */
+void s4_set_errno (int err)
+{
+	int *i = g_static_private_get (&errno);
+	if (i == NULL) {
+		i = malloc (sizeof (int));
+		g_static_private_set (&errno, i, NULL);
+	}
+
+	*i = err;
 }
 
 /**
