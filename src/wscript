@@ -5,7 +5,7 @@
 
 import Options
 
-backend = 'homegrown'
+backend = 'midb'
 
 def build(bld):
     bld.add_subdirs(backend)

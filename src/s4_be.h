@@ -37,7 +37,7 @@ char *s4be_st_reverse (s4be_t *be, int str_id);
 char *s4be_st_reverse_normalized (s4be_t *be, int str_id);
 char *s4be_st_normalize (const char *key);
 void s4be_st_foreach (s4be_t *be,
-		void (*func) (int32_t node, void *userdata),
+		void (*func) (int32_t node, const char *str, void *userdata),
 		void *userdata);
 
 int s4be_ip_add (s4be_t *be, s4_entry_t *entry, s4_entry_t *prop);
