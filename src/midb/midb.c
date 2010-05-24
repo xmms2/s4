@@ -165,7 +165,8 @@ static void _free (s4be_t *s4)
 {
 	g_hash_table_destroy (s4->str_table);
 	g_hash_table_destroy (s4->norm_str_table);
-	g_hash_table_destroy (s4->id_str_table);
+
+	idt_destroy (s4->id_str_table);
 
 	bpt_destroy (s4->int_store);
 	bpt_destroy (s4->rev_store);
@@ -186,7 +187,8 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 
 	s4->str_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, free);
 	s4->norm_str_table = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, free);
-	s4->id_str_table = g_hash_table_new_full (g_int_hash, g_int_equal, free, NULL);
+	s4->id_str_table = idt_create ();
+	idt_insert (s4->id_str_table, NULL);
 
 	g_static_mutex_init (&s4->str_table_lock);
 	g_static_mutex_init (&s4->norm_str_table_lock);

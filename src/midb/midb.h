@@ -19,13 +19,14 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "bpt.h"
+#include "idt.h"
 
 struct s4be_St {
 	GHashTable *str_table; 
 	GStaticMutex str_table_lock;
 	GHashTable *norm_str_table;
 	GStaticMutex norm_str_table_lock;
-	GHashTable *id_str_table;
+	idt_t *id_str_table;
 	GStaticMutex id_str_table_lock;
 
 	GStaticRWLock rwlock;

@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "log.h"
 #include "midb.h"
 
 typedef struct norm_str_St {
@@ -30,17 +31,12 @@ struct str_St {
 	int32_t id;
 };
 
-static int next_id = 0;
-
-str_t *s4be_st_insert (s4be_t *be, int32_t new_id, char *string)
+static void _norm_insert (s4be_t *be, str_t *str)
 {
-	str_t *str;
+	char *norm_str = s4be_st_normalize (str->str);
 	norm_str_t *norm;
-	int32_t *id;
-	char *norm_str = s4be_st_normalize (string);
 
 	g_static_mutex_lock (&be->norm_str_table_lock);
-
 	norm = g_hash_table_lookup (be->norm_str_table, norm_str);
 
 	if (norm == NULL) {
@@ -52,24 +48,38 @@ str_t *s4be_st_insert (s4be_t *be, int32_t new_id, char *string)
 		g_free (norm_str);
 	}
 
+	str->norm_str = norm;
+	norm->strings = g_list_prepend (norm->strings, str);
+	g_static_mutex_unlock (&be->norm_str_table_lock);
+}
+
+static str_t *_create_str (char *string)
+{
+	str_t *str;
+
 	str = malloc (sizeof (str_t));
 	str->str = string;
 	str->ref_count = 0;
-	str->id = new_id;
-	str->norm_str = norm;
+	return str;
+}
 
-	norm->strings = g_list_prepend (norm->strings, str);
-	g_static_mutex_unlock (&be->norm_str_table_lock);
-
-	g_hash_table_insert (be->str_table, str->str, str);
+str_t *s4be_st_insert (s4be_t *be, int32_t new_id, char *string)
+{
+	str_t *str = _create_str (string);
 
 	g_static_mutex_lock (&be->id_str_table_lock);
-	id = malloc (sizeof (int32_t));
-	*id = str->id;
-	g_hash_table_insert (be->id_str_table, id, str);
+	if (idt_replace (be->id_str_table, new_id, str) != NULL) {
+		S4_DBG ("Replaced a string in s4be_st_insert, this should never happen\n");
+	}
+	str->id = new_id;
 	g_static_mutex_unlock (&be->id_str_table_lock);
 
-	midb_log_string_insert (be, new_id, string);
+	_norm_insert (be, str);
+
+	g_static_mutex_lock (&be->str_table_lock);
+	g_hash_table_insert (be->str_table, string, str);
+	g_static_mutex_unlock (&be->str_table_lock);
+
 
 	return str;
 }
@@ -82,13 +92,23 @@ int s4be_st_ref (s4be_t *be, const char *string)
 
 	str = g_hash_table_lookup (be->str_table, string);
 	if (str == NULL) {
-		str = s4be_st_insert (be, ++next_id, strdup (string));
+		str = _create_str (strdup (string));
+
+		g_static_mutex_lock (&be->id_str_table_lock);
+		str->id = idt_insert (be->id_str_table, str);
+		g_static_mutex_unlock (&be->id_str_table_lock);
+
+		_norm_insert (be, str);
+
+		g_hash_table_insert (be->str_table, str->str, str);
+
+		midb_log_string_insert (be, str->id, string);
 	}
 	g_static_mutex_unlock (&be->str_table_lock);
 
 	str->ref_count++;
 
-	return str->id;;
+	return str->id;
 }
 
 int s4be_st_ref_id (s4be_t *be, int32_t id)
@@ -96,7 +116,7 @@ int s4be_st_ref_id (s4be_t *be, int32_t id)
 	str_t *str;
 
 	g_static_mutex_lock (&be->id_str_table_lock);
-	str = g_hash_table_lookup (be->id_str_table, &id);
+	str = idt_get (be->id_str_table, id);
 	if (str == NULL) {
 		return -1;
 		g_static_mutex_unlock (&be->id_str_table_lock);
@@ -189,7 +209,7 @@ char *s4be_st_reverse (s4be_t *be, int str_id)
 {
 	str_t *str;
 	g_static_mutex_lock (&be->id_str_table_lock);
-	str = g_hash_table_lookup (be->id_str_table, &str_id);
+	str = idt_get (be->id_str_table, str_id);
 	g_static_mutex_unlock (&be->id_str_table_lock);
 
 	if (str == NULL)
@@ -202,7 +222,7 @@ char *s4be_st_reverse_normalized (s4be_t *be, int str_id)
 {
 	str_t *str;
 	g_static_mutex_lock (&be->id_str_table_lock);
-	str = g_hash_table_lookup (be->id_str_table, &str_id);
+	str = idt_get (be->id_str_table, str_id);
 	g_static_mutex_unlock (&be->id_str_table_lock);
 
 	if (str == NULL)
@@ -232,7 +252,7 @@ void s4be_st_foreach (s4be_t *be,
 	GHashTableIter iter;
 	str_t *str;
 
-	g_static_mutex_lock (&be->id_str_table_lock);
+	g_static_mutex_lock (&be->str_table_lock);
 	g_hash_table_iter_init (&iter, be->str_table);
 
 	while (g_hash_table_iter_next (&iter, NULL, (gpointer*)&str)) {
@@ -240,5 +260,5 @@ void s4be_st_foreach (s4be_t *be,
 			func (str->id, str->str, userdata);
 	}
 
-	g_static_mutex_unlock (&be->id_str_table_lock);
+	g_static_mutex_unlock (&be->str_table_lock);
 }

@@ -6,7 +6,7 @@
 
 def build(bld):
     obj = bld.new_task_gen('cc')
-    obj.source = "strstore.c bpt.c intpair.c midb.c log.c".split()
+    obj.source = "strstore.c bpt.c intpair.c midb.c log.c idt.c".split()
     obj.includes = '.. ../../include'
     obj.target = 's4_backend'
     obj.uselib = 'glib2'
