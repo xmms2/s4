@@ -67,11 +67,10 @@ static int _read_string (s4be_t *s4, FILE *file)
  */
 static int _read_relations (s4be_t *s4, FILE *file)
 {
-	bpt_record_t rec;
+	midb_data_t rec;
+	s4_entry_t e,p;
 
-	while (fread (&rec, sizeof (bpt_record_t), 1, file) == 1) {
-		bpt_record_t rev;
-
+	while (fread (&rec, sizeof (midb_data_t), 1, file) == 1) {
 		if (rec.key_a < 0) {
 			if (s4be_st_ref_id (s4, -rec.key_a) == -1)
 				return -1;
@@ -92,14 +91,14 @@ static int _read_relations (s4be_t *s4, FILE *file)
 		if (s4be_st_ref_id (s4, rec.src) == -1)
 			return -1;
 
-		rev.key_a = rec.key_b;
-		rev.val_a = rec.val_b;
-		rev.key_b = rec.key_a;
-		rev.val_b = rec.val_a;
-		rev.src = rec.src;
+		e.key_i = rec.key_a;
+		e.val_i = rec.val_a;
+		e.src_i = rec.src;
+		p.key_i = rec.key_b;
+		p.val_i = rec.val_b;
+		p.src_i = rec.src;
 
-		if (bpt_insert (s4->int_store, &rec) == -1 ||
-				bpt_insert (s4->rev_store, &rev) == -1)
+		if (s4be_ip_add (s4, &e, &p) == -1)
 			return -1;
 	}
 
@@ -168,8 +167,8 @@ static void _free (s4be_t *s4)
 
 	idt_destroy (s4->id_str_table);
 
-	bpt_destroy (s4->int_store);
-	bpt_destroy (s4->rev_store);
+	//bpt_destroy (s4->int_store);
+	//bpt_destroy (s4->rev_store);
 
 	free (s4);
 }
@@ -196,8 +195,8 @@ s4be_t *s4be_open (const char *filename, int open_flags)
 
 	g_static_rw_lock_init (&s4->rwlock);
 
-	s4->int_store = bpt_create ();
-	s4->rev_store = bpt_create ();
+//	s4->int_store = bpt_create ();
+//	s4->rev_store = bpt_create ();
 
 	s4->logfile = NULL;
 	s4->filename = strdup (filename);
@@ -222,11 +221,18 @@ static void _write_string (int32_t str_id, const char *str, void *ud)
 	fwrite (str, 1, len, file);
 }
 
-static void _write_relation (bpt_record_t rec, void *ud)
+static void _write_relation (s4_entry_t *e, s4_entry_t *p, void *ud)
 {
 	FILE *file = ud;
+	midb_data_t rec;
 
-	fwrite (&rec, sizeof (bpt_record_t), 1, file);
+	rec.key_a = e->key_i;
+	rec.val_a = e->val_i;
+	rec.key_b = p->key_i;
+	rec.val_b = p->val_i;
+	rec.src = p->src_i;
+
+	fwrite (&rec, sizeof (midb_data_t), 1, file);
 }
 
 static int _write_file (s4be_t *s4, const char *filename)
@@ -240,7 +246,7 @@ static int _write_file (s4be_t *s4, const char *filename)
 
 	fwrite (&i, sizeof (int32_t), 1, file);
 
-	bpt_foreach (s4->int_store, _write_relation, file);
+	s4be_ip_foreach (s4, _write_relation, file);
 	fclose (file);
 
 	return 0;
@@ -278,7 +284,7 @@ int s4be_verify (s4be_t *be, int thorough)
 	int ret = 1;
 
 	if (thorough) {
-		ret = bpt_verify (be->int_store) & bpt_verify (be->rev_store);
+		//ret = bpt_verify (be->int_store) & bpt_verify (be->rev_store);
 	}
 
 	return ret;

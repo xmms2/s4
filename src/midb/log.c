@@ -17,7 +17,7 @@ void midb_log_string_insert (s4be_t *be, int32_t id, const char *string)
 /**
  * Wrapper for midb_log, writes a LOG_PAIR_INSERT entry
  */
-void midb_log_pair_insert (s4be_t *be, bpt_record_t *rec)
+void midb_log_pair_insert (s4be_t *be, midb_data_t *rec)
 {
 	log_entry_t entry;
 	entry.type = LOG_PAIR_INSERT;
@@ -28,7 +28,7 @@ void midb_log_pair_insert (s4be_t *be, bpt_record_t *rec)
 /**
  * Wrapper for midb_log, writes a LOG_PAIR_REMOVE entry
  */
-void midb_log_pair_remove (s4be_t *be, bpt_record_t *rec)
+void midb_log_pair_remove (s4be_t *be, midb_data_t *rec)
 {
 	log_entry_t entry;
 	entry.type = LOG_PAIR_REMOVE;
@@ -56,7 +56,7 @@ void midb_log (s4be_t *be, log_entry_t *entry)
 			break;
 		case LOG_PAIR_INSERT:
 		case LOG_PAIR_REMOVE:
-			fwrite (entry->data.pair, sizeof (bpt_record_t), 1, be->logfile);
+			fwrite (entry->data.pair, sizeof (midb_data_t), 1, be->logfile);
 			break;
 		default:
 			S4_DBG ("Trying to write a log entry with invalid type");

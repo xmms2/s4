@@ -18,11 +18,11 @@
 #include <glib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "bpt.h"
+#include <s4_be.h>
 #include "idt.h"
 
 struct s4be_St {
-	GHashTable *str_table; 
+	GHashTable *str_table;
 	GStaticMutex str_table_lock;
 	GHashTable *norm_str_table;
 	GStaticMutex norm_str_table_lock;
@@ -33,19 +33,22 @@ struct s4be_St {
 
 	FILE *logfile;
 	char *filename;
-
-	bpt_t *int_store;
-	bpt_t *rev_store;
 };
 
 #define LOG_STRING_INSERT  1
 #define LOG_PAIR_INSERT 2
 #define LOG_PAIR_REMOVE 3
 
+typedef struct midb_data_St {
+	int32_t key_a, val_a;
+	int32_t key_b, val_b;
+	int32_t src;
+} midb_data_t;
+
 typedef struct log_entry_St {
 	int32_t type;
 	union {
-		bpt_record_t *pair;
+		midb_data_t *pair;
 		struct {
 			const char *str;
 			int32_t id;
@@ -65,7 +68,12 @@ str_t *s4be_st_insert (s4be_t *be, int32_t new_id, char *string);
 
 void midb_log (s4be_t *be, log_entry_t *entry);
 void midb_log_string_insert (s4be_t *be, int32_t id, const char *string);
-void midb_log_pair_insert (s4be_t *be, bpt_record_t *rec);
-void midb_log_pair_remove (s4be_t *be, bpt_record_t *rec);
+void midb_log_pair_insert (s4be_t *be, midb_data_t *rec);
+void midb_log_pair_remove (s4be_t *be, midb_data_t *rec);
+
+void sp_add (s4be_t *be, int32_t src);
+GHashTable *sp_create (s4be_t *be, const char *srcprefs[]);
+void sp_free (GHashTable *h);
+int sp_get (s4be_t *be, int32_t src);
 
 #endif
