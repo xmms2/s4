@@ -112,6 +112,9 @@ static int ip_leaf_insert (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t sr
 		ip_data_t d = leaf->data[i];
 		if (d.key == key && d.val == val && d.src == src)
 			return -1;
+		if (d.key > key || (d.key == key && (d.val > val || (d.val == val && (d.src > src))))) {
+			break;
+		}
 	}
 
 	if (leaf->size == leaf->alloc) {
@@ -119,9 +122,12 @@ static int ip_leaf_insert (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t sr
 		leaf->data = realloc (leaf->data, sizeof (ip_data_t) * leaf->alloc);
 	}
 
-	leaf->data[leaf->size].key = key;
-	leaf->data[leaf->size].val = val;
-	leaf->data[leaf->size].src = src;
+	memmove (leaf->data + i + 1, leaf->data + i,
+			(leaf->size - i) * sizeof (ip_data_t));
+
+	leaf->data[i].key = key;
+	leaf->data[i].val = val;
+	leaf->data[i].src = src;
 	leaf->size++;
 
 	return 0;
@@ -394,4 +400,80 @@ void s4be_ip_foreach (s4be_t *be,
 			}
 		}
 	}
+}
+
+GList *s4be_ip_fetch (s4be_t *be, s4_set_t *set, int32_t fetch[], int size)
+{
+	GList *ret = NULL;
+	ip_node_t *n;
+	ip_leaf_t *l;
+	int i, j, k;
+	int32_t src, prev_key = INT32_MIN;
+	s4_entry_t *e;
+	int32_t *best_src = malloc (sizeof (int32_t) * size);
+	int32_t *best_pos = malloc (sizeof (int32_t) * size);
+	s4_val_t **vals;
+	int32_t id_val = s4be_st_lookup (be, "id");
+
+	for (e = s4_set_next (set); e != NULL; e = s4_set_next (set)) {
+		if (prev_key != e->key_i) {
+			n = ip_lookup (&root, e->key_i);
+			if (n == NULL)
+				continue;
+			prev_key = e->key_i;
+		}
+		l = ip_lookup (n, e->val_i);
+		if (l == NULL)
+			continue;
+
+		for (i = 0; i < size; i++)
+			best_src[i] = INT32_MAX;
+
+		for (i = 0, j = 0; i < l->size; i++) {
+			while (l->data[i].key > fetch[j] && j < size) j++;
+
+			if (j >= size)
+				break;
+
+			if ((l->data[i].key == fetch[j] || l->data[i].key == -fetch[j]) &&
+					(src = sp_get (be, l->data[i].src)) < best_src[j]) {
+				best_pos[j] = i;
+				best_src[j] = src;
+			}
+		}
+
+		vals = malloc (sizeof (s4_val_t*) * size);
+
+		for (i = 0; i < size; i++) {
+			if (fetch[i] == id_val) {
+				s4_val_t *val = malloc (sizeof (s4_val_t));
+
+				val->val.i = l->val;
+				val->type = S4_VAL_INT;
+				vals[i] = val;
+			}
+			else if (best_src[i] != INT32_MAX) {
+				s4_val_t *val = malloc (sizeof (s4_val_t));
+
+				if (l->data[best_pos[i]].key > 0) {
+					val->val.s = s4be_st_reverse (be, l->data[best_pos[i]].val);
+					val->type = S4_VAL_STR;
+				} else {
+					val->val.i = l->data[best_pos[i]].val;
+					val->type = S4_VAL_INT;
+				}
+
+				vals[i] = val;
+			} else {
+				vals[i] = NULL;
+			}
+		}
+
+		ret = g_list_prepend (ret, vals);
+	}
+
+	free (best_pos);
+	free (best_src);
+
+	return ret;
 }

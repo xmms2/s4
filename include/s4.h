@@ -16,6 +16,7 @@
 #define _S4_H
 
 #include <glib.h>
+#include <stdint.h>
 
 #define ENTRY_INT 0
 #define ENTRY_STR 1
@@ -47,6 +48,17 @@ typedef struct s4_entry_St {
 	char *src_s;
 	int src_i;
 } s4_entry_t;
+
+#define S4_VAL_STR 1
+#define S4_VAL_INT 2
+
+typedef struct s4_val_St {
+	int type;
+	union {
+		const char *s;
+		int32_t i;
+	} val;
+} s4_val_t;
 
 struct s4_set_St;
 typedef struct s4_set_St s4_set_t;
@@ -100,6 +112,9 @@ s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry, int key);
 s4_set_t *s4_entry_get_property (s4_t *s4, s4_entry_t *entry, const char *prop);
 s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case_sens);
 s4_set_t *s4_entry_get_entries (s4_t *s4, const char *key, const char *val);
+
+GList *s4_fetch (s4_t *s4, s4_set_t *set, const char *fetch[]);
+void s4_val_free (s4_val_t *val);
 
 /* query.c */
 // s4_set_t *s4_query (s4_t *s4, xmms_coll_dag_t *dag, xmmsv_coll_t *coll);

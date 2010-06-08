@@ -426,6 +426,48 @@ void s4_set_errno (int err)
 	*i = err;
 }
 
+GList *s4be_ip_fetch (s4be_t *be, s4_set_t *set, int32_t fetch[], int size);
+GList *s4_fetch (s4_t *s4, s4_set_t *set, const char **fetch)
+{
+	int32_t *ifetch;
+	int i, j, size;
+	GList *ret;
+
+	s4be_st_ref (s4->be, "id");
+
+	for (size = 0; fetch[size] != NULL; size++);
+
+	ifetch = malloc (sizeof (int32_t) * size);
+
+	for (i = 0; i < size; i++) {
+		int32_t sn = s4be_st_lookup (s4->be, fetch[i]);
+		for (j = i - 1; j >= 0 && ifetch[j] > sn; j--) {
+			ifetch[j + 1] = ifetch[j];
+		}
+		ifetch[j + 1] = sn;
+	}
+
+	for (i = 0; i < size; i++) {
+		fetch[i] = s4be_st_reverse (s4->be, ifetch[i]);
+	}
+
+	s4be_st_unref (s4->be, "id");
+
+	ret = s4be_ip_fetch (s4->be, set, ifetch, size);
+
+	free (ifetch);
+
+	return ret;
+}
+
+void s4_val_free (s4_val_t *val)
+{
+	if (val->type == S4_VAL_STR)
+		free (val->val.s);
+
+	free (val);
+}
+
 /**
  * @}
  */

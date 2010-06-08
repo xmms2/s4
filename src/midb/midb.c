@@ -170,6 +170,7 @@ static void _free (s4be_t *s4)
 	//bpt_destroy (s4->int_store);
 	//bpt_destroy (s4->rev_store);
 
+	free (s4->filename);
 	free (s4);
 }
 
