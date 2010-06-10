@@ -1,4 +1,5 @@
 #include "s4_be.h"
+#include "query.h"
 #include "midb.h"
 #include <string.h>
 #include <stdlib.h>
@@ -407,7 +408,7 @@ GList *s4be_ip_fetch (s4be_t *be, s4_set_t *set, int32_t fetch[], int size)
 	GList *ret = NULL;
 	ip_node_t *n;
 	ip_leaf_t *l;
-	int i, j, k;
+	int i, j;
 	int32_t src, prev_key = INT32_MIN;
 	s4_entry_t *e;
 	int32_t *best_src = malloc (sizeof (int32_t) * size);
@@ -474,6 +475,102 @@ GList *s4be_ip_fetch (s4be_t *be, s4_set_t *set, int32_t fetch[], int size)
 
 	free (best_pos);
 	free (best_src);
+
+	return ret;
+}
+
+static int check_cond (s4be_t *be, ip_leaf_t *l, s4_condition_t *cond)
+{
+	int ret = 0;
+	int i;
+	switch (cond->type) {
+		case S4_COND_UNION:
+			for (i = 0; !ret && cond->cond.operands[i] != NULL; i++)
+				ret = check_cond (be, l, cond->cond.operands[i]);
+			break;
+		case S4_COND_INTERSECTION:
+			for (ret = 1, i = 0; ret && cond->cond.operands[i] != NULL; i++)
+				ret = check_cond (be, l, cond->cond.operands[i]);
+			break;
+		case S4_COND_COMPLEMENT:
+			for (i = 0; ret && cond->cond.operands[i] != NULL; i++)
+				ret = !check_cond (be, l, cond->cond.operands[i]);
+			break;
+
+		default:
+			if (cond->cond.filter.key == 0) {
+				ret = cond->cond.filter.func (l->val, cond->cond.filter.funcdata);
+			} else {
+				int src, best_pos, best_src = INT_MAX;
+				for (i = 0; i < l->size; i++) {
+					if ((l->data[i].key == cond->cond.filter.key ||
+								l->data[i].key == -cond->cond.filter.key) &&
+							(src = sp_get (be, l->data[i].src)) < best_src) {
+						best_src = src;
+						best_pos = i;
+					}
+				}
+
+				if (best_src != INT_MAX)
+					ret = cond->cond.filter.func (l->data[best_pos].val, cond->cond.filter.funcdata);
+			}
+			break;
+	}
+
+	return ret;
+}
+
+GList *s4be_ip_query (s4be_t *be, int32_t *fetch, int fetch_size, s4_condition_t *cond)
+{
+	GList *ret = NULL;
+	ip_node_t *n;
+	ip_leaf_t *l;
+	int i, j, k, f;
+	s4_val_t **vals;
+
+
+	for (i = 0; i < root.size; i++) {
+		n = root.links[i].data;
+		for (j = 0; j < n->size; j++) {
+			l = n->links[j].data;
+			if (!check_cond (be, l, cond))
+				continue;
+
+			vals = malloc (sizeof (s4_val_t*) * fetch_size);
+
+			for (k = 0; k < fetch_size; k++) {
+				if (fetch[k] == 0) {
+					vals[k] = malloc (sizeof (s4_val_t));
+					vals[k]->type = S4_VAL_INT;
+					vals[k]->val.i = l->val;
+
+					continue;
+				}
+
+				int src, best_pos, best_src = INT_MAX;
+				for (f = 0; f < l->size; f++) {
+					if ((l->data[f].key == fetch[k] || l->data[f].key == -fetch[k]) &&
+							(src = sp_get (be, l->data[f].src)) < best_src) {
+						best_src = src;
+						best_pos = f;
+					}
+				}
+				if (best_src == INT_MAX) {
+					vals[k] = NULL;
+				} else {
+					vals[k] = malloc (sizeof (s4_val_t));
+					if (l->data[best_pos].key > 0) {
+						vals[k]->val.s = s4be_st_reverse (be, l->data[best_pos].val);
+						vals[k]->type = S4_VAL_STR;
+					} else {
+						vals[k]->val.i = l->data[best_pos].val;
+						vals[k]->type = S4_VAL_INT;
+					}
+				}
+			}
+			ret = g_list_prepend (ret, vals);
+		}
+	}
 
 	return ret;
 }

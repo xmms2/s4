@@ -116,7 +116,33 @@ s4_set_t *s4_entry_get_entries (s4_t *s4, const char *key, const char *val);
 GList *s4_fetch (s4_t *s4, s4_set_t *set, const char *fetch[]);
 void s4_val_free (s4_val_t *val);
 
+typedef struct s4_query_St s4_query_t;
+
+typedef enum {
+	S4_COND_UNION,
+	S4_COND_INTERSECTION,
+	S4_COND_COMPLEMENT,
+	S4_COND_EQUAL,
+	S4_COND_GREATER,
+	S4_COND_SMALLER,
+	S4_COND_MATCH
+} s4_condition_type_t;
+
+typedef struct s4_query_condition_St {
+	s4_condition_type_t type;
+	union {
+		struct s4_query_condition_St **operands;
+		struct {
+			const char *key;
+			s4_val_t value;
+			const char *sourcepref;
+		} filter;
+	} cond;
+} s4_query_condition_t;
+
 /* query.c */
-// s4_set_t *s4_query (s4_t *s4, xmms_coll_dag_t *dag, xmmsv_coll_t *coll);
+s4_query_t *s4_query_new (s4_t *s4, const char **fetch, s4_query_condition_t *cond);
+GList *s4_query_run (s4_t *s4, s4_query_t *query);
+void s4_query_free (s4_query_t *query);
 
 #endif /* _S4_H */

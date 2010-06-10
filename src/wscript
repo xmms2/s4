@@ -10,7 +10,7 @@ backend = 'midb'
 def build(bld):
     bld.add_subdirs(backend)
     s4 = bld.new_task_gen('cc', 'staticlib')
-    s4.source = ['entry.c', 's4.c', 'set.c']
+    s4.source = ['entry.c', 's4.c', 'set.c', 'query.c']
     s4.includes = '../include'
     s4.target = 's4'
     s4.install_path = 0

@@ -17,6 +17,7 @@
 
 #include <s4.h>
 #include <stdint.h>
+#include "query.h"
 
 void s4_set_errno (int err);
 
@@ -47,6 +48,7 @@ s4_set_t *s4be_ip_has_this (s4be_t *be, s4_entry_t *entry);
 s4_set_t *s4be_ip_this_has (s4be_t *be, s4_entry_t *entry);
 s4_set_t *s4be_ip_smaller (s4be_t *be, s4_entry_t *entry, int key);
 s4_set_t *s4be_ip_greater (s4be_t *be, s4_entry_t *entry, int key);
+GList *s4be_ip_query (s4be_t *be, int32_t *fetch, int fetch_size, s4_condition_t *cond);
 void s4be_ip_foreach (s4be_t *be,
 		void (*func) (s4_entry_t *e, s4_entry_t *p, void* userdata),
 		void *userdata);
