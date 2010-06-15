@@ -18,9 +18,6 @@
 #include <glib.h>
 #include <stdint.h>
 
-#define ENTRY_INT 0
-#define ENTRY_STR 1
-
 /* Flags */
 #define S4_RECOVER          1 << 0
 #define S4_VERIFY           1 << 1
@@ -39,40 +36,21 @@
 #define S4E_INCONS 5
 #define S4E_MAGIC 6
 
-typedef struct s4_entry_St {
-	int type;
-	char *key_s;
-	int key_i;
-	char *val_s;
-	int val_i;
-	char *src_s;
-	int src_i;
-} s4_entry_t;
-
-#define S4_VAL_STR 1
-#define S4_VAL_INT 2
-
-typedef struct s4_val_St {
-	int type;
-	union {
-		const char *s;
-		int32_t i;
-	} val;
-} s4_val_t;
-
-struct s4_set_St;
-typedef struct s4_set_St s4_set_t;
-
-struct s4be_St;
-typedef struct s4be_St s4be_t;
-
-struct s4_St {
-	s4be_t *be;
-	GThread *s_thread;
-	GCond *cond;
-	GMutex *cond_mutex;
-};
 typedef struct s4_St s4_t;
+
+/* val.c */
+typedef struct s4_val_St s4_val_t;
+
+s4_val_t *s4_val_new_string (const char *str);
+s4_val_t *s4_val_new_string_nocopy (const char *str);
+s4_val_t *s4_val_new_int (int32_t i);
+s4_val_t *s4_val_copy (s4_val_t *val);
+void s4_val_free (s4_val_t *val);
+
+int s4_val_is_str (const s4_val_t *val);
+int s4_val_is_int (const s4_val_t *val);
+int s4_val_get_str (const s4_val_t *val, const char **str);
+int s4_val_get_int (const s4_val_t *val, int32_t *i);
 
 /* s4.c */
 s4_t *s4_open (const char *name, int flags);
@@ -80,69 +58,63 @@ int s4_close (s4_t *s4);
 int s4_verify (s4_t *s4, int flags);
 int s4_recover (s4_t *s4, const char *name);
 void s4_sync (s4_t *s4);
-int s4_start_sync_thread (s4_t *s4);
-int s4_stop_sync_thread (s4_t *s4);
 int s4_errno (void);
 
-/* set.c */
-s4_set_t *s4_set_new (int size);
-void s4_set_free (s4_set_t *set);
-int s4_set_size (s4_set_t *set);
-s4_set_t *s4_set_intersection (s4_set_t *a, s4_set_t *b);
-s4_set_t *s4_set_union (s4_set_t *a, s4_set_t *b);
-s4_set_t *s4_set_complement (s4_set_t *a, s4_set_t *b);
-s4_entry_t *s4_set_get (s4_set_t *set, int index);
-s4_entry_t *s4_set_next (s4_set_t *set);
-void s4_set_reset (s4_set_t *set);
-int s4_set_insert (s4_set_t *set, s4_entry_t *entry);
+int s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
 
-/* entry.c */
-s4_entry_t *s4_entry_get_s (s4_t *s4, const char *key, const char *val);
-s4_entry_t *s4_entry_get_i (s4_t *s4, const char *key, int val);
-s4_entry_t *s4_entry_copy (s4_entry_t *entry);
-void s4_entry_free (s4_entry_t *entry);
-void s4_entry_free_strings (s4_entry_t *entry);
-s4_set_t *s4_entry_contains (s4_t *s4, s4_entry_t *entry);
-s4_set_t *s4_entry_contained(s4_t *s4, s4_entry_t *entry);
-int s4_entry_add (s4_t *s4, s4_entry_t *entry, s4_entry_t *prop, const char *src);
-int s4_entry_del (s4_t *s4, s4_entry_t *entry, s4_entry_t *prop, const char *src);
-void s4_entry_fillin (s4_t *s4, s4_entry_t *entry);
-s4_set_t *s4_entry_smaller (s4_t *s4, s4_entry_t *entry, int key);
-s4_set_t *s4_entry_greater (s4_t *s4, s4_entry_t *entry, int key);
-s4_set_t *s4_entry_get_property (s4_t *s4, s4_entry_t *entry, const char *prop);
-s4_set_t *s4_entry_match (s4_t *s4, s4_set_t *set, const char *pattern, int case_sens);
-s4_set_t *s4_entry_get_entries (s4_t *s4, const char *key, const char *val);
+/* sourcepref.c */
+typedef struct s4_sourcepref_St s4_sourcepref_t;
 
-GList *s4_fetch (s4_t *s4, s4_set_t *set, const char *fetch[]);
-void s4_val_free (s4_val_t *val);
+s4_sourcepref_t *s4_sourcepref_create (s4_t *s4, const char **sourcepref);
+void s4_sourcepref_free (s4_sourcepref_t *sourcepref);
 
-typedef struct s4_query_St s4_query_t;
+/* cond.c */
+typedef enum {
+	S4_FILTER_EQUAL,
+	S4_FILTER_GREATER,
+	S4_FILTER_SMALLER,
+	S4_FILTER_MATCH,
+	S4_FILTER_EXISTS
+} s4_filter_type_t;
 
 typedef enum {
-	S4_COND_UNION,
-	S4_COND_INTERSECTION,
-	S4_COND_COMPLEMENT,
-	S4_COND_EQUAL,
-	S4_COND_GREATER,
-	S4_COND_SMALLER,
-	S4_COND_MATCH
-} s4_condition_type_t;
+	S4_COMBINE_AND,
+	S4_COMBINE_OR,
+	S4_COMBINE_NOT
+} s4_combine_type_t;
 
-typedef struct s4_query_condition_St {
-	s4_condition_type_t type;
-	union {
-		struct s4_query_condition_St **operands;
-		struct {
-			const char *key;
-			s4_val_t value;
-			const char *sourcepref;
-		} filter;
-	} cond;
-} s4_query_condition_t;
+#define S4_COND_CASESENS 1
+#define S4_COND_PARENT 2
+
+typedef struct s4_condition_St s4_condition_t;
+typedef int (*check_function_t)(s4_condition_t *cond, void *data);
+typedef int (*filter_function_t)(s4_val_t *value, s4_condition_t* data);
+typedef int (*combine_function_t)(s4_condition_t *cond, check_function_t func, void *check_data);
+typedef void (*free_func_t)(void*);
+
+s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type, GList *operands);
+s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func, GList *operands);
+
+s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
+		s4_val_t *value, s4_sourcepref_t *sourcepref, int flags);
+s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdata,
+		free_func_t free, const char *key, s4_sourcepref_t *sourcepref, int flags);
+
+int s4_cond_is_filter (s4_condition_t *cond);
+int s4_cond_is_combiner (s4_condition_t *cond);
+
+int s4_cond_get_flags (s4_condition_t *cond);
+const char *s4_cond_get_key (s4_condition_t *cond);
+s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
+
+void s4_cond_free (s4_condition_t *cond);
+filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);
+combine_function_t s4_cond_get_combine_function (s4_condition_t *cond);
 
 /* query.c */
-s4_query_t *s4_query_new (s4_t *s4, const char **fetch, s4_query_condition_t *cond);
-GList *s4_query_run (s4_t *s4, s4_query_t *query);
-void s4_query_free (s4_query_t *query);
+GList *s4_query (s4_t *s4, const char **fetch, s4_condition_t *cond);
 
 #endif /* _S4_H */

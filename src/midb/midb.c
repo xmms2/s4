@@ -68,7 +68,6 @@ static int _read_string (s4be_t *s4, FILE *file)
 static int _read_relations (s4be_t *s4, FILE *file)
 {
 	midb_data_t rec;
-	s4_entry_t e,p;
 
 	while (fread (&rec, sizeof (midb_data_t), 1, file) == 1) {
 		if (rec.key_a < 0) {
@@ -91,6 +90,7 @@ static int _read_relations (s4be_t *s4, FILE *file)
 		if (s4be_st_ref_id (s4, rec.src) == -1)
 			return -1;
 
+		/*
 		e.key_i = rec.key_a;
 		e.val_i = rec.val_a;
 		e.src_i = rec.src;
@@ -100,6 +100,7 @@ static int _read_relations (s4be_t *s4, FILE *file)
 
 		if (s4be_ip_add (s4, &e, &p) == -1)
 			return -1;
+			*/
 	}
 
 	return 0;
@@ -222,6 +223,7 @@ static void _write_string (int32_t str_id, const char *str, void *ud)
 	fwrite (str, 1, len, file);
 }
 
+/*
 static void _write_relation (s4_entry_t *e, s4_entry_t *p, void *ud)
 {
 	FILE *file = ud;
@@ -235,6 +237,7 @@ static void _write_relation (s4_entry_t *e, s4_entry_t *p, void *ud)
 
 	fwrite (&rec, sizeof (midb_data_t), 1, file);
 }
+*/
 
 static int _write_file (s4be_t *s4, const char *filename)
 {
@@ -247,7 +250,7 @@ static int _write_file (s4be_t *s4, const char *filename)
 
 	fwrite (&i, sizeof (int32_t), 1, file);
 
-	s4be_ip_foreach (s4, _write_relation, file);
+	//s4be_ip_foreach (s4, _write_relation, file);
 	fclose (file);
 
 	return 0;

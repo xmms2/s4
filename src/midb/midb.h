@@ -66,6 +66,19 @@ void be_wunlock (s4be_t *s4);
 int s4be_st_ref_id (s4be_t *be, int32_t id);
 str_t *s4be_st_insert (s4be_t *be, int32_t new_id, char *string);
 
+int s4be_st_ref (s4be_t *be, const char *str);
+int s4be_st_unref (s4be_t *be, const char *str);
+int32_t s4be_st_lookup (s4be_t *be, const char *str);
+int32_t *s4be_st_lookup_all (s4be_t *be, const char *str);
+int s4be_st_get_refcount (s4be_t *be, int32_t node);
+int s4be_st_set_refcount (s4be_t *be, int32_t node, int refcount);
+int s4be_st_remove (s4be_t *be, const char* str);
+char *s4be_st_reverse (s4be_t *be, int str_id);
+char *s4be_st_reverse_normalized (s4be_t *be, int str_id);
+char *s4be_st_normalize (const char *key);
+void s4be_st_foreach (s4be_t *be,
+		void (*func) (int32_t node, const char *str, void *userdata),
+		void *userdata);
 void midb_log (s4be_t *be, log_entry_t *entry);
 void midb_log_string_insert (s4be_t *be, int32_t id, const char *string);
 void midb_log_pair_insert (s4be_t *be, midb_data_t *rec);

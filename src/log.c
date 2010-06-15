@@ -1,35 +1,65 @@
-/*  S4 - An XMMS2 medialib backend
- *  Copyright (C) 2009 Sivert Berg
- *
- *  This library is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU Lesser General Public
- *  License as published by the Free Software Foundation; either
- *  version 2.1 of the License, or (at your option) any later version.
- *
- *  This library is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- *  Lesser General Public License for more details.
+#include "s4_priv.h"
+#include "logging.h"
+#include <string.h>
+
+/**
+ * Wrapper for midb_log, writes a LOG_STRING_INSERT entry
  */
-
-#include <glib.h>
-#include <stdio.h>
-
-GLogLevelFlags log_level;
-
-void log_handler (const gchar *log_domain,
-		GLogLevelFlags log_lev,
-		const gchar *message,
-		gpointer user_data)
+void _log_string_insert (s4_t *be, int32_t id, const char *string)
 {
-	if (!(log_level & log_lev))
-		return;
-
-	printf ("%s\n", message);
+	log_entry_t entry;
+	entry.type = LOG_STRING_INSERT;
+	entry.data.str.str = string;
+	entry.data.str.id = id;
+	_log (be, &entry);
 }
 
-void log_init (GLogLevelFlags log_lev)
+/**
+ * Wrapper for midb_log, writes a LOG_PAIR_INSERT entry
+ */
+void _log_pair_insert (s4_t *be, s4_intpair_t *rec)
 {
-	log_level = log_lev;
-	g_log_set_handler (NULL, G_LOG_LEVEL_MASK, log_handler, NULL);
+	log_entry_t entry;
+	entry.type = LOG_PAIR_INSERT;
+	entry.data.pair = rec;
+	_log (be, &entry);
+}
+
+/**
+ * Wrapper for midb_log, writes a LOG_PAIR_REMOVE entry
+ */
+void _log_pair_remove (s4_t *be, s4_intpair_t *rec)
+{
+	log_entry_t entry;
+	entry.type = LOG_PAIR_REMOVE;
+	entry.data.pair = rec;
+	_log (be, &entry);
+}
+
+/**
+ * Write a log entry.
+ */
+void _log (s4_t *be, log_entry_t *entry)
+{
+	int32_t tmp;
+
+	if (be->logfile == NULL)
+		return;
+
+	fwrite (&entry->type, sizeof(int32_t), 1, be->logfile);
+	switch (entry->type) {
+		case LOG_STRING_INSERT:
+			tmp = strlen (entry->data.str.str);
+			fwrite (&entry->data.str.id, sizeof (int32_t), 1, be->logfile);
+			fwrite (&tmp, sizeof (int32_t), 1, be->logfile);
+			fwrite (entry->data.str.str, 1, tmp, be->logfile);
+			break;
+		case LOG_PAIR_INSERT:
+		case LOG_PAIR_REMOVE:
+			fwrite (entry->data.pair, sizeof (s4_intpair_t), 1, be->logfile);
+			break;
+		default:
+			S4_DBG ("Trying to write a log entry with invalid type");
+			break;
+	}
 }

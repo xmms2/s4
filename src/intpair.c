@@ -1,6 +1,4 @@
-#include "s4_be.h"
-#include "query.h"
-#include "midb.h"
+#include "s4_priv.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -28,7 +26,7 @@ typedef struct ip_leaf_St {
 
 ip_node_t root = {.size = 0, .alloc = 1, .links = NULL};
 
-static int ip_search (ip_link_t *links, int size, int32_t val)
+static int _ip_search (ip_link_t *links, int size, int32_t val)
 {
 	int lo, hi;
 	lo = 0; hi = size;
@@ -51,9 +49,9 @@ static int ip_search (ip_link_t *links, int size, int32_t val)
 	return lo;
 }
 
-static void *ip_lookup (ip_node_t *node, int32_t val)
+static void *_ip_lookup (ip_node_t *node, int32_t val)
 {
-	int index = ip_search (node->links, node->size, val);
+	int index = _ip_search (node->links, node->size, val);
 
 	if (index == node->size || node->links[index].val != val)
 		return NULL;
@@ -61,9 +59,9 @@ static void *ip_lookup (ip_node_t *node, int32_t val)
 	return node->links[index].data;
 }
 
-static void *ip_insert (ip_node_t *node, int32_t val, void *data)
+static void *_ip_insert (ip_node_t *node, int32_t val, void *data)
 {
-	int index = ip_search (node->links, node->size, val);
+	int index = _ip_search (node->links, node->size, val);
 
 	if (index == node->size || node->links[index].val != val) {
 		if (node->size == node->alloc || node->links == NULL) {
@@ -83,7 +81,7 @@ static void *ip_insert (ip_node_t *node, int32_t val, void *data)
 	return data;
 }
 
-static ip_leaf_t *ip_create_leaf (int32_t key, int32_t val)
+static ip_leaf_t *_ip_create_leaf (int32_t key, int32_t val)
 {
 	ip_leaf_t *ret = malloc (sizeof (ip_leaf_t));
 	ret->key = key;
@@ -95,7 +93,7 @@ static ip_leaf_t *ip_create_leaf (int32_t key, int32_t val)
 	return ret;
 }
 
-static ip_node_t *ip_create_node (void)
+static ip_node_t *_ip_create_node (void)
 {
 	ip_node_t *ret = malloc (sizeof (ip_leaf_t));
 	ret->size = 0;
@@ -105,7 +103,7 @@ static ip_node_t *ip_create_node (void)
 	return ret;
 }
 
-static int ip_leaf_insert (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t src)
+static int _ip_leaf_insert (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t src)
 {
 	int i;
 
@@ -134,7 +132,7 @@ static int ip_leaf_insert (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t sr
 	return 0;
 }
 
-static int ip_leaf_delete (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t src)
+static int _ip_leaf_delete (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t src)
 {
 	int i;
 	for (i = 0; i < leaf->size; i++) {
@@ -150,6 +148,64 @@ static int ip_leaf_delete (ip_leaf_t *leaf, int32_t key, int32_t val, int32_t sr
 	return -1;
 }
 
+int _ip_add (s4_t *be, s4_intpair_t *pair)
+{
+	ip_node_t *n;
+	ip_leaf_t *l;
+
+	n = _ip_lookup (&root, pair->key_a);
+	if (n == NULL)
+		n = _ip_insert (&root, pair->key_a, _ip_create_node());
+
+	l = _ip_lookup (n, pair->val_a);
+	if (l == NULL)
+		l = _ip_insert (n, pair->val_a, _ip_create_leaf (pair->key_a, pair->val_a));
+
+	return _ip_leaf_insert (l, pair->key_b, pair->val_b, pair->src);
+}
+
+int _ip_del (s4_t *be, s4_intpair_t *pair)
+{
+	ip_node_t *n;
+	ip_leaf_t *l;
+
+	n = _ip_lookup (&root, pair->key_a);
+	if (n == NULL)
+		return -1;
+
+	l = _ip_lookup (n, pair->val_a);
+	if (l == NULL)
+		return -1;
+
+	return _ip_leaf_delete (l, pair->key_b, pair->val_b, pair->src);
+}
+
+void _ip_foreach (s4_t *be, void (*func) (s4_intpair_t *pair, void *data), void *data)
+{
+	ip_node_t *n;
+	ip_leaf_t *l;
+	int i, j, k;
+	s4_intpair_t pair;
+
+	for (i = 0; i < root.size; i++) {
+		n = root.links[i].data;
+		for (j = 0; j < n->size; j++) {
+			l = n->links[j].data;
+
+			pair.key_a = l->key;
+			pair.val_a = l->val;
+
+			for (k = 0; k < l->size; k++) {
+				pair.key_b = l->data[k].key;
+				pair.val_b = l->data[k].val;
+				pair.src = l->data[k].src;
+
+				func (&pair, data);
+			}
+		}
+	}
+}
+/*
 int s4be_ip_add (s4be_t *be, s4_entry_t *entry, s4_entry_t *prop)
 {
 	ip_node_t *n;
@@ -221,6 +277,11 @@ s4_set_t *s4be_ip_get (s4be_t *be, s4_entry_t *entry, int32_t key)
 	return ret;
 }
 
+static int ip_check (int32_t val, int32_t should_be)
+{
+	return val == should_be;
+}
+
 s4_set_t *s4be_ip_has_this (s4be_t *be, s4_entry_t *entry)
 {
 	ip_node_t *n;
@@ -242,7 +303,7 @@ s4_set_t *s4be_ip_has_this (s4be_t *be, s4_entry_t *entry)
 				}
 			}
 
-			if (best != -1 && l->data[best].val == entry->val_i) {
+			if (best != -1 && ip_check (l->data[best].val, entry->val_i)) {
 				s4_entry_t e;
 				e.val_s = e.key_s = e.src_s = NULL;
 				e.key_i = l->key;
@@ -478,97 +539,127 @@ GList *s4be_ip_fetch (s4be_t *be, s4_set_t *set, int32_t fetch[], int size)
 
 	return ret;
 }
+*/
+typedef struct {
+	s4_t *s4;
+	ip_leaf_t *l;
+} check_data_t;
 
-static int check_cond (s4be_t *be, ip_leaf_t *l, s4_condition_t *cond)
+static int check_cond (s4_condition_t *cond, void *d)
 {
+	check_data_t *data = d;
+	ip_leaf_t *l = data->l;
 	int ret = 0;
 	int i;
-	switch (cond->type) {
-		case S4_COND_UNION:
-			for (i = 0; !ret && cond->cond.operands[i] != NULL; i++)
-				ret = check_cond (be, l, cond->cond.operands[i]);
-			break;
-		case S4_COND_INTERSECTION:
-			for (ret = 1, i = 0; ret && cond->cond.operands[i] != NULL; i++)
-				ret = check_cond (be, l, cond->cond.operands[i]);
-			break;
-		case S4_COND_COMPLEMENT:
-			for (i = 0; ret && cond->cond.operands[i] != NULL; i++)
-				ret = !check_cond (be, l, cond->cond.operands[i]);
-			break;
 
-		default:
-			if (cond->cond.filter.key == 0) {
-				ret = cond->cond.filter.func (l->val, cond->cond.filter.funcdata);
-			} else {
-				int src, best_pos, best_src = INT_MAX;
-				for (i = 0; i < l->size; i++) {
-					if ((l->data[i].key == cond->cond.filter.key ||
-								l->data[i].key == -cond->cond.filter.key) &&
-							(src = sp_get (be, l->data[i].src)) < best_src) {
-						best_src = src;
-						best_pos = i;
-					}
+	if (s4_cond_is_combiner (cond)) {
+		ret = s4_cond_get_combine_function (cond)(cond, check_cond, d);
+	} else if (s4_cond_is_filter (cond)) {
+		s4_val_t *val = NULL;
+		int32_t key = _st_lookup (data->s4, s4_cond_get_key (cond));
+
+		if (s4_cond_get_flags (cond) && S4_COND_PARENT) {
+			if (key == ABS(l->key)) {
+				if (l->key < 0) {
+					val = s4_val_new_int (l->val);
+				} else {
+					val = s4_val_new_string_nocopy (_st_reverse (data->s4, l->val));
 				}
-
-				if (best_src != INT_MAX)
-					ret = cond->cond.filter.func (l->data[best_pos].val, cond->cond.filter.funcdata);
 			}
-			break;
+		} else {
+			int src, best_pos, best_src = INT_MAX;
+			for (i = 0; i < l->size; i++) {
+				if (ABS(l->data[i].key) == key &&
+						(src = s4_sourcepref_get_priority (s4_cond_get_sourcepref (cond), l->data[i].src)) < best_src) {
+					best_src = src;
+					best_pos = i;
+				}
+			}
+
+			if (best_src != INT_MAX) {
+				if (l->data[best_pos].key < 0) {
+					val = s4_val_new_int (l->data[best_pos].val);
+				} else {
+					val = s4_val_new_string (_st_reverse (data->s4, l->data[best_pos].val));
+				}
+			}
+		}
+		if (val != NULL)
+			ret = s4_cond_get_filter_function (cond)(val, cond);
 	}
 
 	return ret;
 }
 
-GList *s4be_ip_query (s4be_t *be, int32_t *fetch, int fetch_size, s4_condition_t *cond)
+static s4_val_t **_fetch (s4_t *s4, ip_leaf_t *l, int fetch_size, int32_t *ifetch)
+{
+	s4_val_t **vals;
+	int k,f;
+
+	vals = malloc (sizeof (s4_val_t*) * fetch_size);
+
+	for (k = 0; k < fetch_size; k++) {
+		if (ifetch[k] == 0) {
+			vals[k] = s4_val_new_int (l->val);
+
+			continue;
+		}
+
+		int src, best_pos, best_src = INT_MAX;
+		for (f = 0; f < l->size; f++) {
+			if ((l->data[f].key == ifetch[k] || l->data[f].key == -ifetch[k]) &&
+					(src = 1) < best_src) {
+				best_src = src;
+				best_pos = f;
+			}
+		}
+		if (best_src == INT_MAX) {
+			vals[k] = NULL;
+		} else {
+			if (l->data[best_pos].key > 0) {
+				vals[k] = s4_val_new_string (_st_reverse (s4, l->data[best_pos].val));
+			} else {
+				vals[k] = s4_val_new_int (l->data[best_pos].val);
+			}
+		}
+	}
+
+	return vals;
+}
+
+GList *s4_query (s4_t *s4, const char **fetch, s4_condition_t *cond)
 {
 	GList *ret = NULL;
 	ip_node_t *n;
 	ip_leaf_t *l;
-	int i, j, k, f;
-	s4_val_t **vals;
+	int i, j;
+	check_data_t data;
+	int fetch_size;
+	int32_t *ifetch;
+	int par_filt = 0;
 
+	for (fetch_size = 0; fetch[fetch_size] != NULL; fetch_size++);
+
+	ifetch = malloc (sizeof (int32_t) * fetch_size);
+
+	for (i = 0; i < fetch_size; i++) {
+		ifetch[i] = _st_lookup (s4, fetch[i]);
+	}
+
+	data.s4 = s4;
+
+	if (s4_cond_is_filter (cond) && (s4_cond_get_flags (cond) & S4_COND_PARENT))
+		par_filt = 1;
 
 	for (i = 0; i < root.size; i++) {
 		n = root.links[i].data;
 		for (j = 0; j < n->size; j++) {
 			l = n->links[j].data;
-			if (!check_cond (be, l, cond))
+			data.l = l;
+			if (!check_cond (cond, &data))
 				continue;
 
-			vals = malloc (sizeof (s4_val_t*) * fetch_size);
-
-			for (k = 0; k < fetch_size; k++) {
-				if (fetch[k] == 0) {
-					vals[k] = malloc (sizeof (s4_val_t));
-					vals[k]->type = S4_VAL_INT;
-					vals[k]->val.i = l->val;
-
-					continue;
-				}
-
-				int src, best_pos, best_src = INT_MAX;
-				for (f = 0; f < l->size; f++) {
-					if ((l->data[f].key == fetch[k] || l->data[f].key == -fetch[k]) &&
-							(src = sp_get (be, l->data[f].src)) < best_src) {
-						best_src = src;
-						best_pos = f;
-					}
-				}
-				if (best_src == INT_MAX) {
-					vals[k] = NULL;
-				} else {
-					vals[k] = malloc (sizeof (s4_val_t));
-					if (l->data[best_pos].key > 0) {
-						vals[k]->val.s = s4be_st_reverse (be, l->data[best_pos].val);
-						vals[k]->type = S4_VAL_STR;
-					} else {
-						vals[k]->val.i = l->data[best_pos].val;
-						vals[k]->type = S4_VAL_INT;
-					}
-				}
-			}
-			ret = g_list_prepend (ret, vals);
+			ret = g_list_prepend (ret, _fetch (s4, l, fetch_size, ifetch));
 		}
 	}
 

@@ -17,7 +17,6 @@
 
 #include <s4.h>
 #include <stdint.h>
-#include "query.h"
 
 void s4_set_errno (int err);
 
@@ -27,6 +26,14 @@ int s4be_verify (s4be_t *be, int thorough);
 int s4be_recover (s4be_t *old, s4be_t *rec);
 void s4be_sync (s4be_t *be);
 
+int s4be_add (s4be_t *be, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+int s4be_del (s4be_t *be, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+
+GList *s4be_query (s4be_t *be, const char **fetch, s4_condition_t *cond);
+
+#if 0
 int s4be_st_ref (s4be_t *be, const char *str);
 int s4be_st_unref (s4be_t *be, const char *str);
 int32_t s4be_st_lookup (s4be_t *be, const char *str);
@@ -52,5 +59,6 @@ GList *s4be_ip_query (s4be_t *be, int32_t *fetch, int fetch_size, s4_condition_t
 void s4be_ip_foreach (s4be_t *be,
 		void (*func) (s4_entry_t *e, s4_entry_t *p, void* userdata),
 		void *userdata);
+#endif
 
 #endif /* _S4_BE_H */
