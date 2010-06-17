@@ -97,8 +97,6 @@ static int _read_relations (s4_t *s4, FILE *file)
 		if (_st_ref_id (s4, rec.src) == -1)
 			return -1;
 
-		s4_add_source (s4, _st_reverse (s4, rec.src));
-
 		if (_ip_add (s4, &rec) == -1)
 			return -1;
 	}
@@ -245,8 +243,9 @@ static int _write_file (s4_t *s4, const char *filename)
  * @param flags Zero or more of the flags bitwise-or'd.
  * @return A pointer to an s4_t, or NULL if something went wrong.
  */
-s4_t *s4_open (const char *filename, int open_flags)
+s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 {
+	int i;
 	s4_t* s4 = malloc (sizeof(s4_t));
 
 	s4->str_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, free);
@@ -258,10 +257,15 @@ s4_t *s4_open (const char *filename, int open_flags)
 	g_static_mutex_init (&s4->norm_str_table_lock);
 	g_static_mutex_init (&s4->id_str_table_lock);
 
-	g_static_rw_lock_init (&s4->rwlock);
+	s4->index_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, (GDestroyNotify)_index_free);
+	g_static_mutex_init (&s4->index_table_lock);
 
-//	s4->int_store = bpt_create ();
-//	s4->rev_store = bpt_create ();
+	s4->intpair_table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)_index_free);
+	g_static_rw_lock_init (&s4->intpair_lock);
+
+	for (i = 0; indices != NULL && indices[i] != NULL; i++) {
+		_index_add (s4, indices[i], _index_create ());
+	}
 
 	s4->logfile = NULL;
 	s4->filename = strdup (filename);
@@ -384,7 +388,6 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	} else {
 		return 0;
 	}
-	s4_add_source (s4, src);
 
 	return _ip_add (s4, &pair);
 }

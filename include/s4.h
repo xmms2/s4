@@ -53,7 +53,7 @@ int s4_val_get_str (const s4_val_t *val, const char **str);
 int s4_val_get_int (const s4_val_t *val, int32_t *i);
 
 /* s4.c */
-s4_t *s4_open (const char *name, int flags);
+s4_t *s4_open (const char *name, const char **indices, int flags);
 int s4_close (s4_t *s4);
 int s4_verify (s4_t *s4, int flags);
 int s4_recover (s4_t *s4, const char *name);
@@ -109,6 +109,7 @@ int s4_cond_is_combiner (s4_condition_t *cond);
 int s4_cond_get_flags (s4_condition_t *cond);
 const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
+int s4_cond_is_continuous (s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
 filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);

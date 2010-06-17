@@ -21,24 +21,27 @@ struct s4_condition_St {
 			const char *key;
 			s4_sourcepref_t *sp;
 			int flags;
+			int continuous;
 		} filter;
 	} u;
+
+	int32_t ikey;
 };
 
 static int never (void)
 {
-	return 0;
+	return 1;
 }
 static int always (void)
 {
-	return 1;
+	return 0;
 }
 
 static int or_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	int ret = 0;
+	int ret = 1;
 	GList *i = cond->u.combine.operands;
-	for (;!ret && i != NULL; i = g_list_next (i)) {
+	for (;ret && i != NULL; i = g_list_next (i)) {
 		ret = func (i->data, check_data);
 	}
 
@@ -47,9 +50,9 @@ static int or_combiner (s4_condition_t *cond, check_function_t func, void *check
 
 static int and_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	int ret = 1;
+	int ret = 0;
 	GList *i = cond->u.combine.operands;
-	for (;ret && i != NULL; i = g_list_next (i)) {
+	for (;!ret && i != NULL; i = g_list_next (i)) {
 		ret = func (i->data, check_data);
 	}
 
@@ -80,10 +83,10 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 	int32_t i1,i2;
 
 	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return i1 == i2;
+		return (i1 > i2)?1:((i1 < i2)?-1:0);
 	if (s4_val_get_str (value, &s1) && s4_val_get_str (d, &s2))
-		return strcmp (s1, s2) == 0;
-	return 0;
+		return strcmp (s1, s2);
+	return 1;
 }
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
@@ -110,9 +113,9 @@ static int match_filter (s4_val_t *value, s4_condition_t *cond)
 	const char *s;
 
 	if (s4_val_get_str (value, &s)) {
-		return g_pattern_match_string (spec, s);
+		return !g_pattern_match_string (spec, s);
 	}
-	return 0;
+	return 1;
 }
 
 static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s4_val_t *val)
@@ -122,16 +125,19 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 			cond->u.filter.func = equal_filter;
 			cond->u.filter.funcdata = s4_val_copy (val);
 			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.continuous = 1;
 			break;
 		case S4_FILTER_GREATER:
 			cond->u.filter.func = greater_filter;
 			cond->u.filter.funcdata = s4_val_copy (val);
 			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.continuous = 1;
 			break;
 		case S4_FILTER_SMALLER:
 			cond->u.filter.func = smaller_filter;
 			cond->u.filter.funcdata = s4_val_copy (val);
 			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.continuous = 1;
 			break;
 		case S4_FILTER_MATCH:
 			{
@@ -145,12 +151,14 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 					cond->u.filter.funcdata = NULL;
 					cond->u.filter.free_func = NULL;
 				}
+				cond->u.filter.continuous = 0;
 			}
 			break;
 		case S4_FILTER_EXISTS:
 			cond->u.filter.func = (filter_function_t)always;
 			cond->u.filter.funcdata = NULL;
 			cond->u.filter.free_func = NULL;
+			cond->u.filter.continuous = 1;
 			break;
 	}
 }
@@ -187,6 +195,7 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
 	cond->u.filter.key = key;
 	cond->u.filter.sp = sourcepref;
 	cond->u.filter.flags = flags;
+	cond->ikey = 0;
 
 	_set_filter_function (cond, type, value);
 
@@ -205,6 +214,7 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	cond->u.filter.func = func;
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
+	cond->ikey = 0;
 
 	return cond;
 }
@@ -256,4 +266,19 @@ filter_function_t s4_cond_get_filter_function (s4_condition_t *cond)
 combine_function_t s4_cond_get_combine_function (s4_condition_t *cond)
 {
 	return cond->u.combine.func;
+}
+
+void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey)
+{
+	cond->ikey = ikey;
+}
+
+int32_t s4_cond_get_ikey (s4_condition_t *cond)
+{
+	return cond->ikey;
+}
+
+int s4_cond_is_continuous (s4_condition_t *cond)
+{
+	return cond->u.filter.continuous;
 }
