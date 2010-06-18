@@ -43,7 +43,7 @@ s4_val_t *s4_val_new_int (int32_t i)
 	return val;
 }
 
-s4_val_t *s4_val_copy (s4_val_t *val)
+s4_val_t *s4_val_copy (const s4_val_t *val)
 {
 	switch (val->type) {
 		case S4_VAL_STR:

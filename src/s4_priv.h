@@ -87,4 +87,14 @@ void _log_string_insert (s4_t *be, int32_t id, const char *string);
 int32_t s4_cond_get_ikey (s4_condition_t *cond);
 void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);
 
+s4_resultset_t *s4_resultset_create (int col_count);
+void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results);
+
+s4_result_t *s4_result_create (s4_result_t *next, const char *key, s4_val_t *val, const char *src);
+void s4_result_free (s4_result_t *res);
+
+int s4_fetchspec_size (s4_fetchspec_t *spec);
+const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
+s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
+
 #endif

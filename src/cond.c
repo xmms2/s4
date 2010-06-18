@@ -94,7 +94,7 @@ static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 	int32_t i1,i2;
 
 	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return i1 > i2;
+		return i1 <= i2;
 	return 0;
 }
 static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
@@ -103,7 +103,7 @@ static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
 	int32_t i1,i2;
 
 	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return i1 < i2;
+		return i1 >= i2;
 	return 0;
 }
 
@@ -242,6 +242,11 @@ const char *s4_cond_get_key (s4_condition_t *cond)
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond)
 {
 	return cond->u.filter.sp;
+}
+
+void *s4_cond_get_funcdata (s4_condition_t *cond)
+{
+	return cond->u.filter.funcdata;
 }
 
 void s4_cond_free (s4_condition_t *cond)

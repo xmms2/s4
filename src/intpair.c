@@ -272,67 +272,68 @@ static int check_cond (s4_condition_t *cond, void *d)
 	return ret;
 }
 
-static s4_val_t **_fetch (s4_t *s4, ip_leaf_t *l, int fetch_size, int32_t *ifetch)
+static s4_result_t **_fetch (s4_t *s4, ip_leaf_t *l, s4_fetchspec_t *fs)
 {
-	s4_val_t **vals;
+	s4_result_t **result;
 	int k,f;
+	int fetch_size = s4_fetchspec_size (fs);
+	s4_val_t *val;
 
-	vals = malloc (sizeof (s4_val_t*) * fetch_size);
+	result = malloc (sizeof (s4_result_t*) * fetch_size);
 
 	for (k = 0; k < fetch_size; k++) {
-		if (ifetch[k] == 0) {
-			vals[k] = s4_val_new_int (l->val);
+		const char *key = _st_reverse (s4, ABS (l->key));
+		const char *fkey = s4_fetchspec_get_key (fs, k);
+		int32_t ikey = (fkey != NULL)? _st_lookup (s4, fkey):0;
+		s4_sourcepref_t *sp = s4_fetchspec_get_sourcepref (fs, k);
 
-			continue;
+		result[k] = NULL;
+
+		if (fkey == NULL || ikey == ABS (l->key)) {
+			val = s4_val_new_int (l->val);
+			result[k] = s4_result_create (result[k], key, val, NULL);
 		}
 
 		int src, best_pos, best_src = INT_MAX;
 		for (f = 0; f < l->size; f++) {
-			if ((l->data[f].key == ifetch[k] || l->data[f].key == -ifetch[k]) &&
-					(src = 1) < best_src) {
-				best_src = src;
-				best_pos = f;
+			if (fkey == NULL) {
+				if (l->data[f].key > 0) {
+					val = s4_val_new_string (_st_reverse (s4, l->data[f].val));
+				} else {
+					val = s4_val_new_int (l->data[f].val);
+				}
+				result[k] = s4_result_create (result[k], _st_reverse (s4, ABS(l->data[f].key)),
+						val, _st_reverse (s4, ABS(l->data[f].src)));
+			} else {
+				if (ABS(l->data[f].key) == ikey &&
+						(src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
+					best_src = src;
+					best_pos = f;
+				}
 			}
 		}
-		if (best_src == INT_MAX) {
-			vals[k] = NULL;
-		} else {
+		if (best_src != INT_MAX) {
 			if (l->data[best_pos].key > 0) {
-				vals[k] = s4_val_new_string (_st_reverse (s4, l->data[best_pos].val));
+				val = s4_val_new_string (_st_reverse (s4, l->data[best_pos].val));
 			} else {
-				vals[k] = s4_val_new_int (l->data[best_pos].val);
+				val = s4_val_new_int (l->data[best_pos].val);
 			}
+			result[k] = s4_result_create (result[k], _st_reverse (s4, ABS(l->data[best_pos].key)),
+							val, _st_reverse (s4, ABS(l->data[best_pos].src)));
 		}
 	}
 
-	return vals;
+	return result;
 }
 
-GList *s4_query (s4_t *s4, const char **fetch, s4_condition_t *cond)
+s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 {
-	GList *ret = NULL;
-	int i;
 	check_data_t data;
-	int fetch_size;
-	int32_t *ifetch;
 	GList *leaves;
 	s4_index_t *index;
+	s4_resultset_t *ret = NULL;
 
 	g_static_rw_lock_reader_lock (&s4->intpair_lock);
-
-	for (fetch_size = 0; fetch[fetch_size] != NULL; fetch_size++);
-
-	ifetch = malloc (sizeof (int32_t) * fetch_size);
-
-	for (i = 0; i < fetch_size; i++) {
-		ifetch[i] = _st_lookup (s4, fetch[i]);
-		if (ifetch[i] == 0 && strcmp (fetch[i], "id")) {
-			g_static_rw_lock_reader_unlock (&s4->intpair_lock);
-			return NULL;
-		}
-	}
-
-	data.s4 = s4;
 
 	if (s4_cond_is_filter (cond) && (s4_cond_get_flags (cond) & S4_COND_PARENT)) {
 		int32_t key = _st_lookup (s4, s4_cond_get_key (cond));
@@ -356,12 +357,17 @@ GList *s4_query (s4_t *s4, const char **fetch, s4_condition_t *cond)
 			leaves = _index_search (index, (index_function_t)_everything, cond);
 	}
 
+	if (leaves != NULL) {
+		ret = s4_resultset_create (s4_fetchspec_size (fs));
+	}
+
+	data.s4 = s4;
 	for (; leaves != NULL; leaves = g_list_delete_link (leaves, leaves)) {
 		data.l = leaves->data;
 		if (check_cond (cond, &data))
 			continue;
 
-		ret = g_list_prepend (ret, _fetch (s4, data.l, fetch_size, ifetch));
+		s4_resultset_add_row (ret, _fetch (s4, data.l, fs));
 	}
 
 	g_static_rw_lock_reader_unlock (&s4->intpair_lock);

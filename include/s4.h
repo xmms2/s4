@@ -44,7 +44,7 @@ typedef struct s4_val_St s4_val_t;
 s4_val_t *s4_val_new_string (const char *str);
 s4_val_t *s4_val_new_string_nocopy (const char *str);
 s4_val_t *s4_val_new_int (int32_t i);
-s4_val_t *s4_val_copy (s4_val_t *val);
+s4_val_t *s4_val_copy (const s4_val_t *val);
 void s4_val_free (s4_val_t *val);
 
 int s4_val_is_str (const s4_val_t *val);
@@ -110,12 +110,36 @@ int s4_cond_get_flags (s4_condition_t *cond);
 const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
 int s4_cond_is_continuous (s4_condition_t *cond);
+void *s4_cond_get_funcdata (s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
 filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);
 combine_function_t s4_cond_get_combine_function (s4_condition_t *cond);
 
+/* fetchspec.c */
+typedef struct s4_fetchspec_St s4_fetchspec_t;
+
+s4_fetchspec_t *s4_fetchspec_create (void);
+void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref);
+void s4_fetchspec_free (s4_fetchspec_t *spec);
+
+/* result.c */
+typedef struct s4_result_St s4_result_t;
+
+const s4_result_t *s4_result_next (const s4_result_t *res);
+const char *s4_result_get_key (const s4_result_t *res);
+const char *s4_result_get_src (const s4_result_t *res);
+const s4_val_t *s4_result_get_val (const s4_result_t *res);
+
+/* resultset.c */
+typedef struct s4_resultset_St s4_resultset_t;
+
+const s4_result_t *s4_resultset_get_result (const s4_resultset_t *set, int row, int col);
+int s4_resultset_get_colcount (const s4_resultset_t *set);
+int s4_resultset_get_rowcount (const s4_resultset_t *set);
+void s4_resultset_free (s4_resultset_t *set);
+
 /* query.c */
-GList *s4_query (s4_t *s4, const char **fetch, s4_condition_t *cond);
+s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);
 
 #endif /* _S4_H */
