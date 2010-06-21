@@ -7,8 +7,8 @@ import Options
 
 def build(bld):
     s4 = bld.new_task_gen('cc', 'staticlib')
-    s4.source = ['s4.c', 'sourcepref.c', 'val.c', 'cond.c', 'strstore.c',
-'intpair.c', 'idt.c', 'log.c', 'index.c', 'result.c', 'resultset.c', 'fetchspec.c']
+    s4.source = ['s4.c', 'sourcepref.c', 'val.c', 'cond.c',
+'log.c', 'index.c', 'result.c', 'resultset.c', 'fetchspec.c', 'relation.c', 'string.c']
     s4.includes = '../include'
     s4.target = 's4'
     s4.install_path = 0

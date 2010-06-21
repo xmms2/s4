@@ -7,18 +7,14 @@
 #include "idt.h"
 
 struct s4_St {
-	GHashTable *str_table;
-	GStaticMutex str_table_lock;
-	GHashTable *norm_str_table;
-	GStaticMutex norm_str_table_lock;
-	idt_t *id_str_table;
-	GStaticMutex id_str_table_lock;
-
 	GHashTable *index_table;
 	GStaticMutex index_table_lock;
 
-	GHashTable *intpair_table;
-	GStaticRWLock intpair_lock;
+	GHashTable *rel_table;
+	GStaticRWLock rel_lock;
+
+	GStringChunk *strings;
+	GStaticMutex strings_lock;
 
 	FILE *logfile;
 	char *filename;
@@ -27,20 +23,9 @@ struct s4_St {
 typedef struct str_St str_t;
 
 void s4_set_errno (int err);
-int s4_sourcepref_get_priority (s4_sourcepref_t *sp, int32_t src);
+int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src);
 
-str_t *_st_insert (s4_t *be, int32_t new_id, char *string);
-int _st_ref (s4_t *be, const char *str);
-int _st_ref_id (s4_t *be, int32_t id);
-int _st_unref (s4_t *be, const char *str);
-int32_t _st_lookup (s4_t *be, const char *str);
-int32_t *_st_lookup_all (s4_t *be, const char *str);
-char *_st_reverse (s4_t *be, int str_id);
-char *_st_reverse_normalized (s4_t *be, int str_id);
-char *_st_normalize (const char *key);
-void _st_foreach (s4_t *be,
-		void (*func) (int32_t node, const char *str, void *userdata),
-		void *userdata);
+const char *_string_lookup (s4_t *s4, const char *str);
 
 typedef struct {
 	int32_t key_a, val_a;
@@ -59,7 +44,7 @@ s4_index_t *_index_get (s4_t *s4, const char *key);
 s4_index_t *_index_create (void);
 int _index_add (s4_t *s4, const char *key, s4_index_t *index);
 int _index_insert (s4_index_t *index, s4_val_t *val, void *data);
-int _index_delete (s4_index_t *index, s4_val_t *val, void *data);
+int _index_delete (s4_index_t *index, const s4_val_t *val, void *data);
 GList *_index_search (s4_index_t *index, index_function_t func, void *data);
 void _index_free (s4_index_t *index);
 
@@ -96,5 +81,7 @@ void s4_result_free (s4_result_t *res);
 int s4_fetchspec_size (s4_fetchspec_t *spec);
 const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
 s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
+
+void s4_free_relations (s4_t *s4);
 
 #endif

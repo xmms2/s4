@@ -79,14 +79,7 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	const char *s1,*s2;
-	int32_t i1,i2;
-
-	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return (i1 > i2)?1:((i1 < i2)?-1:0);
-	if (s4_val_get_str (value, &s1) && s4_val_get_str (d, &s2))
-		return strcmp (s1, s2);
-	return 1;
+	return s4_val_comp (value, d);
 }
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {

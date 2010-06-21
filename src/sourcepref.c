@@ -26,7 +26,7 @@ s4_sourcepref_t *s4_sourcepref_create (s4_t *s4, const char **srcprefs)
 {
 	int i;
 	s4_sourcepref_t *sp = malloc (sizeof (s4_sourcepref_t));
-	sp->table = g_hash_table_new_full (g_int_hash, g_int_equal, free, free);
+	sp->table = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, free);
 	sp->s4 = s4;
 	g_static_mutex_init (&sp->lock);
 
@@ -50,24 +50,23 @@ void s4_sourcepref_free (s4_sourcepref_t *sp)
 	for (i = 0; i < sp->spec_count; i++)
 		g_pattern_spec_free (sp->specs[i]);
 
+	free (sp->specs);
+
 	free (sp);
 }
 
-int s4_sourcepref_get_priority (s4_sourcepref_t *sp, int32_t src)
+int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src)
 {
 	g_static_mutex_lock (&sp->lock);
 
-	int *i = g_hash_table_lookup (sp->table, &src);
+	int *i = g_hash_table_lookup (sp->table, src);
 
 	if (i == NULL) {
-		const char *src_str = _st_reverse (sp->s4, src);
-		int pri = _get_priority (sp, src_str);
-		int32_t *key = malloc (sizeof (int32_t));
+		int pri = _get_priority (sp, src);
 
 		i = malloc (sizeof (int));
 		*i = pri;
-		*key = src;
-		g_hash_table_insert (sp->table, key, i);
+		g_hash_table_insert (sp->table, (void*)src, i);
 		g_static_mutex_unlock (&sp->lock);
 
 		return pri;

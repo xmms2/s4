@@ -90,3 +90,18 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i)
 	*i = val->v.i;
 	return 1;
 }
+
+int s4_val_comp (const s4_val_t *v1, const s4_val_t *v2)
+{
+	int32_t i1,i2;
+	const char *s1,*s2;
+
+	if (s4_val_get_int (v1, &i1) && s4_val_get_int (v2, &i2))
+		return (i1 > i2)?1:((i1 < i2)?-1:0);
+	else if (s4_val_get_str (v1, &s1) && s4_val_get_str (v2, &s2))
+		return strcmp (s1, s2);
+	else if (s4_val_is_int (v1))
+		return -1;
+	else
+		return 1;
+}

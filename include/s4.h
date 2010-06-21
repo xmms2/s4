@@ -52,6 +52,8 @@ int s4_val_is_int (const s4_val_t *val);
 int s4_val_get_str (const s4_val_t *val, const char **str);
 int s4_val_get_int (const s4_val_t *val, int32_t *i);
 
+int s4_val_comp (const s4_val_t *v1, const s4_val_t *v2);
+
 /* s4.c */
 s4_t *s4_open (const char *name, const char **indices, int flags);
 int s4_close (s4_t *s4);
@@ -64,6 +66,8 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
 int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
+void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_t *val_a,
+			const char *key_b, const s4_val_t *val_b, const char *src, void *data), void *data);
 
 /* sourcepref.c */
 typedef struct s4_sourcepref_St s4_sourcepref_t;

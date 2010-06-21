@@ -14,6 +14,7 @@ typedef struct {
 } index_t;
 
 struct s4_index_St {
+	GStaticMutex lock;
 	int size, alloc;
 
 	index_t *data;
@@ -37,6 +38,8 @@ s4_index_t *_index_create ()
 	ret->alloc = 1;
 	ret->data = malloc (sizeof (index_t) * ret->alloc);
 
+	g_static_mutex_init (&ret->lock);
+
 	return ret;
 }
 
@@ -51,21 +54,6 @@ int _index_add (s4_t *s4, const char *key, s4_index_t *index)
 	g_static_mutex_unlock (&s4->index_table_lock);
 
 	return ret;
-}
-
-static int _val_comp (s4_val_t *v1, s4_val_t *v2)
-{
-	int32_t i1,i2;
-	const char *s1,*s2;
-
-	if (s4_val_get_int (v1, &i1) && s4_val_get_int (v2, &i2))
-		return (i1 > i2)?1:((i1 < i2)?-1:0);
-	else if (s4_val_get_str (v1, &s1) && s4_val_get_str (v2, &s2))
-		return strcmp (s1, s2);
-	else if (s4_val_is_int (v1))
-		return -1;
-	else
-		return 1;
 }
 
 static int _data_search (index_t *index, void *data)
@@ -109,15 +97,19 @@ static int _bsearch (s4_index_t *index, index_function_t func, void *funcdata)
 
 int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 {
-	int j,i = _bsearch (index, (index_function_t)_val_comp, val);
+	int i,j;
 
-	if (i >= index->size || _val_comp (val, index->data[i].val)) {
+	g_static_mutex_lock (&index->lock);
+
+	i = _bsearch (index, (index_function_t)s4_val_comp, val);
+
+	if (i >= index->size || s4_val_comp (val, index->data[i].val)) {
 		if (index->size >= index->alloc) {
 			index->alloc *= 2;
 			index->data = realloc (index->data, sizeof (index_t) * index->alloc);
 		}
 		memmove (index->data + i + 1, index->data + i, (index->size - i) * sizeof (index_t));
-		index->data[i].val = s4_val_copy (val);
+		index->data[i].val = val;
 		index->data[i].size = 0;
 		index->data[i].alloc = 1;
 		index->data[i].data = malloc (sizeof (index_data_t) * index->data[i].alloc);
@@ -142,20 +134,28 @@ int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 		index->data[i].data[j].count++;
 	}
 
+	g_static_mutex_unlock (&index->lock);
+
 	return 1;
 }
 
-int _index_delete (s4_index_t *index, s4_val_t *val, void *new_data)
+int _index_delete (s4_index_t *index, const s4_val_t *val, void *new_data)
 {
 	int i,j;
 
-	i = _bsearch (index, (index_function_t)_val_comp, val);
-	if (i >= index->size || _val_comp (val, index->data[i].val))
+	g_static_mutex_lock (&index->lock);
+
+	i = _bsearch (index, (index_function_t)s4_val_comp, (void*)val);
+	if (i >= index->size || s4_val_comp (val, index->data[i].val)) {
+		g_static_mutex_unlock (&index->lock);
 		return 0;
+	}
 
 	j = _data_search (index->data + i, new_data);
-	if (j >= index->size || new_data != index->data[i].data)
+	if (j >= index->size || new_data != index->data[i].data) {
+		g_static_mutex_unlock (&index->lock);
 		return 0;
+	}
 
 	if (--index->data[i].data[j].count <= 0) {
 		memmove (index->data[i].data + j, index->data[i].data + j + 1,
@@ -169,6 +169,8 @@ int _index_delete (s4_index_t *index, s4_val_t *val, void *new_data)
 		index->size--;
 	}
 
+	g_static_mutex_unlock (&index->lock);
+
 	return 1;
 }
 
@@ -180,13 +182,17 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 	void *key;
 	GList *ret = NULL;
 
+	g_static_mutex_lock (&index->lock);
+
 	if (func == NULL)
-		func = (index_function_t)_val_comp;
+		func = (index_function_t)s4_val_comp;
 
 	i = _bsearch (index, func, func_data);
 
-	if (i >= index->size || func (index->data[i].val, func_data))
+	if (i >= index->size || func (index->data[i].val, func_data)) {
+		g_static_mutex_unlock (&index->lock);
 		return NULL;
+	}
 
 	found = g_hash_table_new (NULL, NULL);
 
@@ -204,9 +210,20 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 
 	g_hash_table_destroy (found);
 
+	g_static_mutex_unlock (&index->lock);
+
 	return ret;
 }
 
 void _index_free (s4_index_t *index)
 {
+	int i;
+
+	for (i = 0; i < index->size; i++) {
+		free (index->data[i].data);
+	}
+
+	g_static_mutex_free (&index->lock);
+	free (index->data);
+	free (index);
 }
