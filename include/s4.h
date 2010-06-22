@@ -42,7 +42,6 @@ typedef struct s4_St s4_t;
 typedef struct s4_val_St s4_val_t;
 
 s4_val_t *s4_val_new_string (const char *str);
-s4_val_t *s4_val_new_string_nocopy (const char *str);
 s4_val_t *s4_val_new_int (int32_t i);
 s4_val_t *s4_val_copy (const s4_val_t *val);
 void s4_val_free (s4_val_t *val);
@@ -51,8 +50,9 @@ int s4_val_is_str (const s4_val_t *val);
 int s4_val_is_int (const s4_val_t *val);
 int s4_val_get_str (const s4_val_t *val, const char **str);
 int s4_val_get_int (const s4_val_t *val, int32_t *i);
+int s4_val_get_normalized_str (const s4_val_t *val, const char **str);
 
-int s4_val_comp (const s4_val_t *v1, const s4_val_t *v2);
+int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, int casesens);
 
 /* s4.c */
 s4_t *s4_open (const char *name, const char **indices, int flags);

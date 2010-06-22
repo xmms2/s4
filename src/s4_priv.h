@@ -4,7 +4,6 @@
 #include <s4.h>
 #include <glib.h>
 #include <stdio.h>
-#include "idt.h"
 
 struct s4_St {
 	GHashTable *index_table;
@@ -16,6 +15,9 @@ struct s4_St {
 	GStringChunk *strings;
 	GStaticMutex strings_lock;
 
+	GHashTable *norm_table;
+	GStaticMutex norm_lock;
+
 	FILE *logfile;
 	char *filename;
 };
@@ -25,17 +27,17 @@ typedef struct str_St str_t;
 void s4_set_errno (int err);
 int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src);
 
+s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str);
+char *s4_normalize_string (const char *key);
+
 const char *_string_lookup (s4_t *s4, const char *str);
+const char *_string_lookup_normalized (s4_t *s4, const char *str);
 
 typedef struct {
 	int32_t key_a, val_a;
 	int32_t key_b, val_b;
 	int32_t src;
 } s4_intpair_t;
-
-int _ip_add (s4_t *be, s4_intpair_t *pair);
-int _ip_del (s4_t *be, s4_intpair_t *pair);
-void _ip_foreach (s4_t *be, void (*func) (s4_intpair_t *pair, void *data), void *data);
 
 typedef struct s4_index_St s4_index_t;
 typedef int (*index_function_t)(s4_val_t *val, void *data);

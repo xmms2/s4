@@ -19,14 +19,17 @@ typedef struct {
 
 static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 {
-	const char *str;
+	const char *str, *norm;
 
 	if (s4_val_is_int (val)) {
 		return s4_val_copy (val);
 	}
 
 	s4_val_get_str (val, &str);
-	return s4_val_new_string_nocopy (_string_lookup (s4, str));
+	str = _string_lookup (s4, str);
+	norm = _string_lookup_normalized (s4, str);
+
+	return s4_val_new_internal_string (str, norm);
 }
 
 static int _entry_search (entry_t *entry, const char *key)
@@ -54,7 +57,7 @@ static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const 
 		i++;
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
-		if (entry->data[i].src == src && !s4_val_comp (entry->data[i].val, val))
+		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1))
 			return 0;
 	}
 
@@ -82,7 +85,7 @@ static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, 
 		i++;
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
-		if (entry->data[i].src == src && !s4_val_comp (entry->data[i].val, val)) {
+		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1)) {
 			found = 1;
 			break;
 		}

@@ -79,25 +79,17 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_comp (value, d);
+	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS);
 }
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	int32_t i1,i2;
-
-	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return i1 <= i2;
-	return 0;
+	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) < 0;
 }
 static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	int32_t i1,i2;
-
-	if (s4_val_get_int (value, &i1) && s4_val_get_int (d, &i2))
-		return i1 >= i2;
-	return 0;
+	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) > 0;
 }
 
 static int match_filter (s4_val_t *value, s4_condition_t *cond)
@@ -105,7 +97,9 @@ static int match_filter (s4_val_t *value, s4_condition_t *cond)
 	GPatternSpec *spec = cond->u.filter.funcdata;
 	const char *s;
 
-	if (s4_val_get_str (value, &s)) {
+	if ((cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_str (value, &s)) {
+		return !g_pattern_match_string (spec, s);
+	} else if (!(cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_normalized_str (value, &s)) {
 		return !g_pattern_match_string (spec, s);
 	}
 	return 1;
@@ -135,7 +129,11 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 		case S4_FILTER_MATCH:
 			{
 				const char *s;
-				if (s4_val_get_str (val, &s)) {
+				if ((cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_str (val, &s)) {
+					cond->u.filter.func = match_filter;
+					cond->u.filter.funcdata = g_pattern_spec_new (s);
+					cond->u.filter.free_func = (free_func_t)g_pattern_spec_free;
+				} else if (!(cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_normalized_str (val, &s)) {
 					cond->u.filter.func = match_filter;
 					cond->u.filter.funcdata = g_pattern_spec_new (s);
 					cond->u.filter.free_func = (free_func_t)g_pattern_spec_free;

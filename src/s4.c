@@ -91,12 +91,12 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
 		src = g_hash_table_lookup (strings, GINT_TO_POINTER (ABS (rec.src)));
 
 		if (rec.key_a > 0) {
-			val_a = s4_val_new_string_nocopy (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_a)));
+			val_a = s4_val_new_string (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_a)));
 		} else {
 			val_a = s4_val_new_int (rec.val_a);
 		}
 		if (rec.key_b > 0) {
-			val_b = s4_val_new_string_nocopy (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_b)));
+			val_b = s4_val_new_string (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_b)));
 		} else {
 			val_b = s4_val_new_int (rec.val_b);
 		}
@@ -322,6 +322,9 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 
 	s4->rel_table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)_index_free);
 	g_static_rw_lock_init (&s4->rel_lock);
+
+	s4->norm_table = g_hash_table_new (NULL, NULL);
+	g_static_mutex_init (&s4->norm_lock);
 
 	for (i = 0; indices != NULL && indices[i] != NULL; i++) {
 		_index_add (s4, indices[i], _index_create ());

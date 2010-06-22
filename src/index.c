@@ -95,15 +95,20 @@ static int _bsearch (s4_index_t *index, index_function_t func, void *funcdata)
 	return lo;
 }
 
+static int _val_cmp (const s4_val_t *v1, s4_val_t *v2)
+{
+	return s4_val_cmp (v1, v2, 1);
+}
+
 int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 {
 	int i,j;
 
 	g_static_mutex_lock (&index->lock);
 
-	i = _bsearch (index, (index_function_t)s4_val_comp, val);
+	i = _bsearch (index, (index_function_t)_val_cmp, val);
 
-	if (i >= index->size || s4_val_comp (val, index->data[i].val)) {
+	if (i >= index->size || _val_cmp (val, index->data[i].val)) {
 		if (index->size >= index->alloc) {
 			index->alloc *= 2;
 			index->data = realloc (index->data, sizeof (index_t) * index->alloc);
@@ -145,8 +150,8 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *new_data)
 
 	g_static_mutex_lock (&index->lock);
 
-	i = _bsearch (index, (index_function_t)s4_val_comp, (void*)val);
-	if (i >= index->size || s4_val_comp (val, index->data[i].val)) {
+	i = _bsearch (index, (index_function_t)_val_cmp, (void*)val);
+	if (i >= index->size || _val_cmp (val, index->data[i].val)) {
 		g_static_mutex_unlock (&index->lock);
 		return 0;
 	}
@@ -185,7 +190,7 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 	g_static_mutex_lock (&index->lock);
 
 	if (func == NULL)
-		func = (index_function_t)s4_val_comp;
+		func = (index_function_t)_val_cmp;
 
 	i = _bsearch (index, func, func_data);
 
