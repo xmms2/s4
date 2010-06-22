@@ -17,6 +17,23 @@ typedef struct {
 	entry_data_t *data;
 } entry_t;
 
+/**
+ * @addtogroup S4
+ * @{
+ */
+
+/**
+ * @{
+ * @internal
+ */
+
+/**
+ * Creates an internal copy of val
+ *
+ * @param s4 The database to find constant strings in
+ * @param val The value to copy
+ * @return A new internal value that is equal to val
+ */
 static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 {
 	const char *str, *norm;
@@ -32,6 +49,14 @@ static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 	return s4_val_new_internal_string (str, norm);
 }
 
+/**
+ * Searches an entry for key
+ *
+ * @param entry The entry to search
+ * @param key The key to search for
+ * @return The index of the item before the first item with key=key,
+ * or the index of the first item with key=key.
+ */
 static int _entry_search (entry_t *entry, const char *key)
 {
 	int lo = 0;
@@ -49,6 +74,15 @@ static int _entry_search (entry_t *entry, const char *key)
 	return lo;
 }
 
+/**
+ * Inserts a key,value,source tuple into an entry
+ *
+ * @param entry The entry to insert into
+ * @param key The key to insert
+ * @param val The value to insert
+ * @param src The source to insert
+ * @return 0 if the tuple already exists, non-zero otherwise
+ */
 static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const char *src)
 {
 	int i = _entry_search (entry, key);
@@ -76,6 +110,15 @@ static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const 
 	return 1;
 }
 
+/**
+ * Deletes a key,value,source tuple from an entry
+ *
+ * @param entry The entry to delete from
+ * @param key The key to delete
+ * @param val The value to delete
+ * @param src The source to delete
+ * @return 0 if the tuple was not found, 1 otherwise
+ */
 static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, const char *src)
 {
 	int i = _entry_search (entry, key);
@@ -100,6 +143,13 @@ static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, 
 	return 1;
 }
 
+/**
+ * Creates a new entry
+ *
+ * @param key The key of the entry
+ * @param val The value of the entry
+ * @return A new empty entry
+ */
 static entry_t *_entry_create (const char *key, s4_val_t *val)
 {
 	entry_t *entry = malloc (sizeof (entry_t));
@@ -115,6 +165,21 @@ static entry_t *_entry_create (const char *key, s4_val_t *val)
 	return entry;
 }
 
+/**
+ * @}
+ */
+
+/**
+ * Adds a new relation to a database
+ *
+ * @param s4 The database to add to
+ * @param key_a The key of the first entry
+ * @param value_a The value of the first entry
+ * @param key_b The key of the second entry
+ * @param value_b The value of the second entry
+ * @param src The source that made the relation
+ * @return non-zero if everything went alrite, 0 otherwise
+ */
 int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src)
 {
@@ -167,6 +232,17 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	return ret;
 }
 
+/**
+ * Deletes a relation from a database
+ *
+ * @param s4 The database to delete from
+ * @param key_a The key of the first entry
+ * @param val_a The value of the first entry
+ * @param key_b The key of the second entry
+ * @param val_b The value of the second entry
+ * @param src The source that made the relation
+ * @return non-zero if everything went alrite, 0 otherwise
+ */
 int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src)
 {
@@ -211,12 +287,69 @@ int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	return ret;
 }
 
+/**
+ * @{
+ * @internal
+ */
+
+/**
+ * An index function that matches everything
+ *
+ * @return 0
+ */
+static int _everything (void)
+{
+	return 0;
+}
+
+/**
+ * Frees all relations in a database
+ *
+ * @param s4 The database to free in
+ */
+void _free_relations (s4_t *s4)
+{
+	GHashTableIter iter;
+	s4_index_t *index;
+	GList *entries;
+
+	g_static_rw_lock_reader_lock (&s4->rel_lock);
+	g_hash_table_iter_init (&iter, s4->rel_table);
+
+	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
+		entries = _index_search (index, (index_function_t)_everything, NULL);
+
+		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
+			entry_t *entry = entries->data;
+			int i;
+
+			for (i = 0; i < entry->size; i++) {
+				s4_val_free (entry->data[i].val);
+			}
+
+			s4_val_free (entry->val);
+
+			free (entry->data);
+			free (entry);
+		}
+	}
+
+	g_static_rw_lock_reader_unlock (&s4->rel_lock);
+}
+
 typedef struct {
 	s4_t *s4;
 	entry_t *l;
 } check_data_t;
 
-static int check_cond (s4_condition_t *cond, void *d)
+/**
+ * Checks an entry against a condition
+ *
+ * @param cond The condition to check
+ * @param d The database and entry to check
+ * @return 0 if the entry matched, non-zero otherwise
+ */
+static int _check_cond (s4_condition_t *cond, void *d)
 {
 	check_data_t *data = d;
 	entry_t *l = data->l;
@@ -224,7 +357,7 @@ static int check_cond (s4_condition_t *cond, void *d)
 	int i;
 
 	if (s4_cond_is_combiner (cond)) {
-		ret = s4_cond_get_combine_function (cond)(cond, check_cond, d);
+		ret = s4_cond_get_combine_function (cond)(cond, _check_cond, d);
 	} else if (s4_cond_is_filter (cond)) {
 		s4_val_t *val = NULL;
 		const char *key = _string_lookup (data->s4, s4_cond_get_key (cond));
@@ -255,6 +388,14 @@ static int check_cond (s4_condition_t *cond, void *d)
 	return ret;
 }
 
+/**
+ * Fetches values from an entry
+ *
+ * @param s4 The database the entry lives in
+ * @param entry The entry to fetch from
+ * @param fs The fetchspec that tells us what to fetch
+ * @return An array of results
+ */
 static s4_result_t **_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 {
 	s4_result_t **result;
@@ -294,11 +435,19 @@ static s4_result_t **_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 	return result;
 }
 
-static int _everything (void)
-{
-	return 0;
-}
+/**
+ * @}
+ */
 
+/**
+ * Queries a database for all entries matching a condition,
+ * then fetches data from them.
+ *
+ * @param s4 The database to search
+ * @param fs The fetchspec to use when fetching data
+ * @param cond The condition to check entries against
+ * @return A resultset with a row for every entry that matched
+ */
 s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 {
 	check_data_t data;
@@ -317,7 +466,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		else
 			entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 	} else if (s4_cond_is_filter (cond) &&
-			s4_cond_is_continuous(cond) &&
+			s4_cond_is_monotonic (cond) &&
 			(index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {
 		entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 	} else {
@@ -339,7 +488,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		data.l = entry;
 
 		g_static_mutex_lock (&entry->lock);
-		if (!check_cond (cond, &data))
+		if (!_check_cond (cond, &data))
 			s4_resultset_add_row (ret, _fetch (s4, entry, fs));
 		g_static_mutex_unlock (&entry->lock);
 	}
@@ -347,6 +496,13 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 	return ret;
 }
 
+/**
+ * Calls the given function for every relation in the database
+ *
+ * @param s4 The database to iterate over
+ * @param func The function to call
+ * @param data The data to be passed as the last argument to func
+ */
 void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_t *val_a,
 			const char *key_b, const s4_val_t *val_b, const char *src, void *data), void *data)
 {
@@ -373,32 +529,6 @@ void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_
 	g_static_rw_lock_reader_unlock (&s4->rel_lock);
 }
 
-void s4_free_relations (s4_t *s4)
-{
-	GHashTableIter iter;
-	s4_index_t *index;
-	GList *entries;
-
-	g_static_rw_lock_reader_lock (&s4->rel_lock);
-	g_hash_table_iter_init (&iter, s4->rel_table);
-
-	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
-		entries = _index_search (index, (index_function_t)_everything, NULL);
-
-		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
-			entry_t *entry = entries->data;
-			int i;
-
-			for (i = 0; i < entry->size; i++) {
-				s4_val_free (entry->data[i].val);
-			}
-
-			s4_val_free (entry->val);
-
-			free (entry->data);
-			free (entry);
-		}
-	}
-
-	g_static_rw_lock_reader_unlock (&s4->rel_lock);
-}
+/**
+ * @}
+ */

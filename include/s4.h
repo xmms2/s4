@@ -72,8 +72,9 @@ void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_
 /* sourcepref.c */
 typedef struct s4_sourcepref_St s4_sourcepref_t;
 
-s4_sourcepref_t *s4_sourcepref_create (s4_t *s4, const char **sourcepref);
+s4_sourcepref_t *s4_sourcepref_create (const char **sourcepref);
 void s4_sourcepref_free (s4_sourcepref_t *sourcepref);
+int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src);
 
 /* cond.c */
 typedef enum {
@@ -113,7 +114,7 @@ int s4_cond_is_combiner (s4_condition_t *cond);
 int s4_cond_get_flags (s4_condition_t *cond);
 const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
-int s4_cond_is_continuous (s4_condition_t *cond);
+int s4_cond_is_monotonic (s4_condition_t *cond);
 void *s4_cond_get_funcdata (s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
@@ -126,6 +127,9 @@ typedef struct s4_fetchspec_St s4_fetchspec_t;
 s4_fetchspec_t *s4_fetchspec_create (void);
 void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref);
 void s4_fetchspec_free (s4_fetchspec_t *spec);
+int s4_fetchspec_size (s4_fetchspec_t *spec);
+const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
+s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
 
 /* result.c */
 typedef struct s4_result_St s4_result_t;

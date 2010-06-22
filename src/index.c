@@ -20,6 +20,22 @@ struct s4_index_St {
 	index_t *data;
 };
 
+/**
+ *
+ * @internal
+ * @defgroup Index Index
+ * @ingroup S4
+ * @brief Search indexes for S4
+ *
+ */
+
+/**
+ * Gets the index associated with key
+ *
+ * @param s4 The database to look for the index in
+ * @param key The key the index should be indexing
+ * @return The index, or NULL if it is not found
+ */
 s4_index_t *_index_get (s4_t *s4, const char *key)
 {
 	s4_index_t *ret;
@@ -31,6 +47,11 @@ s4_index_t *_index_get (s4_t *s4, const char *key)
 	return ret;
 }
 
+/**
+ * Creates a new index
+ *
+ * @return A new index
+ */
 s4_index_t *_index_create ()
 {
 	s4_index_t *ret = malloc (sizeof (s4_index_t));
@@ -43,6 +64,14 @@ s4_index_t *_index_create ()
 	return ret;
 }
 
+/**
+ * Adds an index to a database
+ *
+ * @param s4 The database to add the index to
+ * @param key The key to associate the index with
+ * @param index The index to insert
+ * @return 0 if the key already has an index, non-zero otherwise
+ */
 int _index_add (s4_t *s4, const char *key, s4_index_t *index)
 {
 	int ret = 0;
@@ -100,6 +129,14 @@ static int _val_cmp (const s4_val_t *v1, s4_val_t *v2)
 	return s4_val_cmp (v1, v2, 1);
 }
 
+/**
+ * Inserts a new value-data pair into the index
+ *
+ * @param index The index to insert into
+ * @param val The value to associate the data with
+ * @param new_data The data
+ * @return 1
+ */
 int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 {
 	int i,j;
@@ -144,7 +181,15 @@ int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 	return 1;
 }
 
-int _index_delete (s4_index_t *index, const s4_val_t *val, void *new_data)
+/**
+ * Removes a value-data pair from the index
+ *
+ * @param index The index to remove from
+ * @param val The value to remove
+ * @param data The data to remove
+ * @return 0 if the value-data pair is not found, 1 otherwise
+ */
+int _index_delete (s4_index_t *index, const s4_val_t *val, void *data)
 {
 	int i,j;
 
@@ -156,8 +201,8 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *new_data)
 		return 0;
 	}
 
-	j = _data_search (index->data + i, new_data);
-	if (j >= index->size || new_data != index->data[i].data) {
+	j = _data_search (index->data + i, data);
+	if (j >= index->size || data != index->data[i].data) {
 		g_static_mutex_unlock (&index->lock);
 		return 0;
 	}
@@ -179,6 +224,16 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *new_data)
 	return 1;
 }
 
+/**
+ * Searches an index
+ *
+ * @param index The index to search
+ * @param func The function to use when searching. It must be monotonic,
+ * It should return 0  if the value matches, -1 if the value is too small
+ * and 1 if the value is too big,
+ * @param func_data Data passed as the second argument to func
+ * @return A GList where list->data is the data found matching
+ */
 GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 {
 	int i,j;
@@ -220,6 +275,11 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 	return ret;
 }
 
+/**
+ * Frees an index. The values and data is NOT freed
+ *
+ * @param index The index to free
+ */
 void _index_free (s4_index_t *index)
 {
 	int i;
@@ -232,3 +292,7 @@ void _index_free (s4_index_t *index)
 	free (index->data);
 	free (index);
 }
+
+/**
+ * @}
+ */

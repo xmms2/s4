@@ -19,6 +19,21 @@ struct s4_val_St {
 	} v;
 };
 
+/**
+ *
+ * @defgroup Value Value
+ * @ingroup S4
+ * @brief The way values are represented in S4
+ *
+ * @{
+ */
+
+/**
+ * Creates a new string value
+ *
+ * @param str The string to use as the value
+ * @return A new string value, must be freed with s4_val_free
+ */
 s4_val_t *s4_val_new_string (const char *str)
 {
 	s4_val_t *val = malloc (sizeof (s4_val_t));
@@ -29,6 +44,20 @@ s4_val_t *s4_val_new_string (const char *str)
 	return val;
 }
 
+/**
+ * @{
+ * @internal
+ */
+
+/**
+ * Creates a new internal string value.
+ * Internal string values are different from normal string values in that
+ * the string is not copied.
+ *
+ * @param str The string to use as the value
+ * @param normalized_str The normalized version of str
+ * @return A new internal string value, must be freed with s4_val_free
+ */
 s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str)
 {
 	s4_val_t *val = malloc (sizeof (s4_val_t));
@@ -39,6 +68,16 @@ s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_st
 	return val;
 }
 
+/**
+ * @}
+ */
+
+/**
+ * Creates a new integer value
+ *
+ * @param i The integer to use as the value
+ * @return A new integer value, must be freed with s4_val_free
+ */
 s4_val_t *s4_val_new_int (int32_t i)
 {
 	s4_val_t *val = malloc (sizeof (s4_val_t));
@@ -48,6 +87,12 @@ s4_val_t *s4_val_new_int (int32_t i)
 	return val;
 }
 
+/**
+ * Copies a value
+ *
+ * @param val The value to copy
+ * @return A new value that's a copy of val, must be freed with s4_val_free
+ */
 s4_val_t *s4_val_copy (const s4_val_t *val)
 {
 	const char *s;
@@ -62,6 +107,11 @@ s4_val_t *s4_val_copy (const s4_val_t *val)
 	}
 }
 
+/**
+ * Frees a value
+ *
+ * @param val The value to free
+ */
 void s4_val_free (s4_val_t *val)
 {
 	if (val->type == S4_VAL_STR) {
@@ -72,16 +122,35 @@ void s4_val_free (s4_val_t *val)
 	free (val);
 }
 
+/**
+ * Checks is a value is a string value
+ *
+ * @param val The value to check
+ * @return non-zero if val is a string value, 0 otherwise
+ */
 int s4_val_is_str (const s4_val_t *val)
 {
 	return val->type == S4_VAL_STR || val->type == S4_VAL_STR_INTERNAL;
 }
 
+/**
+ * Checks is a value is an integer value
+ *
+ * @param val The value to check
+ * @return non-zero if val is an integer value, 0 otherwise
+ */
 int s4_val_is_int (const s4_val_t *val)
 {
 	return val->type == S4_VAL_INT;
 }
 
+/**
+ * Tries to get the string in a string value
+ *
+ * @param val The value to get the string of
+ * @param str A pointer to a pointer where the string pointer will be stored
+ * @return 0 if val is not a string value, non-zero otherwise
+ */
 int s4_val_get_str (const s4_val_t *val, const char **str)
 {
 	if (!s4_val_is_str (val))
@@ -91,6 +160,13 @@ int s4_val_get_str (const s4_val_t *val, const char **str)
 	return 1;
 }
 
+/**
+ * Tries to get the normalized string in a string value
+ *
+ * @param val The value to get the string of
+ * @param str A pointer to a pointer where the string pointer will be stored
+ * @return 0 if val is not a string value, non-zero otherwise
+ */
 int s4_val_get_normalized_str (const s4_val_t *val, const char **str)
 {
 	if (!s4_val_is_str (val))
@@ -103,6 +179,13 @@ int s4_val_get_normalized_str (const s4_val_t *val, const char **str)
 	return 1;
 }
 
+/**
+ * Tries to get the integer in an integer value
+ *
+ * @param val The value to get the integer of
+ * @param i A pointer to an integer where the integer will be stored
+ * @return 0 if val is not an integer value, non-zero otherwise
+ */
 int s4_val_get_int (const s4_val_t *val, int32_t *i)
 {
 	if (!s4_val_is_int (val))
@@ -112,6 +195,14 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i)
 	return 1;
 }
 
+/**
+ * Compares two values
+ *
+ * @param v1 The first value
+ * @param v2 The second value
+ * @param casesens Non-zero if the values should be compared casesensitively, 0 otherwise
+ * @return <0 if v1<v2, 0 if v1==v2 and >0 if v1>v2
+ */
 int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, int casesens)
 {
 	int32_t i1,i2;
@@ -128,3 +219,7 @@ int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, int casesens)
 	else
 		return 1;
 }
+
+/**
+ * @}
+ */

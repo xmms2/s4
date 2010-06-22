@@ -7,9 +7,17 @@ struct s4_sourcepref_St {
 	GStaticMutex lock;
 	GPatternSpec **specs;
 	int spec_count;
-	s4_t *s4;
 };
 
+/**
+ * @defgroup Sourcepref Source Preferences
+ * @ingroup S4
+ * @brief Handles source preferences
+ *
+ * @{
+ */
+
+/* Helper function to s4_sourcepref_get_priority */
 static int _get_priority (s4_sourcepref_t *sp, const char *src)
 {
 	int i;
@@ -22,12 +30,19 @@ static int _get_priority (s4_sourcepref_t *sp, const char *src)
 	return INT_MAX;
 }
 
-s4_sourcepref_t *s4_sourcepref_create (s4_t *s4, const char **srcprefs)
+/**
+ * Creates a new source preferences that can be used when querying
+ *
+ * @param srcprefs An NULL terminated array of sources, where the
+ * first one has the highest priority. The sources may use glob-
+ * like patterns, for example "plugin*".
+ * @return A new sourcepref
+ */
+s4_sourcepref_t *s4_sourcepref_create (const char **srcprefs)
 {
 	int i;
 	s4_sourcepref_t *sp = malloc (sizeof (s4_sourcepref_t));
 	sp->table = g_hash_table_new_full (g_direct_hash, g_direct_equal, NULL, free);
-	sp->s4 = s4;
 	g_static_mutex_init (&sp->lock);
 
 	for (i = 0; srcprefs[i] != NULL; i++);
@@ -41,6 +56,10 @@ s4_sourcepref_t *s4_sourcepref_create (s4_t *s4, const char **srcprefs)
 	return sp;
 }
 
+/**
+ * Frees a sourcepref
+ * @param sp The sourcepref to free
+ */
 void s4_sourcepref_free (s4_sourcepref_t *sp)
 {
 	int i;
@@ -55,6 +74,13 @@ void s4_sourcepref_free (s4_sourcepref_t *sp)
 	free (sp);
 }
 
+/**
+ * Gets the priority of a source
+ *
+ * @param sp The sourcepref to check against
+ * @param src The source to check
+ * @return The priority of the source
+ */
 int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src)
 {
 	g_static_mutex_lock (&sp->lock);
@@ -75,3 +101,7 @@ int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src)
 
 	return *i;
 }
+
+/**
+ * @}
+ */

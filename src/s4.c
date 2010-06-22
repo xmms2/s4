@@ -34,11 +34,17 @@ static GStaticPrivate _errno = G_STATIC_PRIVATE_INIT;
 #define S4_MAGIC_LEN (strlen (S4_MAGIC))
 
 /**
- * Read strings from a file
+ * @{
+ * @internal
+ */
+
+/**
+ * Reads strings from a file
  *
  * @param s4 The database to add the strings to
  * @param file The file to read from
- * @return 0 on success, -1 otherwise
+ * @return A hashtable with the id as they key and the
+ * corresponding string as they values or NULL on error
  */
 static GHashTable *_read_string (s4_t *s4, FILE *file)
 {
@@ -72,7 +78,7 @@ static GHashTable *_read_string (s4_t *s4, FILE *file)
 }
 
 /**
- * Read relations from a file
+ * Reads relations from a file
  *
  * @param s4 The database to insert them into
  * @param file The file to read
@@ -111,7 +117,7 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
 }
 
 /**
- * Read an S4 database from filename.
+ * Reads an S4 database from filename.
  *
  * @param s4 The s4 database to read the data into
  * @param filename The name of the file to read from
@@ -162,21 +168,28 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 }
 
 /**
- * Free a midb handle and everything it points at
+ * Frees an S4 handle and everything it points at
  *
- * @param s4 Fhe handle to free
+ * @param s4 The handle to free
  */
 static void _free (s4_t *s4)
 {
-	s4_free_relations (s4);
+	_free_relations (s4);
 	g_hash_table_destroy (s4->index_table);
 	g_hash_table_destroy (s4->rel_table);
+	g_hash_table_destroy (s4->norm_table);
 	g_string_chunk_free (s4->strings);
 
 	free (s4->filename);
 	free (s4);
 }
 
+/**
+ * Writes all the id->string relations in the hash table to file
+ *
+ * @param strings The hashtable holding the key-value pairs
+ * @param file The file to write to
+ */
 static void _write_strings (GHashTable *strings, FILE *file)
 {
 	GHashTableIter iter;
@@ -193,6 +206,12 @@ static void _write_strings (GHashTable *strings, FILE *file)
 	}
 }
 
+/**
+ * Writes a list of int-pairs to file
+ *
+ * @param pairs A GList with pairs to write
+ * @param file The file to write to
+ */
 static void _write_pairs (GList *pairs, FILE *file)
 {
 	for (; pairs != NULL; pairs = g_list_next (pairs)) {
@@ -208,6 +227,14 @@ typedef struct {
 	int new_id;
 } save_data_t;
 
+/**
+ * Gets the id of a string, or gives it an unique id if it doens't have one
+ *
+ * @param table A hashtable with id->string pairs
+ * @param str The string to lookup
+ * @param new_id A pointer to an int holding the next free id to use
+ * @return The id associated with the string
+ */
 static int _get_string_number (GHashTable *table, const char *str, int *new_id)
 {
 	int i = GPOINTER_TO_INT (g_hash_table_lookup (table, str));
@@ -220,6 +247,9 @@ static int _get_string_number (GHashTable *table, const char *str, int *new_id)
 	return i;
 }
 
+/*
+ * A helper function converting all relationships into intpairs
+ */
 static void _entry_to_pair (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src, void *data)
 {
@@ -248,6 +278,13 @@ static void _entry_to_pair (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	sd->pairs = g_list_prepend (sd->pairs, pair);
 }
 
+/**
+ * Writes the database to disk
+ * 
+ * @param s4 The database to write
+ * @param filename The file to write to
+ * @return 0 on success, non-zero on error
+ */
 static int _write_file (s4_t *s4, const char *filename)
 {
 	int32_t i = -1;
@@ -273,9 +310,12 @@ static int _write_file (s4_t *s4, const char *filename)
 	return 0;
 }
 
+/**
+ * @}
+ */
 
 /**
- * Open an S4 database
+ * Opens an S4 database
  *
  * @b The different flags you can pass:
  * <P>
@@ -298,15 +338,11 @@ static int _write_file (s4_t *s4, const char *filename)
  * @b S4_EXISTS
  * <BR>
  * 		If the file does not exists it will fail and return NULL.
- * </P><P>
- * @b S4_SYNC_THREAD
- * <BR>
- * 		It will start a synchronisation thread that will flush the
- * 		database to disk in regular intervals.
  * </P>
  *
  * @param filename The name of the file containing the database
- * @param flags Zero or more of the flags bitwise-or'd.
+ * @param indices An array of keys to have indices on
+ * @param open_flags Zero or more of the flags bitwise-or'd.
  * @return A pointer to an s4_t, or NULL if something went wrong.
  */
 s4_t *s4_open (const char *filename, const char **indices, int open_flags)
@@ -344,7 +380,7 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 }
 
 /**
- * Close an open S4 database
+ * Closes an open S4 database
  *
  * @param s4 The database to close
  *
@@ -359,7 +395,7 @@ int s4_close (s4_t* s4)
 }
 
 /**
- * Write all changes to disk
+ * Writes all changes to disk
  *
  * @param s4 The database to sync
  *
@@ -392,7 +428,7 @@ int s4_recover (s4_t *s4, const char *name)
 
 
 /**
- * Return the last error number set.
+ * Returns the last error number set.
  * This function is thread safe, error numbers set in one thread
  * will NOT be seen in another thread.
  *
@@ -408,7 +444,7 @@ int s4_errno()
 }
 
 /**
- * Set errno to the given error number
+ * Sets errno to the given error number
  *
  * @param err The error number to set
  */

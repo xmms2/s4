@@ -1,5 +1,23 @@
 #include "s4_priv.h"
 
+/**
+ *
+ * @internal
+ * @defgroup String String
+ * @ingroup S4
+ * @brief Handles string in S4
+ *
+ * @{
+ */
+
+/**
+ * Get a pointer to a constant string that's equal to str. _string_lookup
+ * will always return the same pointer for the same string
+ *
+ * @param s4 The database to look for the string in
+ * @param str The string to find the constant string of
+ * @return A pointer to a string equal to str
+ */
 const char *_string_lookup (s4_t *s4, const char *str)
 {
 	const char *ret;
@@ -14,9 +32,15 @@ const char *_string_lookup (s4_t *s4, const char *str)
 	return ret;
 }
 
-char *s4_normalize_string (const char *key)
+/**
+ * Get the normalized string of str
+ *
+ * @param str The string to normalize
+ * @return A normalized version of str, must be freed with g_free
+ */
+char *s4_normalize_string (const char *str)
 {
-	char *tmp = g_utf8_casefold (key, -1);
+	char *tmp = g_utf8_casefold (str, -1);
 	char *ret = g_utf8_normalize (tmp, -1, G_NORMALIZE_DEFAULT);
 
 	if (ret == NULL) {
@@ -28,7 +52,14 @@ char *s4_normalize_string (const char *key)
 	return ret;
 }
 
-
+/**
+ * Get the normalized string corresponding to str. str must have
+ * been obtained by calling _string_lookup.
+ *
+ * @param s4 The database to look in
+ * @param str The string to find the normalized string of
+ * @return The normalized string of str
+ */
 const char *_string_lookup_normalized (s4_t *s4, const char *str)
 {
 	const char *ret;
@@ -48,3 +79,7 @@ const char *_string_lookup_normalized (s4_t *s4, const char *str)
 
 	return ret;
 }
+
+/**
+ * @}
+ */
