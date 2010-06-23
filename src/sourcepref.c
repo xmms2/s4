@@ -83,6 +83,9 @@ void s4_sourcepref_free (s4_sourcepref_t *sp)
  */
 int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src)
 {
+	if (sp == NULL)
+		return 0;
+
 	g_static_mutex_lock (&sp->lock);
 
 	int *i = g_hash_table_lookup (sp->table, src);

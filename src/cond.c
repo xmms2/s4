@@ -427,6 +427,11 @@ void s4_cond_update_key (s4_t *s4, s4_condition_t *cond)
 	}
 }
 
+GList *s4_cond_get_operands (s4_condition_t *cond)
+{
+	return cond->u.combine.operands;
+}
+
 /**
  * @}
  */

@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
-SETUP (s4) {
+SETUP (S4) {
 	if (!g_thread_get_initialized ())
 		g_thread_init (NULL);
 
@@ -33,121 +33,203 @@ CLEANUP () {
 char *name;
 s4_t *s4;
 
-static void _open ()
-{
-	name = strdup (tmpnam (NULL));
-	s4 = s4_open (name, S4_VERIFY | S4_SYNC_THREAD);
-}
-static void _close ()
-{
-	s4_close (s4);
-	g_unlink (name);
-	free (name);
-}
 
 #define ARG_SIZE 10
 struct db_struct {
 	const char *name;
 	const char *args[ARG_SIZE];
+	const char *src;
 };
 
 static void create_db (struct db_struct *db)
 {
-	s4_entry_t *entry, *prop;
+	s4_val_t *name_val, *arg_val;
 	int i, j;
 
 	for (i = 0; db[i].name != NULL; i++) {
-		entry = s4_entry_get_s (s4, "entry", db[i].name);
+		name_val = s4_val_new_string (db[i].name);
 
 		for (j = 0; db[i].args[j] != NULL; j++) {
-			prop = s4_entry_get_s (s4, "property", db[i].args[j]);
-			s4_entry_add (s4, entry, prop, "testsuite");
-			s4_entry_free (prop);
+			arg_val = s4_val_new_string (db[i].args[j]);
+			CU_ASSERT (s4_add (s4, "entry", name_val, "property", arg_val, db[i].src));
+			s4_val_free (arg_val);
 		}
-		s4_entry_free (entry);
+
+		s4_val_free (name_val);
 	}
 }
 
 static void check_db (struct db_struct *db)
 {
-	s4_entry_t *entry, *se;
-	s4_set_t *set;
 	int i, j;
+	s4_fetchspec_t *fs = s4_fetchspec_create ();
+	s4_fetchspec_add (fs, NULL, NULL);
 
 	for (i = 0; db[i].name != NULL; i++) {
-		char *args[ARG_SIZE];
-		memcpy (args, db[i].args, ARG_SIZE * sizeof (char*));
+		s4_val_t *name_val = s4_val_new_string (db[i].name);
+		s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL,
+				"entry", name_val, NULL, S4_COND_PARENT);
+		s4_resultset_t *set = s4_query (s4, fs, cond);
+		const s4_result_t *res = s4_resultset_get_result (set, 0, 0);
+		int found[ARG_SIZE] = {0};
 
-		entry = s4_entry_get_s (s4, "entry", db[i].name);
-		set = s4_entry_contains (s4, entry);
+		for (; res != NULL; res = s4_result_next (res)) {
+			for (j = 0; db[i].args[j] != NULL; j++) {
+				const char *str;
 
-		for (se = s4_set_next (set); se != NULL; se = s4_set_next (set)) {
-			s4_entry_fillin (s4, se);
-			for (j = 0; args[j] != NULL &&
-					strcmp (args[j], se->val_s); j++);
-			CU_ASSERT_PTR_NOT_NULL (args[j]);
-			memmove (args + j, args + j + 1,
-					(ARG_SIZE - j - 1) * sizeof (char*));
+				if (s4_val_get_str (s4_result_get_val (res), &str) && !strcmp (str, db[i].args[j]) &&
+						!strcmp (s4_result_get_key (res), "property") &&
+						!strcmp (s4_result_get_src (res), db[i].src)) {
+					found[j] = 1;
+					break;
+				}
+			}
+		}
+		for (j = 0; db[i].args[j] != NULL; j++) {
+			CU_ASSERT_EQUAL (found[j], 1);
 		}
 
-		s4_set_free (set);
-
-		CU_ASSERT_PTR_NULL (args[0]);
-
-		s4_entry_free (entry);
+		s4_resultset_free (set);
+		s4_cond_free (cond);
+		s4_val_free (name_val);
 	}
+
+	s4_fetchspec_free (fs);
 }
 
-CASE (s4_verify) {
+CASE (test_open) {
 	struct db_struct db[] = {
-		{"a",  {"b", "c", NULL}},
-		{"c", {"d", "e", NULL}},
-		{NULL, {NULL}}};
-	_open ();
+		{"a", {"b", "c", NULL}, "src_a"},
+		{"b", {"x", "foobar", NULL}, "src_b"},
+		{"c", {"basdf", "c", NULL}, "src_c"},
+		{NULL, {NULL}, NULL}};
+	name = strdup (tmpnam (NULL));
 
-	create_db (db);
-	check_db (db);
+	s4 = s4_open (name, NULL, S4_EXISTS);
+	CU_ASSERT_PTR_NULL (s4);
+	CU_ASSERT_EQUAL (s4_errno (), S4E_NOENT);
 
-	s4_sync (s4);
-	CU_ASSERT_TRUE (s4_verify (s4, S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT));
+	s4 = s4_open (name, NULL, S4_NEW);
 
-	_close ();
-}
+	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
 
-CASE (s4_recover) {
-	char *filename;
-	s4_t *tmp;
-	struct db_struct db[] = {
-		{"a",  {"b", "c", NULL}},
-		{"c", {"d", "e", NULL}},
-		{NULL, {NULL}}};
-	_open ();
-
-	create_db (db);
-	check_db (db);
-
-	filename = tmpnam (NULL);
-	s4_recover (s4, filename);
-
-	tmp = s4;
-	s4 = s4_open (filename, S4_EXISTS);
-	s4_sync (s4);
-	CU_ASSERT_TRUE (s4_verify (s4, S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT));
-	check_db (db);
+	create_db(db);
+	check_db(db);
 
 	s4_close (s4);
 
-	g_unlink (filename);
+	s4 = s4_open (name, NULL, S4_NEW);
+	CU_ASSERT_PTR_NULL (s4);
+	CU_ASSERT_EQUAL (s4_errno (), S4E_EXISTS);
 
-	s4 = tmp;
+	s4 = s4_open (name, NULL, S4_EXISTS);
 
-	_close();
+	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
+
+	check_db(db);
+
+	s4_close (s4);
+	g_unlink (name);
+	free (name);
 }
 
-CASE (s4_open) {
-	name = strdup (tmpnam (NULL));
-	s4 = s4_open (name, S4_VERIFY | S4_EXISTS);
+static void del_db (struct db_struct db[])
+{
+	s4_val_t *name_val, *arg_val;
+	int i, j;
 
-	CU_ASSERT_PTR_NULL (s4);
-	CU_ASSERT_EQUAL (s4_errno(), S4E_NOENT);
+	for (i = 0; db[i].name != NULL; i++) {
+		name_val = s4_val_new_string (db[i].name);
+
+		for (j = 0; db[i].args[j] != NULL; j++) {
+			arg_val = s4_val_new_string (db[i].args[j]);
+			CU_ASSERT (s4_del (s4, "entry", name_val, "property", arg_val, db[i].src));
+			s4_val_free (arg_val);
+		}
+
+		s4_val_free (name_val);
+	}
+}
+
+CASE (test_add_and_del) {
+	struct db_struct db[] = {
+		{"a", {"b", "c", NULL}, "src_a"},
+		{"b", {"x", "foobar", NULL}, "src_b"},
+		{"c", {"basdf", "c", NULL}, "src_c"},
+		{NULL, {NULL}, NULL}};
+	struct db_struct empty[] = {
+		{NULL, {NULL}}};
+	name = strdup (tmpnam (NULL));
+	s4 = s4_open (name, NULL, S4_NEW);
+
+	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
+
+	create_db(db);
+	check_db(db);
+
+	del_db (db);
+	check_db (empty);
+
+	s4_close (s4);
+	g_unlink (name);
+	free (name);
+}
+
+static void check_result (const s4_result_t *res, const char *key, const char *val, const char *src)
+{
+	const char *str;
+	CU_ASSERT (s4_val_get_str (s4_result_get_val (res), &str));
+	CU_ASSERT (!strcmp (s4_result_get_key (res), key));
+	CU_ASSERT (!strcmp (str, val));
+	CU_ASSERT (!strcmp (s4_result_get_src (res), src));
+}
+
+CASE (test_query) {
+	struct db_struct db[] = {
+		{"a", {"a", NULL}, "1"},
+		{"a", {"b", NULL}, "2"},
+		{"b", {"a", NULL}, "2"},
+		{"b", {"b", NULL}, "1"},
+		{NULL, {NULL}, NULL}};
+	const char *sources[] = {"1", "2", NULL};
+	name = strdup (tmpnam (NULL));
+	s4 = s4_open (name, NULL, S4_NEW);
+
+	create_db (db);
+	check_db (db);
+
+	s4_sourcepref_t *sp = s4_sourcepref_create (sources);
+	s4_fetchspec_t *fs = s4_fetchspec_create ();
+	s4_fetchspec_add (fs, "property", sp);
+
+	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property", s4_val_new_string ("a"), sp, 0);
+	s4_resultset_t *set = s4_query (s4, fs, cond);
+	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
+	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
+	CU_ASSERT_EQUAL (s4_resultset_get_rowcount (set), 1);
+
+	const s4_result_t *res = s4_resultset_get_result (set, 0, 0);
+	CU_ASSERT_PTR_NOT_NULL_FATAL (res);
+	check_result (res, "property", "a", "1");
+	s4_resultset_free (set);
+	s4_cond_free (cond);
+
+	cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property", s4_val_new_string ("b"), sp, 0);
+	set = s4_query (s4, fs, cond);
+	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
+	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
+	CU_ASSERT_EQUAL (s4_resultset_get_rowcount (set), 1);
+
+	res = s4_resultset_get_result (set, 0, 0);
+	CU_ASSERT_PTR_NOT_NULL_FATAL (res);
+	check_result (res, "property", "b", "1");
+	s4_resultset_free (set);
+	s4_cond_free (cond);
+
+	s4_sourcepref_free (sp);
+	s4_fetchspec_free (fs);
+
+	s4_close (s4);
+	g_unlink (name);
+	free (name);
 }

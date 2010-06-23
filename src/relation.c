@@ -476,12 +476,19 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 			(index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {
 		entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 	} else {
-		index = g_hash_table_lookup (s4->rel_table, _string_lookup (s4, "song_id"));
+		GList *indices = NULL;
+		GHashTableIter iter;
 
-		if (index == NULL)
-			entries = NULL;
-		else
-			entries = _index_search (index, (index_function_t)_everything, NULL);
+		g_static_rw_lock_reader_lock (&s4->rel_lock);
+		g_hash_table_iter_init (&iter, s4->rel_table);
+		while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
+			indices = g_list_prepend (indices, index);
+		}
+		g_static_rw_lock_reader_unlock (&s4->rel_lock);
+
+		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
+			entries = g_list_concat (entries, _index_search (index, (index_function_t)_everything, NULL));
+		}
 	}
 
 	if (entries != NULL) {

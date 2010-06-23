@@ -116,6 +116,7 @@ const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
 int s4_cond_is_monotonic (s4_condition_t *cond);
 void *s4_cond_get_funcdata (s4_condition_t *cond);
+GList *s4_cond_get_operands (s4_condition_t *cond);
 void s4_cond_update_key (s4_t *s4, s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
