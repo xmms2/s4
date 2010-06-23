@@ -1,4 +1,4 @@
-#include <s4.h>
+#include "s4_priv.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -116,7 +116,7 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) < 0;
+	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) <= 0;
 }
 /*
  * A filter that checks if the checked value is smaller than the given value
@@ -124,7 +124,7 @@ static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) > 0;
+	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) >= 0;
 }
 /*
  * A filter that checks if the checked value matches (glob-like pattern)
@@ -408,6 +408,23 @@ combine_function_t s4_cond_get_combine_function (s4_condition_t *cond)
 int s4_cond_is_monotonic (s4_condition_t *cond)
 {
 	return cond->u.filter.monotonic;
+}
+
+/**
+ * Change the key with a constant key for faster checking
+ *
+ * @param s4 The database to optimize for
+ * @param cond The condition to update
+ */
+void s4_cond_update_key (s4_t *s4, s4_condition_t *cond)
+{
+	if (cond->type == S4_COND_COMBINER) {
+		GList *i;
+		for (i = cond->u.combine.operands; i != NULL; i = g_list_next (i))
+			s4_cond_update_key (s4, i->data);
+	} else if (cond->type == S4_COND_FILTER) {
+		cond->u.filter.key = _string_lookup (s4, cond->u.filter.key);
+	}
 }
 
 /**

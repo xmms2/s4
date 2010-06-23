@@ -1,5 +1,6 @@
 #include "s4_priv.h"
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
 	const char *key;
@@ -35,6 +36,7 @@ s4_fetchspec_t *s4_fetchspec_create (void)
  * Adds something to fetch to the fetch specification. If key is NULL, it will fetch
  * everything in an entry
  *
+ * @param s4 The database to lookup the key in (for faster fetching)
  * @param spec The specification to add to
  * @param key The key to fetch
  * @param sourcepref The sourcepref to use when deciding which key-value pair to fetch
@@ -46,6 +48,14 @@ void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *s
 	data.pref = sourcepref;
 
 	g_array_append_val (spec->array, data);
+}
+
+void s4_fetchspec_update_key (s4_t *s4, s4_fetchspec_t *spec)
+{
+	int i;
+	for (i = 0; i < spec->array->len; i++)
+		g_array_index (spec->array, fetch_data_t, i).key =
+			_string_lookup (s4, g_array_index (spec->array, fetch_data_t, i).key);
 }
 
 /**

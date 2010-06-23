@@ -116,6 +116,7 @@ const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
 int s4_cond_is_monotonic (s4_condition_t *cond);
 void *s4_cond_get_funcdata (s4_condition_t *cond);
+void s4_cond_update_key (s4_t *s4, s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
 filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);
@@ -130,6 +131,7 @@ void s4_fetchspec_free (s4_fetchspec_t *spec);
 int s4_fetchspec_size (s4_fetchspec_t *spec);
 const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
 s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
+void s4_fetchspec_update_key (s4_t *s4, s4_fetchspec_t *spec);
 
 /* result.c */
 typedef struct s4_result_St s4_result_t;

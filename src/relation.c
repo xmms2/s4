@@ -17,6 +17,8 @@ typedef struct {
 	entry_data_t *data;
 } entry_t;
 
+#define LINEAR_SEARCH_SIZE 0
+
 /**
  * @addtogroup S4
  * @{
@@ -62,7 +64,7 @@ static int _entry_search (entry_t *entry, const char *key)
 	int lo = 0;
 	int hi = entry->size;
 
-	while (hi > lo) {
+	while ((hi - lo) > LINEAR_SEARCH_SIZE) {
 		int m = (hi + lo) / 2;
 
 		if (entry->data[m].key < key)
@@ -70,6 +72,8 @@ static int _entry_search (entry_t *entry, const char *key)
 		else
 			hi = m;
 	}
+
+	for (; entry->data[lo].key < key && lo < hi; lo++);
 
 	return lo;
 }
@@ -86,9 +90,6 @@ static int _entry_search (entry_t *entry, const char *key)
 static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const char *src)
 {
 	int i = _entry_search (entry, key);
-
-	if (i < entry->size && entry->data[i].key < key)
-		i++;
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
 		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1))
@@ -123,9 +124,6 @@ static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, 
 {
 	int i = _entry_search (entry, key);
 	int found = 0;
-
-	if (i < entry->size && entry->data[i].key < key)
-		i++;
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
 		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1)) {
@@ -359,29 +357,27 @@ static int _check_cond (s4_condition_t *cond, void *d)
 	if (s4_cond_is_combiner (cond)) {
 		ret = s4_cond_get_combine_function (cond)(cond, _check_cond, d);
 	} else if (s4_cond_is_filter (cond)) {
-		s4_val_t *val = NULL;
-		const char *key = _string_lookup (data->s4, s4_cond_get_key (cond));
+		const char *key = s4_cond_get_key (cond);
 
 		if (s4_cond_get_flags (cond) && S4_COND_PARENT) {
 			if (key == l->key) {
-				val = l->val;
+				ret = s4_cond_get_filter_function (cond)(l->val, cond);
 			}
 		} else {
-			int src, best_pos, best_src = INT_MAX;
-			for (i = 0; i < l->size; i++) {
-				if (l->data[i].key == key &&
-						(src = s4_sourcepref_get_priority (s4_cond_get_sourcepref (cond), l->data[i].src)) < best_src) {
+			s4_sourcepref_t *sp = s4_cond_get_sourcepref (cond);
+			int start, src, best_src = INT_MAX;
+
+			start = _entry_search (l, key);
+			for (i = start; l->data[i].key == key; i++) {
+				if ((src = s4_sourcepref_get_priority (sp, l->data[i].src)) < best_src) {
 					best_src = src;
-					best_pos = i;
 				}
 			}
-
-			if (best_src != INT_MAX) {
-				val = l->data[best_pos].val;
+			for (i = start; ret && l->data[i].key == key; i++) {
+				if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
+					ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
+				}
 			}
-		}
-		if (val != NULL) {
-			ret = s4_cond_get_filter_function (cond)(val, cond);
 		}
 	}
 
@@ -405,31 +401,38 @@ static s4_result_t **_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 	result = malloc (sizeof (s4_result_t*) * fetch_size);
 
 	for (k = 0; k < fetch_size; k++) {
-		const char *fkey = _string_lookup (s4, s4_fetchspec_get_key (fs, k));
+		const char *fkey = s4_fetchspec_get_key (fs, k);
 		s4_sourcepref_t *sp = s4_fetchspec_get_sourcepref (fs, k);
 
 		result[k] = NULL;
 
-		if (fkey == NULL || fkey == l->key) {
+		if (fkey == NULL) {
 			result[k] = s4_result_create (result[k], l->key, l->val, NULL);
-		}
 
-		int src, best_pos, best_src = INT_MAX;
-		for (f = 0; f < l->size; f++) {
-			if (fkey == NULL) {
+			for (f = 0; f < l->size; f++) {
 				result[k] = s4_result_create (result[k], l->data[f].key, l->data[f].val, l->data[f].src);
-			} else {
-				if (l->data[f].key == fkey &&
-						(src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
+			}
+		} else {
+			int src, start, best_src = INT_MAX;
+			if (fkey == l->key) {
+				result[k] = s4_result_create (result[k], l->key, l->val, NULL);
+			}
+
+			start = _entry_search (l, fkey);
+
+			for (f = start; l->data[f].key == fkey; f++) {
+				if ((src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
 					best_src = src;
-					best_pos = f;
+				}
+			}
+			for (f = start; l->data[f].key == fkey; f++) {
+				if (s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
+					result[k] = s4_result_create (result[k], l->data[f].key,
+							l->data[f].val, l->data[f].src);
 				}
 			}
 		}
-		if (best_src != INT_MAX) {
-			result[k] = s4_result_create (result[k], l->data[best_pos].key,
-					l->data[best_pos].val, l->data[best_pos].src);
-		}
+
 	}
 
 	return result;
@@ -455,8 +458,11 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 	s4_index_t *index;
 	s4_resultset_t *ret = NULL;
 
+	s4_cond_update_key (s4, cond);
+	s4_fetchspec_update_key (s4, fs);
+
 	if (s4_cond_is_filter (cond) && (s4_cond_get_flags (cond) & S4_COND_PARENT)) {
-		const char *key = _string_lookup (s4, s4_cond_get_key (cond));
+		const char *key = s4_cond_get_key (cond);
 		g_static_rw_lock_reader_lock (&s4->rel_lock);
 		index = g_hash_table_lookup (s4->rel_table, key);
 		g_static_rw_lock_reader_unlock (&s4->rel_lock);
