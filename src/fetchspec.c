@@ -36,7 +36,6 @@ s4_fetchspec_t *s4_fetchspec_create (void)
  * Adds something to fetch to the fetch specification. If key is NULL, it will fetch
  * everything in an entry
  *
- * @param s4 The database to lookup the key in (for faster fetching)
  * @param spec The specification to add to
  * @param key The key to fetch
  * @param sourcepref The sourcepref to use when deciding which key-value pair to fetch
