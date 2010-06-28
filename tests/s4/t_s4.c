@@ -33,6 +33,22 @@ CLEANUP () {
 char *name;
 s4_t *s4;
 
+static void _open (int flags)
+{
+	name = strdup (tmpnam (NULL));
+	s4 = s4_open (name, NULL, flags);
+}
+
+static void _close ()
+{
+	char *logname = g_strconcat (name, ".log", NULL);
+	s4_close (s4);
+	g_unlink (name);
+	g_unlink (logname);
+	g_free (logname);
+	free (name);
+}
+
 
 #define ARG_SIZE 10
 struct db_struct {
@@ -97,15 +113,34 @@ static void check_db (struct db_struct *db)
 	s4_fetchspec_free (fs);
 }
 
+CASE (test_log) {
+	struct db_struct db[] = {
+		{"a", {"a", NULL}, "1"},
+		{"a", {"b", NULL}, "2"},
+		{"b", {"a", NULL}, "2"},
+		{"b", {"b", NULL}, "1"},
+		{NULL, {NULL}, NULL}};
+	_open (S4_NEW);
+
+	create_db (db);
+	check_db (db);
+
+	s4 = s4_open (name, NULL, 0);
+	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
+
+	check_db (db);
+
+	_close ();
+}
+
+
 CASE (test_open) {
 	struct db_struct db[] = {
 		{"a", {"b", "c", NULL}, "src_a"},
 		{"b", {"x", "foobar", NULL}, "src_b"},
 		{"c", {"basdf", "c", NULL}, "src_c"},
 		{NULL, {NULL}, NULL}};
-	name = strdup (tmpnam (NULL));
-
-	s4 = s4_open (name, NULL, S4_EXISTS);
+	_open (S4_EXISTS);
 	CU_ASSERT_PTR_NULL (s4);
 	CU_ASSERT_EQUAL (s4_errno (), S4E_NOENT);
 
@@ -127,10 +162,7 @@ CASE (test_open) {
 	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
 
 	check_db(db);
-
-	s4_close (s4);
-	g_unlink (name);
-	free (name);
+	_close();
 }
 
 static void del_db (struct db_struct db[])
@@ -159,8 +191,7 @@ CASE (test_add_and_del) {
 		{NULL, {NULL}, NULL}};
 	struct db_struct empty[] = {
 		{NULL, {NULL}}};
-	name = strdup (tmpnam (NULL));
-	s4 = s4_open (name, NULL, S4_NEW);
+	_open (S4_NEW);
 
 	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
 
@@ -170,9 +201,7 @@ CASE (test_add_and_del) {
 	del_db (db);
 	check_db (empty);
 
-	s4_close (s4);
-	g_unlink (name);
-	free (name);
+	_close ();
 }
 
 static void check_result (const s4_result_t *res, const char *key, const char *val, const char *src)
@@ -192,8 +221,7 @@ CASE (test_query) {
 		{"b", {"b", NULL}, "1"},
 		{NULL, {NULL}, NULL}};
 	const char *sources[] = {"1", "2", NULL};
-	name = strdup (tmpnam (NULL));
-	s4 = s4_open (name, NULL, S4_NEW);
+	_open (S4_NEW);
 
 	create_db (db);
 	check_db (db);
@@ -229,7 +257,5 @@ CASE (test_query) {
 	s4_sourcepref_free (sp);
 	s4_fetchspec_free (fs);
 
-	s4_close (s4);
-	g_unlink (name);
-	free (name);
+	_close ();
 }
