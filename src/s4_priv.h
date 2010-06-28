@@ -12,7 +12,7 @@ struct s4_St {
 	GStaticMutex index_table_lock;
 
 	GHashTable *rel_table;
-	GStaticRWLock rel_lock;
+	GStaticMutex rel_lock;
 
 	GStringChunk *strings;
 	GStaticMutex strings_lock;

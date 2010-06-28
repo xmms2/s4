@@ -191,14 +191,14 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	key_b = _string_lookup (s4, key_b);
 	src = _string_lookup (s4, src);
 
-	g_static_rw_lock_writer_lock (&s4->rel_lock);
+	g_static_mutex_lock (&s4->rel_lock);
 	index = g_hash_table_lookup (s4->rel_table, key_a);
 
 	if (index == NULL) {
 		index = _index_create ();
 		g_hash_table_insert (s4->rel_table, (void*)key_a, index);
 	}
-	g_static_rw_lock_writer_unlock (&s4->rel_lock);
+	g_static_mutex_unlock (&s4->rel_lock);
 
 	entries = _index_search (index, NULL, (void*)value_a);
 
@@ -255,9 +255,9 @@ int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	key_b = _string_lookup (s4, key_b);
 	src = _string_lookup (s4, src);
 
-	g_static_rw_lock_writer_lock (&s4->rel_lock);
+	g_static_mutex_lock (&s4->rel_lock);
 	index = g_hash_table_lookup (s4->rel_table, key_a);
-	g_static_rw_lock_writer_unlock (&s4->rel_lock);
+	g_static_mutex_unlock (&s4->rel_lock);
 
 	if (index == NULL) {
 		return 0;
@@ -314,7 +314,7 @@ void _free_relations (s4_t *s4)
 	s4_index_t *index;
 	GList *entries;
 
-	g_static_rw_lock_reader_lock (&s4->rel_lock);
+	g_static_mutex_lock (&s4->rel_lock);
 	g_hash_table_iter_init (&iter, s4->rel_table);
 
 	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
@@ -335,7 +335,7 @@ void _free_relations (s4_t *s4)
 		}
 	}
 
-	g_static_rw_lock_reader_unlock (&s4->rel_lock);
+	g_static_mutex_unlock (&s4->rel_lock);
 }
 
 typedef struct {
@@ -466,9 +466,9 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 
 	if (s4_cond_is_filter (cond) && (s4_cond_get_flags (cond) & S4_COND_PARENT)) {
 		const char *key = s4_cond_get_key (cond);
-		g_static_rw_lock_reader_lock (&s4->rel_lock);
+		g_static_mutex_lock (&s4->rel_lock);
 		index = g_hash_table_lookup (s4->rel_table, key);
-		g_static_rw_lock_reader_unlock (&s4->rel_lock);
+		g_static_mutex_unlock (&s4->rel_lock);
 
 		if (index == NULL)
 			entries = NULL;
@@ -482,12 +482,12 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		GList *indices = NULL;
 		GHashTableIter iter;
 
-		g_static_rw_lock_reader_lock (&s4->rel_lock);
+		g_static_mutex_lock (&s4->rel_lock);
 		g_hash_table_iter_init (&iter, s4->rel_table);
 		while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
 			indices = g_list_prepend (indices, index);
 		}
-		g_static_rw_lock_reader_unlock (&s4->rel_lock);
+		g_static_mutex_unlock (&s4->rel_lock);
 
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
 			entries = g_list_concat (entries, _index_search (index, (index_function_t)_everything, NULL));
@@ -524,25 +524,28 @@ void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_
 {
 	GHashTableIter iter;
 	s4_index_t *index;
-	GList *entries;
+	GList *indices = NULL, *entries;
 
-	g_static_rw_lock_reader_lock (&s4->rel_lock);
+	g_static_mutex_lock (&s4->rel_lock);
 	g_hash_table_iter_init (&iter, s4->rel_table);
-
 	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
-		entries = _index_search (index, (index_function_t)_everything, NULL);
+		indices = g_list_prepend (indices, index);
+	}
+	g_static_mutex_unlock (&s4->rel_lock);
 
+	for (; indices != NULL; indices = g_list_delete_link (indices, indices)) {
+		entries = _index_search (indices->data, (index_function_t)_everything, NULL);
 		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
 			entry_t *entry = entries->data;
 			int i;
 
+			g_static_mutex_lock (&entry->lock);
 			for (i = 0; i < entry->size; i++) {
 				func (s4, entry->key, entry->val, entry->data[i].key, entry->data[i].val, entry->data[i].src, data);
 			}
+			g_static_mutex_unlock (&entry->lock);
 		}
 	}
-
-	g_static_rw_lock_reader_unlock (&s4->rel_lock);
 }
 
 /**
