@@ -31,7 +31,12 @@ static GStaticPrivate _errno = G_STATIC_PRIVATE_INIT;
  */
 
 #define S4_MAGIC ("s4db")
-#define S4_MAGIC_LEN (strlen (S4_MAGIC))
+#define S4_MAGIC_LEN (4)
+
+typedef struct {
+	char magic[S4_MAGIC_LEN];
+	log_number_t last_checkpoint;
+} s4_header_t;
 
 /**
  * @{
@@ -125,8 +130,8 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
  */
 static int _read_file (s4_t *s4, const char *filename, int flags)
 {
-	char magic[S4_MAGIC_LEN];
 	FILE *file = fopen (filename, "r");
+	s4_header_t hdr;
 
 	if (file == NULL) {
 		int ret = 0;
@@ -149,12 +154,14 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 		return -1;
 	}
 
-	fread (magic, 1, S4_MAGIC_LEN, file);
-	if (strncmp (S4_MAGIC, magic, S4_MAGIC_LEN)) {
+	fread (&hdr, sizeof (s4_header_t), 1, file);
+	if (strncmp (S4_MAGIC, hdr.magic, S4_MAGIC_LEN)) {
 		fclose (file);
 		s4_set_errno (S4E_MAGIC);
 		return -1;
 	}
+
+	s4->last_checkpoint = hdr.last_checkpoint;
 
 	GHashTable *strings = _read_string (s4, file);
 	if (strings == NULL || _read_relations (s4, file, strings) == -1) {
@@ -165,23 +172,6 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 
 	fclose (file);
 	return 0;
-}
-
-/**
- * Frees an S4 handle and everything it points at
- *
- * @param s4 The handle to free
- */
-static void _free (s4_t *s4)
-{
-	_free_relations (s4);
-	g_hash_table_destroy (s4->index_table);
-	g_hash_table_destroy (s4->rel_table);
-	g_hash_table_destroy (s4->norm_table);
-	g_string_chunk_free (s4->strings);
-
-	free (s4->filename);
-	free (s4);
 }
 
 /**
@@ -228,7 +218,7 @@ typedef struct {
 } save_data_t;
 
 /**
- * Gets the id of a string, or gives it an unique id if it doens't have one
+ * Gets the id of a string, or gives it an unique id if it doesn't have one
  *
  * @param table A hashtable with id->string pairs
  * @param str The string to lookup
@@ -280,7 +270,7 @@ static void _entry_to_pair (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 
 /**
  * Writes the database to disk
- * 
+ *
  * @param s4 The database to write
  * @param filename The file to write to
  * @return 0 on success, non-zero on error
@@ -289,7 +279,11 @@ static int _write_file (s4_t *s4, const char *filename)
 {
 	int32_t i = -1;
 	FILE *file = fopen (filename, "w");
+	s4_header_t hdr;
 	save_data_t sd;
+
+	if (file == NULL)
+		return -1;
 
 	sd.strings = g_hash_table_new (NULL, NULL);
 	sd.pairs = NULL;
@@ -297,7 +291,10 @@ static int _write_file (s4_t *s4, const char *filename)
 
 	s4_foreach (s4, _entry_to_pair, &sd);
 
-	fwrite (S4_MAGIC, 1, S4_MAGIC_LEN, file);
+	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
+	hdr.last_checkpoint = s4->last_checkpoint;
+
+	fwrite (&hdr, sizeof (s4_header_t), 1, file);
 	_write_strings (sd.strings, file);
 	fwrite (&i, sizeof (int32_t), 1, file);
 	_write_pairs (sd.pairs, file);
@@ -310,6 +307,94 @@ static int _write_file (s4_t *s4, const char *filename)
 	return 0;
 }
 
+static void *_sync_thread (s4_t *s4)
+{
+	char *tmpfile = g_strconcat (s4->filename, ".chkpnt", NULL);
+	g_mutex_lock (s4->log_lock);
+	while (s4->sync_thread_run) {
+		g_cond_wait (s4->sync_cond, s4->log_lock);
+		s4->last_synced = s4->last_logpoint;
+		g_mutex_unlock (s4->log_lock);
+
+		if (_write_file (s4, tmpfile)) {
+			S4_ERROR ("sync thread could not write file");
+		}
+		g_rename (tmpfile, s4->filename);
+
+		g_mutex_lock (s4->log_lock);
+		s4->last_checkpoint = s4->last_synced;
+		g_cond_broadcast (s4->sync_finished_cond);
+	}
+	g_mutex_unlock (s4->log_lock);
+
+	g_free (tmpfile);
+
+	return NULL;
+}
+
+/* Start sync */
+void _start_sync (s4_t *s4)
+{
+	g_cond_signal (s4->sync_cond);
+}
+
+/* Start and wait for sync to finish */
+void _sync (s4_t *s4)
+{
+	_start_sync (s4);
+	g_cond_wait (s4->sync_finished_cond, s4->log_lock);
+}
+
+static s4_t *_alloc (void)
+{
+	s4_t* s4 = malloc (sizeof(s4_t));
+
+	s4->strings = g_string_chunk_new (8192);
+	g_static_mutex_init (&s4->strings_lock);
+
+	s4->index_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, (GDestroyNotify)_index_free);
+	g_static_mutex_init (&s4->index_table_lock);
+
+	s4->rel_table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)_index_free);
+	g_static_mutex_init (&s4->rel_lock);
+
+	s4->norm_table = g_hash_table_new (NULL, NULL);
+	g_static_mutex_init (&s4->norm_lock);
+
+	s4->log_lock = g_mutex_new ();
+
+	s4->sync_cond = g_cond_new ();
+	s4->sync_finished_cond = g_cond_new ();
+
+	return s4;
+}
+
+/**
+ * Frees an S4 handle and everything it points at
+ *
+ * @param s4 The handle to free
+ */
+static void _free (s4_t *s4)
+{
+	_free_relations (s4);
+	g_hash_table_destroy (s4->index_table);
+	g_hash_table_destroy (s4->rel_table);
+	g_hash_table_destroy (s4->norm_table);
+	g_string_chunk_free (s4->strings);
+
+	g_mutex_free (s4->log_lock);
+	g_cond_free (s4->sync_cond);
+	g_cond_free (s4->sync_finished_cond);
+
+	g_static_mutex_free (&s4->strings_lock);
+	g_static_mutex_free (&s4->rel_lock);
+	g_static_mutex_free (&s4->index_table_lock);
+	g_static_mutex_free (&s4->norm_lock);
+
+	free (s4->filename);
+	free (s4);
+}
+
 /**
  * @}
  */
@@ -319,17 +404,6 @@ static int _write_file (s4_t *s4, const char *filename)
  *
  * @b The different flags you can pass:
  * <P>
- * @b S4_VERIFY
- * <BR>
- * 		S4 will check the database. If it is inconsistent and
- *		if S4_RECOVERYis set it will try to recover it.
- * </P><P>
- * @b S4_RECOVERY
- * <BR>
- * 		If S4_VERIFY is set the database will be recovered if it
- * 		is inconsistent. If S4_VERIFY is not set it will try to
- * 		recover the database anyway.
- * </P><P>
  * @b S4_NEW
  * <BR>
  * 		It will create a new file if one does not already exists.
@@ -338,6 +412,8 @@ static int _write_file (s4_t *s4, const char *filename)
  * @b S4_EXISTS
  * <BR>
  * 		If the file does not exists it will fail and return NULL.
+ * 		s4_errno may be used to get more information about what
+ * 		went wrong.
  * </P>
  *
  * @param filename The name of the file containing the database
@@ -348,19 +424,9 @@ static int _write_file (s4_t *s4, const char *filename)
 s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 {
 	int i;
-	s4_t* s4 = malloc (sizeof(s4_t));
+	s4_t *s4;
 
-	s4->strings = g_string_chunk_new (8192);
-	g_static_mutex_init (&s4->strings_lock);
-
-	s4->index_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, (GDestroyNotify)_index_free);
-	g_static_mutex_init (&s4->index_table_lock);
-
-	s4->rel_table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)_index_free);
-	g_static_rw_lock_init (&s4->rel_lock);
-
-	s4->norm_table = g_hash_table_new (NULL, NULL);
-	g_static_mutex_init (&s4->norm_lock);
+	s4 = _alloc ();
 
 	for (i = 0; indices != NULL && indices[i] != NULL; i++) {
 		_index_add (s4, indices[i], _index_create ());
@@ -368,13 +434,22 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 
 	s4->logfile = NULL;
 	s4->filename = strdup (filename);
+	s4->last_checkpoint = 0;
+	s4->last_synced = 0;
+	s4->last_logpoint = 0;
 
 	if (_read_file (s4, s4->filename, open_flags)) {
 		_free (s4);
 		return NULL;
 	}
 
-	s4->logfile = fopen ("/tmp/s4.log", "w");
+	if (_log_open (s4)) {
+		_free (s4);
+		return NULL;
+	}
+
+	s4->sync_thread_run = 1;
+	s4->sync_thread = g_thread_create ((GThreadFunc)_sync_thread, s4, TRUE, NULL);
 
 	return s4;
 }
@@ -387,12 +462,18 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
  */
 int s4_close (s4_t* s4)
 {
-	_write_file (s4, s4->filename);
+	g_mutex_lock (s4->log_lock);
+	s4->sync_thread_run = 0;
+	g_cond_signal (s4->sync_cond);
+	g_mutex_unlock (s4->log_lock);
+	g_thread_join (s4->sync_thread);
 
+	_log_close (s4);
 	_free (s4);
 
 	return 0;
 }
+
 
 /**
  * Writes all changes to disk
@@ -402,30 +483,10 @@ int s4_close (s4_t* s4)
  */
 void s4_sync (s4_t *s4)
 {
+	g_mutex_lock (s4->log_lock);
+	_sync (s4);
+	g_mutex_unlock (s4->log_lock);
 }
-
-/*
-int s4_recover (s4_t *s4, const char *name)
-{
-	s4be_t *rec;
-	int ret = 1;
-
-	rec = s4be_open (name, S4_NEW);
-
-	if (rec == NULL) {
-		return 0;
-	}
-
-	ret = s4be_recover (s4->be, rec);
-
-	fix_refcount (rec);
-
-	s4be_close (rec);
-
-	return ret;
-}
-*/
-
 
 /**
  * Returns the last error number set.
@@ -434,9 +495,9 @@ int s4_recover (s4_t *s4, const char *name)
  *
  * @return The last error number set, or 0 if none has been set
  */
-int s4_errno()
+s4_errno_t s4_errno()
 {
-	int *i = g_static_private_get (&_errno);
+	s4_errno_t *i = g_static_private_get (&_errno);
 	if (i == NULL) {
 		return 0;
 	}
@@ -448,11 +509,11 @@ int s4_errno()
  *
  * @param err The error number to set
  */
-void s4_set_errno (int err)
+void s4_set_errno (s4_errno_t err)
 {
-	int *i = g_static_private_get (&_errno);
+	s4_errno_t *i = g_static_private_get (&_errno);
 	if (i == NULL) {
-		i = malloc (sizeof (int));
+		i = malloc (sizeof (s4_errno_t));
 		g_static_private_set (&_errno, i, NULL);
 	}
 

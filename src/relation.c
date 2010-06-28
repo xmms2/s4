@@ -223,6 +223,8 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		if (index != NULL) {
 			_index_insert (index, val_b, entry);
 		}
+
+		_log_add (s4, key_a, value_a, key_b, value_b, src);
 	} else {
 		s4_val_free (val_b);
 	}
@@ -280,6 +282,7 @@ int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		if (index != NULL) {
 			_index_delete (index, val_b, entry);
 		}
+		_log_del (s4, key_a, val_a, key_b, val_b, src);
 	}
 
 	return ret;

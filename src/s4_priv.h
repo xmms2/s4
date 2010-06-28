@@ -5,6 +5,8 @@
 #include <glib.h>
 #include <stdio.h>
 
+typedef uint32_t log_number_t;
+
 struct s4_St {
 	GHashTable *index_table;
 	GStaticMutex index_table_lock;
@@ -19,12 +21,22 @@ struct s4_St {
 	GStaticMutex norm_lock;
 
 	FILE *logfile;
+	GMutex *log_lock;
+	GCond *sync_cond, *sync_finished_cond;
+	log_number_t last_checkpoint;
+	log_number_t last_synced;
+	log_number_t last_logpoint;
+	int sync_thread_run;
+	GThread *sync_thread;
+
 	char *filename;
 };
 
 typedef struct str_St str_t;
 
-void s4_set_errno (int err);
+void s4_set_errno (s4_errno_t err);
+void _start_sync (s4_t *s4);
+void _sync (s4_t *s4);
 
 s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str);
 char *s4_normalize_string (const char *key);
@@ -49,26 +61,12 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *data);
 GList *_index_search (s4_index_t *index, index_function_t func, void *data);
 void _index_free (s4_index_t *index);
 
-
-#define LOG_STRING_INSERT  1
-#define LOG_PAIR_INSERT 2
-#define LOG_PAIR_REMOVE 3
-
-typedef struct log_entry_St {
-	int32_t type;
-	union {
-		s4_intpair_t *pair;
-		struct {
-			const char *str;
-			int32_t id;
-		} str;
-	} data;
-} log_entry_t;
-
-void _log (s4_t *be, log_entry_t *entry);
-void _log_pair_remove (s4_t *be, s4_intpair_t *rec);
-void _log_pair_insert (s4_t *be, s4_intpair_t *rec);
-void _log_string_insert (s4_t *be, int32_t id, const char *string);
+void _log_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+void _log_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+int _log_open (s4_t *s4);
+int _log_close (s4_t *s4);
 
 int32_t s4_cond_get_ikey (s4_condition_t *cond);
 void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);

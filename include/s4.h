@@ -28,13 +28,19 @@
 #define S4_EXISTS           1 << 5
 #define S4_SYNC_THREAD      1 << 6
 
-/* Error codes */
-#define S4E_EXISTS 1
-#define S4E_NOENT 2
-#define S4E_OPEN  3
-#define S4E_STHREAD 4
-#define S4E_INCONS 5
-#define S4E_MAGIC 6
+/**
+ * Error codes
+ */
+typedef enum {
+	S4E_EXISTS, /**< Tried to open a database with S4_NEW, but the file already exists */
+	S4E_NOENT, /**< Tried to open a database with S4_EXISTS, but it did not exist */
+	S4E_OPEN, /**< fopen failed when trying to open the database. errno has more details */
+	S4E_MAGIC, /**< Magic number was not correct. Probably not an S4 database */
+	S4E_INCONS, /**< Database is inconsistent. */
+	S4E_LOGOPEN, /**< Could not open log file. See errno for more details */
+	S4E_LOGREDO /**< Could not redo changes in the log. Probably corrupted log */
+} s4_errno_t;
+
 
 typedef struct s4_St s4_t;
 
@@ -60,7 +66,7 @@ int s4_close (s4_t *s4);
 int s4_verify (s4_t *s4, int flags);
 int s4_recover (s4_t *s4, const char *name);
 void s4_sync (s4_t *s4);
-int s4_errno (void);
+s4_errno_t s4_errno (void);
 
 int s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
