@@ -129,7 +129,7 @@ static s4_condition_t *create_combiner (s4_combine_type_t type, s4_condition_t *
 
 static int test_combiner (s4_condition_t *cond, const char *str)
 {
-	return s4_cond_get_combine_function (cond)(cond, test_cond, str);
+	return s4_cond_get_combine_function (cond)(cond, (check_function_t)test_cond, (void*)str);
 }
 
 CASE (test_and) {
