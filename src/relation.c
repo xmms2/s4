@@ -385,12 +385,12 @@ static int _check_cond (s4_condition_t *cond, void *d)
 			int start, src, best_src = INT_MAX;
 
 			start = _entry_search (l, key);
-			for (i = start; l->data[i].key == key; i++) {
+			for (i = start; i < l->size && l->data[i].key == key; i++) {
 				if ((src = s4_sourcepref_get_priority (sp, l->data[i].src)) < best_src) {
 					best_src = src;
 				}
 			}
-			for (i = start; ret && l->data[i].key == key; i++) {
+			for (i = start; i < l->size && ret && l->data[i].key == key; i++) {
 				if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
 					ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
 				}
@@ -437,12 +437,12 @@ static s4_result_t **_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 
 			start = _entry_search (l, fkey);
 
-			for (f = start; l->data[f].key == fkey; f++) {
+			for (f = start; f < l->size && l->data[f].key == fkey; f++) {
 				if ((src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
 					best_src = src;
 				}
 			}
-			for (f = start; l->data[f].key == fkey; f++) {
+			for (f = start; f < l->size && l->data[f].key == fkey; f++) {
 				if (s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
 					result[k] = s4_result_create (result[k], l->data[f].key,
 							l->data[f].val, l->data[f].src);
