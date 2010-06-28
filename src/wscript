@@ -16,25 +16,12 @@ def build(bld):
     s4.export_incdirs = '../include'
 
     if bld.env['BUILD_TOOLS']:
-        verify = bld.new_task_gen('cc', 'program')
-        verify.source = ["s4_verify.c", "log.c"]
-        verify.target = "s4_verify"
-        verify.install_path = 0
-        verify.uselib_local = 's4'
-
-        recover = bld.new_task_gen('cc', 'program')
-        recover.source = ["s4_recover.c"]
-        recover.target = "s4_recover"
-        recover.install_path = 0
-        recover.uselib_local = "s4"
-        recover.uselib = "glib2"
-
         bench = bld.new_task_gen('cc', 'program')
-        bench.source = ["s4_bench.c", "log.c"]
+        bench.source = ["s4_bench.c", "logging.c"]
         bench.target = "s4_bench"
         bench.install_path = 0
         bench.uselib_local = "s4"
-        bench.uselib = "glib2"
+        bench.uselib = "glib2 gthread2"
 
 def configure(conf):
     if Options.options.build_tools:

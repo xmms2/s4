@@ -1,12 +1,11 @@
 #include "s4.h"
-#include "s4_be.h"
-#include "log.h"
+#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <glib/gstdio.h>
 
-#define ENTRIES 1000000
+#define ENTRIES 100000
 
 long timediff (GTimeVal *prev, GTimeVal *cur)
 {
@@ -36,10 +35,11 @@ int main (int argc, char *argv[])
 	char *filename = tmpnam (NULL);
 	GTimeVal cur, prev;
 
+	g_thread_init (NULL);
 	log_init(G_LOG_LEVEL_MASK & ~G_LOG_LEVEL_DEBUG);
 	g_get_current_time (&prev);
 
-	s4 = s4_open (filename, S4_NEW);
+	s4 = s4_open (filename, NULL, S4_NEW);
 
 	if (s4 == NULL) {
 		fprintf (stderr, "Could not open %s\n", argv[1]);
@@ -49,55 +49,55 @@ int main (int argc, char *argv[])
 	take_time ("s4_open took", &prev, &cur);
 
 	for (i = 0; i < ENTRIES; i++) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_add (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_add (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_add took", &prev, &cur);
 
 	for (i = 0; i < ENTRIES; i++) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_del (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_del (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_del took", &prev, &cur);
 
 	for (i = 0; i < ENTRIES; i++) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_add (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_add (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_add took", &prev, &cur);
 
 	for (i = 0; i < ENTRIES; i++) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_del (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_del (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_del took", &prev, &cur);
 
 	for (i = ENTRIES; i > 0; i--) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_add (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_add (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_add (backwards) took", &prev, &cur);
 
 	for (i = ENTRIES; i > 0; i--) {
-		s4_entry_t entry;
-		entry.key_i = entry.val_i = entry.src_i = i;
-
-		s4be_ip_del (s4->be, &entry, &entry);
+		s4_val_t *val;
+		val = s4_val_new_int (i);
+		s4_del (s4, "a", val, "b", val, "src");
+		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_del (backwards) took", &prev, &cur);
@@ -107,6 +107,7 @@ int main (int argc, char *argv[])
 	take_time ("s4_close took", &prev, &cur);
 
 	g_unlink (filename);
+	g_unlink (g_strconcat (filename, ".log", NULL));
 
 	take_time ("g_unlink took", &prev, &cur);
 
