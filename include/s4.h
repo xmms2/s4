@@ -149,10 +149,15 @@ const char *s4_result_get_src (const s4_result_t *res);
 const s4_val_t *s4_result_get_val (const s4_result_t *res);
 
 /* resultset.c */
+typedef struct s4_resultrow_St s4_resultrow_t;
+void s4_resultrow_set_col (s4_resultrow_t *row, int col_no, s4_result_t *col);
+int s4_resultrow_get_col (const s4_resultrow_t *row, int col_no, const s4_result_t **col);
+
 typedef struct s4_resultset_St s4_resultset_t;
 
 s4_resultset_t *s4_resultset_create (int col_count);
-void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results);
+void s4_resultset_add_row (s4_resultset_t *set, const s4_resultrow_t *row);
+int s4_resultset_get_row (const s4_resultset_t *set, int row_no, const s4_resultrow_t **row);
 const s4_result_t *s4_resultset_get_result (const s4_resultset_t *set, int row, int col);
 int s4_resultset_get_colcount (const s4_resultset_t *set);
 int s4_resultset_get_rowcount (const s4_resultset_t *set);

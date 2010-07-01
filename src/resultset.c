@@ -24,6 +24,12 @@ struct s4_resultset_St {
 	GPtrArray *results;
 };
 
+struct s4_resultrow_St {
+	int refs;
+	int col_count;
+	s4_result_t *cols[0];
+};
+
 /**
  * @defgroup ResultSet Result Set
  * @ingroup S4
@@ -64,10 +70,27 @@ s4_resultset_t *s4_resultset_create (int col_count)
  * @param set The resultset to add to
  * @param results An array of results to add
  */
-void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results)
+void s4_resultset_add_row (s4_resultset_t *set, const s4_resultrow_t *row)
 {
-	g_ptr_array_add (set->results, results);
+	s4_resultrow_ref ((s4_resultrow_t*)row);
+	g_ptr_array_add (set->results, (void*)row);
 	set->row_count++;
+}
+
+/**
+ * Gets a row from a resultset
+ * @param set The resultset to get the row from
+ * @param row_no The index of the row to fetch
+ * @param row A pointer to where the row will be saved
+ * @return 0 if row_no was out of bounds, 1 otherwise
+ */
+int s4_resultset_get_row (const s4_resultset_t *set, int row_no, const s4_resultrow_t **row)
+{
+	if (row_no < 0 || row_no >= set->row_count)
+		return 0;
+
+	*row = g_ptr_array_index (set->results, row_no);
+	return 1;
 }
 
 /**
@@ -79,12 +102,13 @@ void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results)
  */
 const s4_result_t *s4_resultset_get_result (const s4_resultset_t *set, int row, int col)
 {
-	s4_result_t **res;
+	s4_resultrow_t *r;
+
 	if (row >= set->row_count || row < 0 || col >= set->col_count || col < 0)
 		return NULL;
 
-	res = g_ptr_array_index (set->results, row);
-	return res[col];
+	r = g_ptr_array_index (set->results, row);
+	return r->cols[col];
 }
 
 /**
@@ -107,13 +131,13 @@ int s4_resultset_get_rowcount (const s4_resultset_t *set)
 	return set->row_count;
 }
 
-static int _compare_rows (const s4_result_t ***row1, const s4_result_t ***row2, const int *order)
+static int _compare_rows (const s4_resultrow_t **row1, const s4_resultrow_t **row2, const int *order)
 {
 	int i, ret = 0;
 	for (i = 0; !ret && order[i] != 0; i++) {
 		int col = ABS(order[i]) - 1;
-		const s4_val_t *val1 = (*row1)[col] == NULL?NULL:s4_result_get_val ((*row1)[col]);
-		const s4_val_t *val2 = (*row2)[col] == NULL?NULL:s4_result_get_val ((*row2)[col]);
+		const s4_val_t *val1 = (*row1)->cols[col] == NULL?NULL:s4_result_get_val ((*row1)->cols[col]);
+		const s4_val_t *val2 = (*row2)->cols[col] == NULL?NULL:s4_result_get_val ((*row2)->cols[col]);
 
 		if (val1 == NULL || val2 == NULL) {
 			if (val1 == NULL)
@@ -146,25 +170,98 @@ void s4_resultset_sort (const s4_resultset_t *set, const int *order)
  */
 void s4_resultset_free (s4_resultset_t *set)
 {
-	int i,j;
+	int i;
 
 	for (i = 0; i < set->row_count; i++) {
-		s4_result_t **results = g_ptr_array_index (set->results, i);
-		for (j = 0; j < set->col_count; j++) {
-			s4_result_t *prev,*res = results[j];
-
-			while (res != NULL) {
-				prev = res;
-				res = (s4_result_t*)s4_result_next (res);
-				s4_result_free (prev);
-			}
-		}
-
-		free (results);
+		s4_resultrow_t *row = g_ptr_array_index (set->results, i);
+		s4_resultrow_unref (row);
 	}
 
 	g_ptr_array_free (set->results, TRUE);
 	free (set);
+}
+
+/**
+ * Creates a new row
+ * @param col_count The number of columns in the row
+ * @return A new resultrow
+ */
+s4_resultrow_t *s4_resultrow_create (int col_count)
+{
+	int i;
+	s4_resultrow_t *row = malloc (sizeof (s4_resultrow_t)
+			+ sizeof (s4_result_t*) * col_count);
+
+	for (i = 0; i < col_count; i++) {
+		row->cols[i] = NULL;
+	}
+	row->refs = 0;
+	row->col_count = col_count;
+
+	return row;
+}
+
+/**
+ * Sets a column in a resultrow
+ * @param row The row to set the column in
+ * @param col_no The index of the column to set
+ * @param col The new value of the column
+ */
+void s4_resultrow_set_col (s4_resultrow_t *row, int col_no, s4_result_t *col)
+{
+	if (col_no < 0 || col_no >= row->col_count)
+		return;
+
+	row->cols[col_no] = col;
+}
+
+/**
+ * Gets the value of a column in a resultrow
+ * @param row The row to get the column from
+ * @param col_no The index of the column to get
+ * @param col A pointer to where the column will be saved
+ * @return 0 if col_no is out of bounds or the column is NULL, 1 otherwise
+ */
+int s4_resultrow_get_col (const s4_resultrow_t *row, int col_no, const s4_result_t **col)
+{
+	if (col_no < 0 || col_no >= row->col_count || row->cols[col_no] == NULL)
+		return 0;
+
+	*col = row->cols[col_no];
+	return 1;
+}
+
+/**
+ * References a resultrow
+ * @param row The row to reference
+ */
+void s4_resultrow_ref (s4_resultrow_t *row)
+{
+	row->refs++;
+}
+
+/**
+ * Unreferences a resultrow. If the refcount hits 0 the row will be freed
+ * @param row The row to unreference
+ */
+void s4_resultrow_unref (s4_resultrow_t *row)
+{
+	row->refs--;
+
+	if (row->refs <= 0) {
+		int i;
+		for (i = 0; i < row->col_count; i++) {
+			if (row->cols[i] != NULL) {
+				s4_result_t *prev,*res = row->cols[i];
+				while (res != NULL) {
+					prev = res;
+					res = (s4_result_t*)s4_result_next (res);
+					s4_result_free (prev);
+				}
+			}
+		}
+		free (row);
+	}
 }
 
 /**

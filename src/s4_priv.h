@@ -88,6 +88,10 @@ void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);
 s4_result_t *s4_result_create (s4_result_t *next, const char *key, s4_val_t *val, const char *src);
 void s4_result_free (s4_result_t *res);
 
+s4_resultrow_t *s4_resultrow_create (int colcount);
+void s4_resultrow_ref (s4_resultrow_t *row);
+void s4_resultrow_unref (s4_resultrow_t *row);
+
 void _free_relations (s4_t *s4);
 
 #endif
