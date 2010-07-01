@@ -175,7 +175,7 @@ int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
 
 	j = _data_search (index->data + i, new_data);
 
-	if (j >= index->size || new_data != index->data[i].data[j].data) {
+	if (j >= index->data[i].size || new_data != index->data[i].data[j].data) {
 		if (index->data[i].size >= index->data[i].alloc) {
 			index->data[i].alloc *= 2;
 			index->data[i].data = realloc (index->data[i].data, sizeof (index_data_t) * index->data[i].alloc);

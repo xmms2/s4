@@ -87,7 +87,7 @@ static int _entry_search (entry_t *entry, const char *key)
 			hi = m;
 	}
 
-	for (; entry->data[lo].key < key && lo < hi; lo++);
+	for (; lo < hi && entry->data[lo].key < key; lo++);
 
 	return lo;
 }
