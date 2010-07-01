@@ -85,9 +85,6 @@ int _log_close (s4_t *s4);
 int32_t s4_cond_get_ikey (s4_condition_t *cond);
 void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);
 
-s4_resultset_t *s4_resultset_create (int col_count);
-void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results);
-
 s4_result_t *s4_result_create (s4_result_t *next, const char *key, s4_val_t *val, const char *src);
 void s4_result_free (s4_result_t *res);
 

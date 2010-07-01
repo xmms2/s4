@@ -107,6 +107,39 @@ int s4_resultset_get_rowcount (const s4_resultset_t *set)
 	return set->row_count;
 }
 
+static int _compare_rows (const s4_result_t ***row1, const s4_result_t ***row2, const int *order)
+{
+	int i, ret = 0;
+	for (i = 0; !ret && order[i] != 0; i++) {
+		int col = ABS(order[i]) - 1;
+		const s4_val_t *val1 = (*row1)[col] == NULL?NULL:s4_result_get_val ((*row1)[col]);
+		const s4_val_t *val2 = (*row2)[col] == NULL?NULL:s4_result_get_val ((*row2)[col]);
+
+		if (val1 == NULL || val2 == NULL) {
+			if (val1 == NULL)
+				ret--;
+			if (val2 == NULL)
+				ret++;
+		} else {
+			ret = s4_val_cmp (val1, val2, 0);
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * Sorts a resultset.
+ * @param set The set to sort
+ * @param order A zero terminated array with integers. An positive integer i
+ * will result in the column (i - 1) being sorted descending, a negative
+ * integer i will. result in the column (-i - 1) being sorted ascending.
+ */
+void s4_resultset_sort (const s4_resultset_t *set, const int *order)
+{
+	g_ptr_array_sort_with_data (set->results, (GCompareDataFunc)_compare_rows, (void*)order);
+}
+
 /**
  * Frees a resultset and all the results in it
  * @param set The set to free

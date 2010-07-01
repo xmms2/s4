@@ -151,10 +151,13 @@ const s4_val_t *s4_result_get_val (const s4_result_t *res);
 /* resultset.c */
 typedef struct s4_resultset_St s4_resultset_t;
 
+s4_resultset_t *s4_resultset_create (int col_count);
+void s4_resultset_add_row (s4_resultset_t *set, s4_result_t **results);
 const s4_result_t *s4_resultset_get_result (const s4_resultset_t *set, int row, int col);
 int s4_resultset_get_colcount (const s4_resultset_t *set);
 int s4_resultset_get_rowcount (const s4_resultset_t *set);
 void s4_resultset_free (s4_resultset_t *set);
+void s4_resultset_sort (const s4_resultset_t *set, const int *order);
 
 /* query.c */
 s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);
