@@ -254,7 +254,7 @@ CASE (test_query) {
 	s4_resultset_free (set);
 	s4_cond_free (cond);
 
-	s4_sourcepref_free (sp);
+	s4_sourcepref_unref (sp);
 	s4_fetchspec_free (fs);
 
 	_close ();

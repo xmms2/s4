@@ -39,5 +39,5 @@ CASE (test_sourcepref) {
 	CU_ASSERT_EQUAL (s4_sourcepref_get_priority (sp, "something else"), INT_MAX);
 	CU_ASSERT_EQUAL (s4_sourcepref_get_priority (NULL, "something else"), 0);
 
-	s4_sourcepref_free (sp);
+	s4_sourcepref_unref (sp);
 }
