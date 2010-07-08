@@ -164,6 +164,7 @@ int s4_resultset_get_colcount (const s4_resultset_t *set);
 int s4_resultset_get_rowcount (const s4_resultset_t *set);
 void s4_resultset_free (s4_resultset_t *set);
 void s4_resultset_sort (const s4_resultset_t *set, const int *order);
+void s4_resultset_shuffle (const s4_resultset_t *set);
 
 /* query.c */
 s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);

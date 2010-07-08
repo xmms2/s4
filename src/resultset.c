@@ -168,6 +168,15 @@ void s4_resultset_sort (const s4_resultset_t *set, const int *order)
 }
 
 /**
+ * Shuffles the resultset into a pseudo-random order
+ * @param set The resultset to shuffle
+ */
+void s4_resultset_shuffle (const s4_resultset_t *set)
+{
+	g_ptr_array_sort (set->results, (GCompareFunc)g_random_int);
+}
+
+/**
  * Frees a resultset and all the results in it
  * @param set The set to free
  */
