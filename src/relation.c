@@ -488,8 +488,11 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 
 		if (index == NULL)
 			entries = NULL;
-		else
+		else if (s4_cond_is_monotonic (cond)) {
 			entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+		} else {
+			entries = _index_search (index, (index_function_t)_everything, NULL);
+		}
 	} else if (s4_cond_is_filter (cond) &&
 			s4_cond_is_monotonic (cond) &&
 			(index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {

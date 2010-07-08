@@ -296,6 +296,7 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	cond->u.filter.func = func;
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
+	cond->u.filter.monotonic = 0;
 
 	return cond;
 }
