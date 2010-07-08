@@ -79,7 +79,8 @@ void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_
 typedef struct s4_sourcepref_St s4_sourcepref_t;
 
 s4_sourcepref_t *s4_sourcepref_create (const char **sourcepref);
-void s4_sourcepref_free (s4_sourcepref_t *sourcepref);
+void s4_sourcepref_unref (s4_sourcepref_t *sourcepref);
+s4_sourcepref_t *s4_sourcepref_ref (s4_sourcepref_t *sp);
 int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src);
 
 /* cond.c */

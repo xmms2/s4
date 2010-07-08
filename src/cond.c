@@ -262,8 +262,13 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
 
 	cond->type = S4_COND_FILTER;
 	cond->u.filter.key = key;
-	cond->u.filter.sp = sourcepref;
 	cond->u.filter.flags = flags;
+
+	if (sourcepref != NULL) {
+		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
+	} else {
+		cond->u.filter.sp = NULL;
+	}
 
 	_set_filter_function (cond, type, value);
 
@@ -291,12 +296,17 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 
 	cond->type = S4_COND_FILTER;
 	cond->u.filter.key = key;
-	cond->u.filter.sp = sourcepref;
 	cond->u.filter.flags = flags;
 	cond->u.filter.func = func;
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
 	cond->u.filter.monotonic = 0;
+
+	if (sourcepref != NULL) {
+		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
+	} else {
+		cond->u.filter.sp = NULL;
+	}
 
 	return cond;
 }
@@ -382,6 +392,8 @@ void s4_cond_free (s4_condition_t *cond)
 	} else if (cond->type == S4_COND_FILTER) {
 		if (cond->u.filter.free_func != NULL)
 			cond->u.filter.free_func (cond->u.filter.funcdata);
+		if (cond->u.filter.sp != NULL)
+			s4_sourcepref_unref (cond->u.filter.sp);
 		free (cond);
 	}
 }

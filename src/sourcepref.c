@@ -21,6 +21,7 @@ struct s4_sourcepref_St {
 	GStaticMutex lock;
 	GPatternSpec **specs;
 	int spec_count;
+	int ref_count;
 };
 
 /**
@@ -63,6 +64,7 @@ s4_sourcepref_t *s4_sourcepref_create (const char **srcprefs)
 
 	sp->specs = malloc (sizeof (GPatternSpec*) * i);
 	sp->spec_count = i;
+	sp->ref_count = 1;
 
 	for (i = 0; i < sp->spec_count; i++)
 		sp->specs[i] = g_pattern_spec_new (srcprefs[i]);
@@ -71,21 +73,35 @@ s4_sourcepref_t *s4_sourcepref_create (const char **srcprefs)
 }
 
 /**
- * Frees a sourcepref
+ * Decreases the reference of a sourcepref.
+ * If the reference count is less than or equal to zero
+ * it will be freed.
  * @param sp The sourcepref to free
  */
-void s4_sourcepref_free (s4_sourcepref_t *sp)
+void s4_sourcepref_unref (s4_sourcepref_t *sp)
 {
 	int i;
-	g_hash_table_destroy (sp->table);
-	g_static_mutex_free (&sp->lock);
 
-	for (i = 0; i < sp->spec_count; i++)
-		g_pattern_spec_free (sp->specs[i]);
+	if (--sp->ref_count <= 0) {
+		g_hash_table_destroy (sp->table);
+		g_static_mutex_free (&sp->lock);
 
-	free (sp->specs);
+		for (i = 0; i < sp->spec_count; i++)
+			g_pattern_spec_free (sp->specs[i]);
 
-	free (sp);
+		free (sp->specs);
+		free (sp);
+	}
+}
+
+/**
+ * Increases the refcount of a sourcepref
+ * @param sp The sourcepref to reference
+ */
+s4_sourcepref_t *s4_sourcepref_ref (s4_sourcepref_t *sp)
+{
+	sp->ref_count++;
+	return sp;
 }
 
 /**
