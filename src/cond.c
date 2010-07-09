@@ -130,7 +130,7 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) <= 0;
+	return -(s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) <= 0);
 }
 /*
  * A filter that checks if the checked value is smaller than the given value
