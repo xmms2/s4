@@ -31,8 +31,10 @@ struct s4_St {
 	GStringChunk *strings;
 	GStaticMutex strings_lock;
 
-	GHashTable *norm_table;
-	GStaticMutex norm_lock;
+	GHashTable *coll_table;
+	GStaticMutex coll_lock;
+	GHashTable *case_table;
+	GStaticMutex case_lock;
 
 	FILE *logfile;
 	GMutex *log_lock;
@@ -53,10 +55,12 @@ void _start_sync (s4_t *s4);
 void _sync (s4_t *s4);
 
 s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str);
-char *s4_normalize_string (const char *key);
+char *s4_string_collate (const char *str);
+char *s4_string_casefold (const char *str);
 
 const char *_string_lookup (s4_t *s4, const char *str);
-const char *_string_lookup_normalized (s4_t *s4, const char *str);
+const char *_string_lookup_casefolded (s4_t *s4, const char *str);
+const char *_string_lookup_collated (s4_t *s4, const char *str);
 
 typedef struct {
 	int32_t key_a, val_a;

@@ -358,8 +358,10 @@ static s4_t *_alloc (void)
 	s4->rel_table = g_hash_table_new_full (NULL, NULL, NULL, (GDestroyNotify)_index_free);
 	g_static_mutex_init (&s4->rel_lock);
 
-	s4->norm_table = g_hash_table_new (NULL, NULL);
-	g_static_mutex_init (&s4->norm_lock);
+	s4->coll_table = g_hash_table_new (NULL, NULL);
+	g_static_mutex_init (&s4->coll_lock);
+	s4->case_table = g_hash_table_new (NULL, NULL);
+	g_static_mutex_init (&s4->case_lock);
 
 	s4->log_lock = g_mutex_new ();
 
@@ -379,7 +381,8 @@ static void _free (s4_t *s4)
 	_free_relations (s4);
 	g_hash_table_destroy (s4->index_table);
 	g_hash_table_destroy (s4->rel_table);
-	g_hash_table_destroy (s4->norm_table);
+	g_hash_table_destroy (s4->coll_table);
+	g_hash_table_destroy (s4->case_table);
 	g_string_chunk_free (s4->strings);
 
 	g_mutex_free (s4->log_lock);
@@ -389,7 +392,8 @@ static void _free (s4_t *s4)
 	g_static_mutex_free (&s4->strings_lock);
 	g_static_mutex_free (&s4->rel_lock);
 	g_static_mutex_free (&s4->index_table_lock);
-	g_static_mutex_free (&s4->norm_lock);
+	g_static_mutex_free (&s4->case_lock);
+	g_static_mutex_free (&s4->coll_lock);
 
 	free (s4->filename);
 	free (s4);

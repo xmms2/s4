@@ -25,7 +25,7 @@
  */
 
 /**
- * Get a pointer to a constant string that's equal to str. _string_lookup
+ * Gets a pointer to a constant string that's equal to str. _string_lookup
  * will always return the same pointer for the same string
  *
  * @param s4 The database to look for the string in
@@ -47,49 +47,79 @@ const char *_string_lookup (s4_t *s4, const char *str)
 }
 
 /**
- * Get the normalized string of str
+ * Creates a string that orders correctly according to the locale
  *
- * @param str The string to normalize
- * @return A normalized version of str, must be freed with g_free
+ * @param str The string to collate
+ * @return A collated version of str, must be freed with g_free
  */
-char *s4_normalize_string (const char *str)
+char *s4_string_collate (const char *str)
 {
-	char *tmp = g_utf8_casefold (str, -1);
-	char *ret = g_utf8_normalize (tmp, -1, G_NORMALIZE_DEFAULT);
+	return g_utf8_collate_key_for_filename (str, -1);
+}
+
+/**
+ * Creates a casefolded version of the string
+ *
+ * @param str The string to casefold
+ * @return A casefolded version of str, free with g_free
+ */
+char *s4_string_casefold (const char *str)
+{
+	return g_utf8_casefold (str, -1);
+}
+
+/**
+ * Gets the casefolded string corresponding to str. str must have
+ * been obtained by calling _string_lookup.
+ *
+ * @param s4 The database to look in
+ * @param str The string to find the casefold string of
+ * @return The casefolded string of str
+ */
+const char *_string_lookup_casefolded (s4_t *s4, const char *str)
+{
+	const char *ret;
+
+	g_static_mutex_lock (&s4->case_lock);
+	ret = g_hash_table_lookup (s4->case_table, str);
 
 	if (ret == NULL) {
-		ret = tmp;
-	} else {
+		char *tmp = s4_string_casefold (str);
+		ret = _string_lookup (s4, tmp);
 		g_free (tmp);
+
+		g_hash_table_insert (s4->case_table, (void*)str, (void*)ret);
 	}
+
+	g_static_mutex_unlock (&s4->case_lock);
 
 	return ret;
 }
 
 /**
- * Get the normalized string corresponding to str. str must have
+ * Gets the collated string corresponding to str. str must have
  * been obtained by calling _string_lookup.
  *
  * @param s4 The database to look in
- * @param str The string to find the normalized string of
- * @return The normalized string of str
+ * @param str The string to find the collated string of
+ * @return The collated string of str
  */
-const char *_string_lookup_normalized (s4_t *s4, const char *str)
+const char *_string_lookup_collated (s4_t *s4, const char *str)
 {
 	const char *ret;
 
-	g_static_mutex_lock (&s4->norm_lock);
-	ret = g_hash_table_lookup (s4->norm_table, str);
+	g_static_mutex_lock (&s4->coll_lock);
+	ret = g_hash_table_lookup (s4->coll_table, str);
 
 	if (ret == NULL) {
-		char *tmp = s4_normalize_string (str);
+		char *tmp = s4_string_collate (str);
 		ret = _string_lookup (s4, tmp);
 		g_free (tmp);
 
-		g_hash_table_insert (s4->norm_table, (void*)str, (void*)ret);
+		g_hash_table_insert (s4->coll_table, (void*)str, (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->norm_lock);
+	g_static_mutex_unlock (&s4->coll_lock);
 
 	return ret;
 }
