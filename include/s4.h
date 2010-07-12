@@ -170,4 +170,11 @@ void s4_resultset_shuffle (const s4_resultset_t *set);
 /* query.c */
 s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);
 
+/* pattern.c */
+typedef struct s4_pattern_St s4_pattern_t;
+
+s4_pattern_t *s4_pattern_create (const char *pattern, int normalize);
+int s4_pattern_match (s4_pattern_t *p, const s4_val_t *val);
+void s4_pattern_free (s4_pattern_t *pattern);
+
 #endif /* _S4_H */
