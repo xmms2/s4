@@ -146,15 +146,8 @@ static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
  */
 static int match_filter (s4_val_t *value, s4_condition_t *cond)
 {
-	GPatternSpec *spec = cond->u.filter.funcdata;
-	const char *s;
-
-	if ((cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_str (value, &s)) {
-		return !g_pattern_match_string (spec, s);
-	} else if (!(cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_normalized_str (value, &s)) {
-		return !g_pattern_match_string (spec, s);
-	}
-	return 1;
+	s4_pattern_t *p = cond->u.filter.funcdata;
+	return !s4_pattern_match (p, value);
 }
 
 /*
@@ -184,19 +177,19 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 		case S4_FILTER_MATCH:
 			{
 				const char *s;
-				if ((cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_str (val, &s)) {
-					cond->u.filter.func = match_filter;
-					cond->u.filter.funcdata = g_pattern_spec_new (s);
-					cond->u.filter.free_func = (free_func_t)g_pattern_spec_free;
-				} else if (!(cond->u.filter.flags & S4_COND_CASESENS) && s4_val_get_normalized_str (val, &s)) {
-					cond->u.filter.func = match_filter;
-					cond->u.filter.funcdata = g_pattern_spec_new (s);
-					cond->u.filter.free_func = (free_func_t)g_pattern_spec_free;
-				} else {
-					cond->u.filter.func = (filter_function_t)never;
-					cond->u.filter.funcdata = NULL;
-					cond->u.filter.free_func = NULL;
+				int32_t i;
+				char c[12];
+
+				if (!s4_val_get_str (val, &s)) {
+					s4_val_get_int (val, &i);
+					sprintf (c, "%i", i);
+					s = c;
 				}
+
+				cond->u.filter.func = match_filter;
+				cond->u.filter.funcdata = s4_pattern_create (s,
+						!(cond->u.filter.flags & S4_COND_CASESENS));
+				cond->u.filter.free_func = (free_func_t)s4_pattern_free;
 				cond->u.filter.monotonic = 0;
 			}
 			break;
