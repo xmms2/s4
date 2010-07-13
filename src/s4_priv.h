@@ -54,7 +54,7 @@ void s4_set_errno (s4_errno_t err);
 void _start_sync (s4_t *s4);
 void _sync (s4_t *s4);
 
-s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str);
+s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
 char *s4_string_collate (const char *str);
 char *s4_string_casefold (const char *str);
 

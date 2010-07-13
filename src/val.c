@@ -26,8 +26,10 @@ struct s4_val_St {
 	s4_val_type_t type;
 	union {
 		struct {
+			s4_t *s4;
 			const char *s;
-			const char *n;
+			const char *co;
+			const char *ca;
 		} str;
 		int32_t i;
 	} v;
@@ -53,7 +55,8 @@ s4_val_t *s4_val_new_string (const char *str)
 	s4_val_t *val = malloc (sizeof (s4_val_t));
 	val->type = S4_VAL_STR;
 	val->v.str.s = strdup (str);
-	val->v.str.n = NULL;
+	val->v.str.co = NULL;
+	val->v.str.ca = NULL;
 
 	return val;
 }
@@ -72,12 +75,14 @@ s4_val_t *s4_val_new_string (const char *str)
  * @param normalized_str The normalized version of str
  * @return A new internal string value, must be freed with s4_val_free
  */
-s4_val_t *s4_val_new_internal_string (const char *str, const char *normalized_str)
+s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4)
 {
 	s4_val_t *val = malloc (sizeof (s4_val_t));
 	val->type = S4_VAL_STR_INTERNAL;
 	val->v.str.s = str;
-	val->v.str.n = normalized_str;
+	val->v.str.co = NULL;
+	val->v.str.ca = NULL;
+	val->v.str.s4 = s4;
 
 	return val;
 }
@@ -130,8 +135,10 @@ void s4_val_free (s4_val_t *val)
 {
 	if (val->type == S4_VAL_STR) {
 		free ((void*)val->v.str.s);
-		if (val->v.str.n != NULL)
-			g_free ((void*)val->v.str.n);
+		if (val->v.str.ca != NULL)
+			g_free ((void*)val->v.str.ca);
+		if (val->v.str.co != NULL)
+			g_free ((void*)val->v.str.co);
 	}
 	free (val);
 }
@@ -181,15 +188,42 @@ int s4_val_get_str (const s4_val_t *val, const char **str)
  * @param str A pointer to a pointer where the string pointer will be stored
  * @return 0 if val is not a string value, non-zero otherwise
  */
-int s4_val_get_normalized_str (const s4_val_t *val, const char **str)
+int s4_val_get_collated_str (const s4_val_t *val, const char **str)
 {
 	if (!s4_val_is_str (val))
 		return 0;
 
-	if (val->v.str.n == NULL) {
-		((s4_val_t*)val)->v.str.n = s4_normalize_string (val->v.str.s);
+	if (val->v.str.co == NULL) {
+		if (val->type == S4_VAL_STR) {
+			((s4_val_t*)val)->v.str.co = s4_string_collate (val->v.str.s);
+		} else {
+			((s4_val_t*)val)->v.str.co = _string_lookup_collated (val->v.str.s4, val->v.str.s);
+		}
 	}
-	*str = val->v.str.n;
+	*str = val->v.str.co;
+	return 1;
+}
+
+/**
+ * Tries to get the normalized string in a string value
+ *
+ * @param val The value to get the string of
+ * @param str A pointer to a pointer where the string pointer will be stored
+ * @return 0 if val is not a string value, non-zero otherwise
+ */
+int s4_val_get_casefolded_str (const s4_val_t *val, const char **str)
+{
+	if (!s4_val_is_str (val))
+		return 0;
+
+	if (val->v.str.ca == NULL) {
+		if (val->type == S4_VAL_STR) {
+			((s4_val_t*)val)->v.str.ca = s4_string_casefold (val->v.str.s);
+		} else {
+			((s4_val_t*)val)->v.str.ca = _string_lookup_casefolded (val->v.str.s4, val->v.str.s);
+		}
+	}
+	*str = val->v.str.ca;
 	return 1;
 }
 

@@ -52,7 +52,7 @@ typedef struct {
  */
 static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 {
-	const char *str, *norm;
+	const char *str;
 
 	if (s4_val_is_int (val)) {
 		return s4_val_copy (val);
@@ -60,9 +60,8 @@ static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 
 	s4_val_get_str (val, &str);
 	str = _string_lookup (s4, str);
-	norm = _string_lookup_normalized (s4, str);
 
-	return s4_val_new_internal_string (str, norm);
+	return s4_val_new_internal_string (str, s4);
 }
 
 /**
