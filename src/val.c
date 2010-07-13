@@ -244,28 +244,96 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i)
 }
 
 /**
+ * Converts a number into a string
+ *
+ * @param num The number to save it in
+ * @param buf A 12 byte char array to save it in.
+ * @return The start of the string in the array
+ */
+static char* _int_to_str (int32_t num, char buf[12])
+{
+	int i = 10;
+	int neg = 0;
+	if (i < 0) {
+		neg = 1;
+		num = -num;
+	}
+
+	buf[11] = '\0';
+
+	for (; i == 10 || num; num /= 10, i--) {
+		buf[i] = '0' + (num % 10);
+	}
+	if (neg) {
+		buf[i] = '-';
+	} else {
+		i++;
+	}
+
+	return buf + i;
+}
+
+/**
+ * Compares an int and a string
+ *
+ * @param i The int
+ * @param s The string
+ * @param casesens If non-zero compare case-sensitively
+ * @return <0 if i<s, 0 if i==s and >0 if i>s
+ */
+static int _int_str_cmp (int32_t i, const char *s, int collated)
+{
+	/* If we're compare binary or caselessly 12 > "100" */
+	if (!collated) {
+		char buf[12];
+		return strcmp (_int_to_str (i, buf), s);
+	/* But collated 12 < "100" */
+	} else {
+		char *end;
+		int32_t j = strtol (s, &end, 10);
+
+		/* If there were no digits we check if the first character
+		 * of the string is bigger or smaller than a number
+		 */
+		if (end == s) {
+			return (*s>'9')?-1:1;
+		} else {
+			/* Check the integers, if they are equal we
+			 * return <0 if there is more text after the number
+			 * and 0 if the string is just an integer
+			 */
+			return (i > j)?1:((i < j)?-1:-(*end != '\0'));
+		}
+	}
+}
+
+/**
  * Compares two values
  *
  * @param v1 The first value
  * @param v2 The second value
- * @param casesens Non-zero if the values should be compared casesensitively, 0 otherwise
+ * @param mode How to compare the values
  * @return <0 if v1<v2, 0 if v1==v2 and >0 if v1>v2
  */
-int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, int casesens)
+int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, s4_cmp_mode_t mode)
 {
 	int32_t i1,i2;
 	const char *s1,*s2;
 
 	if (s4_val_get_int (v1, &i1) && s4_val_get_int (v2, &i2))
 		return (i1 > i2)?1:((i1 < i2)?-1:0);
-	else if (casesens && s4_val_get_str (v1, &s1) && s4_val_get_str (v2, &s2))
+	else if (mode == S4_CMP_BINARY && s4_val_get_str (v1, &s1) && s4_val_get_str (v2, &s2))
 		return strcmp (s1, s2);
-	else if (!casesens && s4_val_get_normalized_str (v1, &s1) && s4_val_get_normalized_str (v2, &s2))
+	else if (mode == S4_CMP_CASELESS && s4_val_get_casefolded_str (v1, &s1) && s4_val_get_casefolded_str (v2, &s2))
 		return strcmp (s1, s2);
-	else if (s4_val_is_int (v1))
-		return -1;
-	else
-		return 1;
+	else if (mode == S4_CMP_COLLATE && s4_val_get_collated_str (v1, &s1) && s4_val_get_collated_str (v2, &s2))
+		return strcmp (s1, s2);
+	else if (s4_val_get_int (v1, &i1) && s4_val_get_str (v2, &s2))
+		return _int_str_cmp (i1, s2, mode == S4_CMP_COLLATE);
+	else if (s4_val_get_int (v2, &i2) && s4_val_get_str (v1, &s1))
+		return -_int_str_cmp (i2, s1, mode == S4_CMP_COLLATE);
+	else /* This should never be hit */
+		return 0;
 }
 
 /**

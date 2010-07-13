@@ -41,6 +41,11 @@ typedef enum {
 	S4E_LOGREDO /**< Could not redo changes in the log. Probably corrupted log */
 } s4_errno_t;
 
+typedef enum {
+	S4_CMP_BINARY, /**< Compare the values byte by byte */
+	S4_CMP_CASELESS, /**< Compare casefolded versions of the strings */
+	S4_CMP_COLLATE /**< Compare collated keys (taking locale into account) */
+} s4_cmp_mode_t;
 
 typedef struct s4_St s4_t;
 
@@ -59,7 +64,7 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i);
 int s4_val_get_collated_str (const s4_val_t *val, const char **str);
 int s4_val_get_casefolded_str (const s4_val_t *val, const char **str);
 
-int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, int casesens);
+int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, s4_cmp_mode_t mode);
 
 /* s4.c */
 s4_t *s4_open (const char *name, const char **indices, int flags);
