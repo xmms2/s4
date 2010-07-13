@@ -122,7 +122,7 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS);
+	return s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS);
 }
 /*
  * A filter that checks if the checked value is greater than the given value
@@ -130,7 +130,7 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return -(s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) <= 0);
+	return -(s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS) <= 0);
 }
 /*
  * A filter that checks if the checked value is smaller than the given value
@@ -138,7 +138,7 @@ static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d, cond->u.filter.flags & S4_COND_CASESENS) >= 0;
+	return s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS) >= 0;
 }
 /*
  * A filter that checks if the checked value matches (glob-like pattern)

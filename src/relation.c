@@ -105,7 +105,7 @@ static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const 
 	int i = _entry_search (entry, key);
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
-		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1))
+		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, S4_CMP_BINARY))
 			return 0;
 	}
 
@@ -139,7 +139,7 @@ static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, 
 	int found = 0;
 
 	for (; i < entry->size && entry->data[i].key == key; i++) {
-		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, 1)) {
+		if (entry->data[i].src == src && !s4_val_cmp (entry->data[i].val, val, S4_CMP_BINARY)) {
 			found = 1;
 			break;
 		}

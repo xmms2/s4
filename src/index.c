@@ -140,7 +140,7 @@ static int _bsearch (s4_index_t *index, index_function_t func, void *funcdata)
 
 static int _val_cmp (const s4_val_t *v1, s4_val_t *v2)
 {
-	return s4_val_cmp (v1, v2, 1);
+	return s4_val_cmp (v1, v2, S4_CMP_CASELESS);
 }
 
 /**

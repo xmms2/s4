@@ -145,7 +145,7 @@ static int _compare_rows (const s4_resultrow_t **row1, const s4_resultrow_t **ro
 			if (val2 == NULL)
 				ret++;
 		} else {
-			ret = s4_val_cmp (val1, val2, 0);
+			ret = s4_val_cmp (val1, val2, S4_CMP_COLLATE);
 		}
 
 		if (order[i] < 0)
