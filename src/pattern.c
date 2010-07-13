@@ -44,7 +44,8 @@ typedef struct pattern_St {
 struct s4_pattern_St {
 	int casefolded;
 	pattern_t *str_pattern;
-	pattern_t *num_pattern;
+	pattern_t *pos_pattern;
+	pattern_t *neg_pattern;
 };
 
 /* Calculates 10^exp */
@@ -170,6 +171,9 @@ static int
 _num_pattern_match (pattern_t *p, int32_t num)
 {
 	int first = 1;
+
+	if (p == NULL)
+		return 0;
 
 	/* Match the first n - 1 sub-patterns */
 	for (; p->next != NULL; p = p->next) {
@@ -354,6 +358,9 @@ _str_pattern_match (pattern_t *p, const char *str)
 static int
 _is_num_pattern (const char *s)
 {
+	/* Skip leading minus */
+	if (*s == '-') s++;
+
 	for (; *s; s++) {
 		if (!isdigit (*s) && *s != '?' && *s != '*')
 			return 0;
@@ -391,10 +398,24 @@ s4_pattern_create (const char *pattern, int casefold)
 
 	ret->casefolded = casefold;
 	ret->str_pattern = _str_pattern_create (pattern, casefold);
-	if (_is_num_pattern (pattern))
-		ret->num_pattern = _num_pattern_create (pattern);
-	else
-		ret->num_pattern = NULL;
+	ret->pos_pattern = NULL;
+	ret->neg_pattern = NULL;
+
+	if (_is_num_pattern (pattern)) {
+		/* No minus sign - we treat it as a positive pattern */
+		if (*pattern != '-') {
+			ret->pos_pattern = _num_pattern_create (pattern);
+		}
+		/* If there is a minus sign or a ? that could match the minus sign
+		 * we cut off the ? or - and create a pattern out of the rest
+		 */
+		if (*pattern == '-' || *pattern == '?') {
+			ret->neg_pattern = _num_pattern_create (pattern + 1);
+		/* A star could match the minus sign */
+		} else if (*pattern == '*') {
+			ret->neg_pattern = _num_pattern_create (pattern);
+		}
+	}
 
 	return ret;
 }
@@ -419,8 +440,12 @@ s4_pattern_match (s4_pattern_t *p, const s4_val_t *val)
 			s4_val_get_str (val, &str);
 			return _str_pattern_match (p->str_pattern, str);
 		}
-	} else if (p->num_pattern != NULL && s4_val_get_int (val, &i)) {
-		return _num_pattern_match (p->num_pattern, i);
+	} else if (s4_val_get_int (val, &i)) {
+		if (i >= 0) {
+			return _num_pattern_match (p->pos_pattern, i);
+		} else {
+			return _num_pattern_match (p->neg_pattern, -i);
+		}
 	}
 	return 0;
 }
@@ -433,6 +458,7 @@ void
 s4_pattern_free (s4_pattern_t *pattern)
 {
 	_free_pattern (pattern->str_pattern);
-	_free_pattern (pattern->num_pattern);
+	_free_pattern (pattern->pos_pattern);
+	_free_pattern (pattern->neg_pattern);
 	free (pattern);
 }
