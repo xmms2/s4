@@ -389,7 +389,7 @@ static int _check_cond (s4_condition_t *cond, void *d)
 					best_src = src;
 				}
 			}
-			for (i = start; i < l->size && ret && l->data[i].key == key; i++) {
+			for (i = start; best_src != INT_MAX && i < l->size && ret && l->data[i].key == key; i++) {
 				if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
 					ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
 				}
