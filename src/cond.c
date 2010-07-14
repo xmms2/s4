@@ -34,6 +34,7 @@ struct s4_condition_St {
 			free_func_t free_func;
 			const char *key;
 			s4_sourcepref_t *sp;
+			s4_cmp_mode_t cmp_mode;
 			int flags;
 			int monotonic;
 		} filter;
@@ -122,7 +123,7 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS);
+	return s4_val_cmp (value, d, cond->u.filter.cmp_mode);
 }
 /*
  * A filter that checks if the checked value is greater than the given value
@@ -130,7 +131,7 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return -(s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS) <= 0);
+	return -(s4_val_cmp (value, d, cond->u.filter.cmp_mode) <= 0);
 }
 /*
  * A filter that checks if the checked value is smaller than the given value
@@ -138,7 +139,7 @@ static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
-	return s4_val_cmp (value, d,(cond->u.filter.flags & S4_COND_CASESENS)?S4_CMP_BINARY:S4_CMP_CASELESS) >= 0;
+	return s4_val_cmp (value, d, cond->u.filter.cmp_mode) >= 0;
 }
 /*
  * A filter that checks if the checked value matches (glob-like pattern)
@@ -187,8 +188,7 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 				}
 
 				cond->u.filter.func = match_filter;
-				cond->u.filter.funcdata = s4_pattern_create (s,
-						!(cond->u.filter.flags & S4_COND_CASESENS));
+				cond->u.filter.funcdata = s4_pattern_create (s, cond->u.filter.cmp_mode == S4_CMP_CASELESS);
 				cond->u.filter.free_func = (free_func_t)s4_pattern_free;
 				cond->u.filter.monotonic = 0;
 			}
@@ -248,14 +248,15 @@ s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func, GList *ope
  * @param flags Condition flags, or 0
  * @return A new filter condition
  */
-s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
-		const char *key, s4_val_t *value, s4_sourcepref_t *sourcepref, int flags)
+s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
+		s4_val_t *value, s4_sourcepref_t *sourcepref, s4_cmp_mode_t cmp_mode, int flags)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_FILTER;
 	cond->u.filter.key = key;
 	cond->u.filter.flags = flags;
+	cond->u.filter.cmp_mode = cmp_mode;
 
 	if (sourcepref != NULL) {
 		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
@@ -283,7 +284,8 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
  * @return A new custom filter condition
  */
 s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdata,
-		free_func_t free, const char *key, s4_sourcepref_t *sourcepref, int flags)
+		free_func_t free, const char *key, s4_sourcepref_t *sourcepref,
+		s4_cmp_mode_t cmp_mode, int flags)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
@@ -294,6 +296,7 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
 	cond->u.filter.monotonic = 0;
+	cond->u.filter.cmp_mode = cmp_mode;
 
 	if (sourcepref != NULL) {
 		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
