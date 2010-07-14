@@ -15,6 +15,7 @@
 #include "s4_priv.h"
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 typedef enum {
 	S4_VAL_STR,
@@ -244,36 +245,6 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i)
 }
 
 /**
- * Converts a number into a string
- *
- * @param num The number to save it in
- * @param buf A 12 byte char array to save it in.
- * @return The start of the string in the array
- */
-static char* _int_to_str (int32_t num, char buf[12])
-{
-	int i = 10;
-	int neg = 0;
-	if (i < 0) {
-		neg = 1;
-		num = -num;
-	}
-
-	buf[11] = '\0';
-
-	for (; i == 10 || num; num /= 10, i--) {
-		buf[i] = '0' + (num % 10);
-	}
-	if (neg) {
-		buf[i] = '-';
-	} else {
-		i++;
-	}
-
-	return buf + i;
-}
-
-/**
  * Compares an int and a string
  *
  * @param i The int
@@ -281,28 +252,34 @@ static char* _int_to_str (int32_t num, char buf[12])
  * @param casesens If non-zero compare case-sensitively
  * @return <0 if i<s, 0 if i==s and >0 if i>s
  */
-static int _int_str_cmp (int32_t i, const char *s, int collated)
+static int _int_str_cmp (int32_t i, const char *s, const char *coll_str)
 {
-	/* If we're compare binary or caselessly 12 > "100" */
-	if (!collated) {
-		char buf[12];
-		return strcmp (_int_to_str (i, buf), s);
-	/* But collated 12 < "100" */
+	static char *coll_num = NULL;
+
+	if (coll_num == NULL) {
+		coll_num = s4_string_collate ("1");
+	}
+
+	/* If we're comparing binary or caselessly we place integers after strings
+	 * This is because with binary and caseless string-matching "123" < "23"
+	 * but integers still use integer matching and 23 < 123, so we have to
+	 * keep them separate (or we would break antisymmetry)
+	 */
+	if (coll_str == NULL) {
+		return 1;
+	/* But for collated matching we have "23" < "123" and we can mix string
+	 * and integer matching without breaking anything
+	 */
 	} else {
 		char *end;
 		int32_t j = strtol (s, &end, 10);
 
-		/* If there were no digits we check if the first character
-		 * of the string is bigger or smaller than a number
-		 */
-		if (end == s) {
-			return (*s>'9')?-1:1;
-		} else {
-			/* Check the integers, if they are equal we
-			 * return <0 if there is more text after the number
-			 * and 0 if the string is just an integer
-			 */
+		/* Strings with space in front of the number are treated like normal strings */
+		if (end != s && !isspace (*s)) {
 			return (i > j)?1:((i < j)?-1:-(*end != '\0'));
+		} else {
+			/* See if the given string is smaller or greater than a number */
+			return strcmp (coll_num, coll_str);
 		}
 	}
 }
@@ -329,9 +306,19 @@ int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, s4_cmp_mode_t mode)
 	else if (mode == S4_CMP_COLLATE && s4_val_get_collated_str (v1, &s1) && s4_val_get_collated_str (v2, &s2))
 		return strcmp (s1, s2);
 	else if (s4_val_get_int (v1, &i1) && s4_val_get_str (v2, &s2))
-		return _int_str_cmp (i1, s2, mode == S4_CMP_COLLATE);
+		if (mode == S4_CMP_COLLATE) {
+			s4_val_get_collated_str (v2, &s1);
+			return _int_str_cmp (i1, s2, s1);
+		} else {
+			return _int_str_cmp (i1, s2, NULL);
+		}
 	else if (s4_val_get_int (v2, &i2) && s4_val_get_str (v1, &s1))
-		return -_int_str_cmp (i2, s1, mode == S4_CMP_COLLATE);
+		if (mode == S4_CMP_COLLATE) {
+			s4_val_get_collated_str (v1, &s2);
+			return -_int_str_cmp (i2, s1, s2);
+		} else {
+			return -_int_str_cmp (i2, s1, NULL);
+		}
 	else /* This should never be hit */
 		return 0;
 }
