@@ -182,4 +182,8 @@ s4_pattern_t *s4_pattern_create (const char *pattern, int normalize);
 int s4_pattern_match (s4_pattern_t *p, const s4_val_t *val);
 void s4_pattern_free (s4_pattern_t *pattern);
 
+/* string.c */
+char *s4_string_collate (const char *str);
+char *s4_string_casefold (const char *str);
+
 #endif /* _S4_H */
