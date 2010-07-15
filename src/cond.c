@@ -434,6 +434,17 @@ int s4_cond_is_monotonic (s4_condition_t *cond)
 }
 
 /**
+ * Gets the comparison mode used by the filter condition
+ *
+ * @param cond The condition to check
+ * @return The comparison mode used
+ */
+int s4_cond_get_cmp_mode (s4_condition_t *cond)
+{
+	return cond->u.filter.cmp_mode;
+}
+
+/**
  * Change the key with a constant key for faster checking
  *
  * @param s4 The database to optimize for
