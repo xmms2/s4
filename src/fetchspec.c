@@ -58,7 +58,7 @@ void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *s
 {
 	fetch_data_t data;
 	data.key = key;
-	data.pref = sourcepref;
+	data.pref = s4_sourcepref_ref (sourcepref);
 
 	g_array_append_val (spec->array, data);
 }
@@ -77,6 +77,10 @@ void s4_fetchspec_update_key (s4_t *s4, s4_fetchspec_t *spec)
  */
 void s4_fetchspec_free (s4_fetchspec_t *spec)
 {
+	int i;
+	for (i = 0; i < spec->array->len; i++) {
+		s4_sourcepref_unref (g_array_index (spec->array, fetch_data_t, i).pref);
+	}
 	g_array_free (spec->array, TRUE);
 	free (spec);
 }
