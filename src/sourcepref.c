@@ -82,7 +82,7 @@ void s4_sourcepref_unref (s4_sourcepref_t *sp)
 {
 	int i;
 
-	if (--sp->ref_count <= 0) {
+	if (g_atomic_int_dec_and_test (&sp->ref_count)) {
 		g_hash_table_destroy (sp->table);
 		g_static_mutex_free (&sp->lock);
 
@@ -100,7 +100,7 @@ void s4_sourcepref_unref (s4_sourcepref_t *sp)
  */
 s4_sourcepref_t *s4_sourcepref_ref (s4_sourcepref_t *sp)
 {
-	sp->ref_count++;
+	g_atomic_int_inc (&sp->ref_count);
 	return sp;
 }
 
