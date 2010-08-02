@@ -69,12 +69,12 @@ typedef struct {
 } s4_intpair_t;
 
 typedef struct s4_index_St s4_index_t;
-typedef int (*index_function_t)(s4_val_t *val, void *data);
+typedef int (*index_function_t)(const s4_val_t *val, void *data);
 
 s4_index_t *_index_get (s4_t *s4, const char *key);
 s4_index_t *_index_create (void);
 int _index_add (s4_t *s4, const char *key, s4_index_t *index);
-int _index_insert (s4_index_t *index, s4_val_t *val, void *data);
+int _index_insert (s4_index_t *index, const s4_val_t *val, void *data);
 int _index_delete (s4_index_t *index, const s4_val_t *val, void *data);
 GList *_index_search (s4_index_t *index, index_function_t func, void *data);
 void _index_free (s4_index_t *index);
@@ -89,7 +89,7 @@ int _log_close (s4_t *s4);
 int32_t s4_cond_get_ikey (s4_condition_t *cond);
 void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);
 
-s4_result_t *s4_result_create (s4_result_t *next, const char *key, s4_val_t *val, const char *src);
+s4_result_t *s4_result_create (s4_result_t *next, const char *key, const s4_val_t *val, const char *src);
 void s4_result_free (s4_result_t *res);
 
 s4_resultrow_t *s4_resultrow_create (int colcount);

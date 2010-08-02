@@ -108,7 +108,7 @@ typedef enum {
 
 typedef struct s4_condition_St s4_condition_t;
 typedef int (*check_function_t)(s4_condition_t *cond, void *data);
-typedef int (*filter_function_t)(s4_val_t *value, s4_condition_t* data);
+typedef int (*filter_function_t)(const s4_val_t *value, s4_condition_t* data);
 typedef int (*combine_function_t)(s4_condition_t *cond, check_function_t func, void *check_data);
 typedef void (*free_func_t)(void*);
 

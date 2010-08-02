@@ -22,7 +22,7 @@ typedef struct {
 } index_data_t;
 
 typedef struct {
-	s4_val_t *val;
+	const s4_val_t *val;
 	int size, alloc;
 	index_data_t *data;
 } index_t;
@@ -138,7 +138,7 @@ static int _bsearch (s4_index_t *index, index_function_t func, void *funcdata)
 	return lo;
 }
 
-static int _val_cmp (const s4_val_t *v1, s4_val_t *v2)
+static int _val_cmp (const s4_val_t *v1, const s4_val_t *v2)
 {
 	return s4_val_cmp (v1, v2, S4_CMP_CASELESS);
 }
@@ -151,13 +151,13 @@ static int _val_cmp (const s4_val_t *v1, s4_val_t *v2)
  * @param new_data The data
  * @return 1
  */
-int _index_insert (s4_index_t *index, s4_val_t *val, void *new_data)
+int _index_insert (s4_index_t *index, const s4_val_t *val, void *new_data)
 {
 	int i,j;
 
 	g_static_mutex_lock (&index->lock);
 
-	i = _bsearch (index, (index_function_t)_val_cmp, val);
+	i = _bsearch (index, (index_function_t)_val_cmp, (void*)val);
 
 	if (i >= index->size || _val_cmp (val, index->data[i].val)) {
 		if (index->size >= index->alloc) {

@@ -18,13 +18,13 @@
 
 typedef struct {
 	const char *key;
-	s4_val_t *val;
+	const s4_val_t *val;
 	const char *src;
 } entry_data_t;
 
 typedef struct {
 	const char *key;
-	s4_val_t *val;
+	const s4_val_t *val;
 	int size, alloc;
 	GStaticMutex lock;
 
@@ -99,7 +99,7 @@ static int _entry_search (entry_t *entry, const char *key)
  * @param src The source to insert
  * @return 0 if the tuple already exists, non-zero otherwise
  */
-static int _entry_insert (entry_t *entry, const char *key, s4_val_t *val, const char *src)
+static int _entry_insert (entry_t *entry, const char *key, const s4_val_t *val, const char *src)
 {
 	int i = _entry_search (entry, key);
 
@@ -160,7 +160,7 @@ static int _entry_delete (entry_t *entry, const char *key, const s4_val_t *val, 
  * @param val The value of the entry
  * @return A new empty entry
  */
-static entry_t *_entry_create (const char *key, s4_val_t *val)
+static entry_t *_entry_create (const char *key, const s4_val_t *val)
 {
 	entry_t *entry = malloc (sizeof (entry_t));
 
@@ -197,7 +197,7 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	entry_t *entry;
 	GList *entries;
 	int ret;
-	s4_val_t *val_a, *val_b;
+	const s4_val_t *val_a, *val_b;
 
 	key_a = _string_lookup (s4, key_a);
 	key_b = _string_lookup (s4, key_b);

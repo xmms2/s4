@@ -120,7 +120,7 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 /*
  * A filter that checks if the given and checked value is equal
  */
-static int equal_filter (s4_val_t *value, s4_condition_t *cond)
+static int equal_filter (const s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
 	return s4_val_cmp (value, d, cond->u.filter.cmp_mode);
@@ -128,7 +128,7 @@ static int equal_filter (s4_val_t *value, s4_condition_t *cond)
 /*
  * A filter that checks if the checked value is greater than the given value
  */
-static int greater_filter (s4_val_t *value, s4_condition_t* cond)
+static int greater_filter (const s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
 	return -(s4_val_cmp (value, d, cond->u.filter.cmp_mode) <= 0);
@@ -136,7 +136,7 @@ static int greater_filter (s4_val_t *value, s4_condition_t* cond)
 /*
  * A filter that checks if the checked value is smaller than the given value
  */
-static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
+static int smaller_filter (const s4_val_t *value, s4_condition_t *cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
 	return s4_val_cmp (value, d, cond->u.filter.cmp_mode) >= 0;
@@ -145,7 +145,7 @@ static int smaller_filter (s4_val_t *value, s4_condition_t *cond)
  * A filter that checks if the checked value matches (glob-like pattern)
  * the given value
  */
-static int match_filter (s4_val_t *value, s4_condition_t *cond)
+static int match_filter (const s4_val_t *value, s4_condition_t *cond)
 {
 	s4_pattern_t *p = cond->u.filter.funcdata;
 	return !s4_pattern_match (p, value);

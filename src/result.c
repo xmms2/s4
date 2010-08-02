@@ -19,7 +19,7 @@
 struct s4_result_St {
 	s4_result_t *next;
 	const char *key;
-	s4_val_t *val;
+	const s4_val_t *val;
 	const char *src;
 };
 
@@ -100,7 +100,8 @@ void s4_result_free (s4_result_t *res)
  * @param src The source
  * @return A new result
  */
-s4_result_t *s4_result_create (s4_result_t *next, const char *key, s4_val_t *val, const char *src)
+s4_result_t *s4_result_create (s4_result_t *next, const char *key,
+		const s4_val_t *val, const char *src)
 {
 	s4_result_t *ret = malloc (sizeof (s4_result_t));
 
