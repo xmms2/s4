@@ -25,8 +25,8 @@
  */
 
 /**
- * Gets a pointer to a constant string that's equal to str. _string_lookup
- * will always return the same pointer for the same string
+ * Gets a pointer to a constant string that's equal to str.
+ * _string_lookup will always return the same pointer for the same string
  *
  * @param s4 The database to look for the string in
  * @param str The string to find the constant string of
@@ -35,12 +35,38 @@
 const char *_string_lookup (s4_t *s4, const char *str)
 {
 	const char *ret;
+	const s4_val_t *val;
 
 	if (str == NULL)
 		return NULL;
 
+	val = _string_lookup_val (s4, str);
+	s4_val_get_str (val, &ret);
+
+	return ret;
+}
+
+/**
+ * Gets a pointer to a constant string value with a string equal to str.
+ * _string_lookup_val will always return the same value for the same string.
+ *
+ * @param s4 The database to look for the string in
+ * @param str The string to find the constant string of
+ * @return A pointer to a string value
+ */
+const s4_val_t *_string_lookup_val (s4_t *s4, const char *str)
+{
+	s4_val_t *ret;
+
 	g_static_mutex_lock (&s4->strings_lock);
-	ret = g_string_chunk_insert_const (s4->strings, str);
+
+	ret = g_hash_table_lookup (s4->strings_table, str);
+	if (ret == NULL) {
+		str = g_string_chunk_insert (s4->strings, str);
+		ret = s4_val_new_internal_string (str, s4);
+		g_hash_table_insert (s4->strings_table, (void*)str, ret);
+	}
+
 	g_static_mutex_unlock (&s4->strings_lock);
 
 	return ret;

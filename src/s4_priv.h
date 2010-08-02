@@ -29,6 +29,7 @@ struct s4_St {
 	GStaticMutex rel_lock;
 
 	GStringChunk *strings;
+	GHashTable *strings_table;
 	GStaticMutex strings_lock;
 
 	GHashTable *coll_table;
@@ -59,6 +60,7 @@ s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
 const char *_string_lookup (s4_t *s4, const char *str);
 const char *_string_lookup_casefolded (s4_t *s4, const char *str);
 const char *_string_lookup_collated (s4_t *s4, const char *str);
+const s4_val_t *_string_lookup_val (s4_t *s4, const char *str);
 
 typedef struct {
 	int32_t key_a, val_a;

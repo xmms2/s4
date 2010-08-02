@@ -50,18 +50,17 @@ typedef struct {
  * @param val The value to copy
  * @return A new internal value that is equal to val
  */
-static s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
+static const s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
 {
 	const char *str;
+	int32_t ival;
 
-	if (s4_val_is_int (val)) {
-		return s4_val_copy (val);
+	if (s4_val_get_int (val, &ival)) {
+		return s4_val_new_int (ival);
+	} else if (s4_val_get_str (val, &str)) {
+		return _string_lookup_val (s4, str);
 	}
-
-	s4_val_get_str (val, &str);
-	str = _string_lookup (s4, str);
-
-	return s4_val_new_internal_string (str, s4);
+	return NULL;
 }
 
 /**
@@ -238,8 +237,6 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		}
 
 		_log_add (s4, key_a, value_a, key_b, value_b, src);
-	} else {
-		s4_val_free (val_b);
 	}
 
 	return ret;
@@ -338,10 +335,12 @@ void _free_relations (s4_t *s4)
 			int i;
 
 			for (i = 0; i < entry->size; i++) {
-				s4_val_free (entry->data[i].val);
+				if (s4_val_is_int (entry->data[i].val))
+					s4_val_free ((s4_val_t*)entry->data[i].val);
 			}
 
-			s4_val_free (entry->val);
+			if (s4_val_is_int (entry->val))
+				s4_val_free ((s4_val_t*)entry->val);
 
 			free (entry->data);
 			free (entry);

@@ -350,6 +350,8 @@ static s4_t *_alloc (void)
 	s4_t* s4 = malloc (sizeof(s4_t));
 
 	s4->strings = g_string_chunk_new (8192);
+	s4->strings_table = g_hash_table_new_full (g_str_hash, g_str_equal,
+			NULL, (GDestroyNotify)s4_val_free);
 	g_static_mutex_init (&s4->strings_lock);
 
 	s4->index_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, (GDestroyNotify)_index_free);
@@ -383,6 +385,7 @@ static void _free (s4_t *s4)
 	g_hash_table_destroy (s4->rel_table);
 	g_hash_table_destroy (s4->coll_table);
 	g_hash_table_destroy (s4->case_table);
+	g_hash_table_destroy (s4->strings_table);
 	g_string_chunk_free (s4->strings);
 
 	g_mutex_free (s4->log_lock);
