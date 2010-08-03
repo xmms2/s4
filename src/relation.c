@@ -534,7 +534,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		data.l = entry;
 
 		g_static_mutex_lock (&entry->lock);
-		if (!_check_cond (cond, &data))
+		if (entry->size != 0 && !_check_cond (cond, &data))
 			s4_resultset_add_row (ret, _fetch (s4, entry, fs));
 		g_static_mutex_unlock (&entry->lock);
 	}
