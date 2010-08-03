@@ -32,9 +32,11 @@ static GStaticPrivate _errno = G_STATIC_PRIVATE_INIT;
 
 #define S4_MAGIC ("s4db")
 #define S4_MAGIC_LEN (4)
+#define S4_VERSION 1
 
 typedef struct {
 	char magic[S4_MAGIC_LEN];
+	int32_t version;
 	log_number_t last_checkpoint;
 } s4_header_t;
 
@@ -158,6 +160,12 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 	if (strncmp (S4_MAGIC, hdr.magic, S4_MAGIC_LEN)) {
 		fclose (file);
 		s4_set_errno (S4E_MAGIC);
+		return -1;
+	}
+
+	if (hdr.version != S4_VERSION) {
+		fclose (file);
+		s4_set_errno (S4E_VERSION);
 		return -1;
 	}
 
@@ -292,6 +300,7 @@ static int _write_file (s4_t *s4, const char *filename)
 	s4_foreach (s4, _entry_to_pair, &sd);
 
 	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
+	hdr.version = S4_VERSION;
 	hdr.last_checkpoint = s4->last_checkpoint;
 
 	fwrite (&hdr, sizeof (s4_header_t), 1, file);

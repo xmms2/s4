@@ -36,6 +36,7 @@ typedef enum {
 	S4E_NOENT, /**< Tried to open a database with S4_EXISTS, but it did not exist */
 	S4E_OPEN, /**< fopen failed when trying to open the database. errno has more details */
 	S4E_MAGIC, /**< Magic number was not correct. Probably not an S4 database */
+	S4E_VERSION, /**< Version number was incorrect */
 	S4E_INCONS, /**< Database is inconsistent. */
 	S4E_LOGOPEN, /**< Could not open log file. See errno for more details */
 	S4E_LOGREDO /**< Could not redo changes in the log. Probably corrupted log */
