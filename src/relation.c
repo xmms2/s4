@@ -373,26 +373,35 @@ static int _check_cond (s4_condition_t *cond, void *d)
 		ret = s4_cond_get_combine_function (cond)(cond, _check_cond, d);
 	} else if (s4_cond_is_filter (cond)) {
 		const char *key = s4_cond_get_key (cond);
+		int null = key == NULL;
 
 		if (s4_cond_get_flags (cond) && S4_COND_PARENT) {
-			if (key == l->key) {
+			if (key == l->key || null) {
 				ret = s4_cond_get_filter_function (cond)(l->val, cond);
 			}
 		} else {
-			s4_sourcepref_t *sp = s4_cond_get_sourcepref (cond);
-			int start, src, best_src = INT_MAX;
+			i = 0;
+			do {
+				s4_sourcepref_t *sp = s4_cond_get_sourcepref (cond);
+				int start, src, best_src = INT_MAX;
 
-			start = _entry_search (l, key);
-			for (i = start; i < l->size && l->data[i].key == key; i++) {
-				if ((src = s4_sourcepref_get_priority (sp, l->data[i].src)) < best_src) {
-					best_src = src;
+				if (null) {
+					key = l->data[i].key;
 				}
-			}
-			for (i = start; best_src != INT_MAX && i < l->size && ret && l->data[i].key == key; i++) {
-				if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
-					ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
+
+				start = _entry_search (l, key);
+
+				for (i = start; i < l->size && l->data[i].key == key; i++) {
+					if ((src = s4_sourcepref_get_priority (sp, l->data[i].src)) < best_src) {
+						best_src = src;
+					}
 				}
-			}
+				for (i = start; best_src != INT_MAX && i < l->size && ret && l->data[i].key == key; i++) {
+					if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
+						ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
+					}
+				}
+			} while (i < l->size && ret && null);
 		}
 	}
 
@@ -417,21 +426,22 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 
 	for (k = 0; k < fetch_size; k++) {
 		const char *fkey = s4_fetchspec_get_key (fs, k);
+		int null = fkey == NULL;
 		s4_result_t *result;
 		s4_sourcepref_t *sp = s4_fetchspec_get_sourcepref (fs, k);
 
 		result = NULL;
+		f = 0;
 
-		if (fkey == NULL) {
+		if (fkey == l->key || null) {
 			result = s4_result_create (result, l->key, l->val, NULL);
+		}
 
-			for (f = 0; f < l->size; f++) {
-				result = s4_result_create (result, l->data[f].key, l->data[f].val, l->data[f].src);
-			}
-		} else {
+		do {
 			int src, start, best_src = INT_MAX;
-			if (fkey == l->key) {
-				result = s4_result_create (result, l->key, l->val, NULL);
+
+			if (null && l->size > 0) {
+				fkey = l->data[f].key;
 			}
 
 			start = _entry_search (l, fkey);
@@ -447,7 +457,7 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 							l->data[f].val, l->data[f].src);
 				}
 			}
-		}
+		} while (f < l->size && null);
 
 		s4_resultrow_set_col (row, k, result);
 	}
@@ -478,7 +488,9 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 	s4_cond_update_key (s4, cond);
 	s4_fetchspec_update_key (s4, fs);
 
-	if (s4_cond_is_filter (cond) && (s4_cond_get_flags (cond) & S4_COND_PARENT)) {
+	if (s4_cond_is_filter (cond)
+			&& (s4_cond_get_flags (cond) & S4_COND_PARENT)
+			&& s4_cond_get_key (cond) != NULL) {
 		const char *key = s4_cond_get_key (cond);
 		g_static_mutex_lock (&s4->rel_lock);
 		index = g_hash_table_lookup (s4->rel_table, key);
@@ -491,9 +503,10 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		} else {
 			entries = _index_search (index, (index_function_t)_everything, NULL);
 		}
-	} else if (s4_cond_is_filter (cond) &&
-			s4_cond_is_monotonic (cond) &&
-			(index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {
+	} else if (s4_cond_is_filter (cond)
+			&& s4_cond_is_monotonic (cond)
+			&& s4_cond_get_key (cond) != NULL
+			&& (index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {
 		entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 	} else {
 		GList *indices = NULL;
