@@ -84,7 +84,7 @@ static void check_db (struct db_struct *db)
 	for (i = 0; db[i].name != NULL; i++) {
 		s4_val_t *name_val = s4_val_new_string (db[i].name);
 		s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL,
-				"entry", name_val, NULL, S4_COND_PARENT);
+				"entry", name_val, NULL, S4_CMP_CASELESS, S4_COND_PARENT);
 		s4_resultset_t *set = s4_query (s4, fs, cond);
 		const s4_result_t *res = s4_resultset_get_result (set, 0, 0);
 		int found[ARG_SIZE] = {0};
@@ -230,7 +230,8 @@ CASE (test_query) {
 	s4_fetchspec_t *fs = s4_fetchspec_create ();
 	s4_fetchspec_add (fs, "property", sp);
 
-	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property", s4_val_new_string ("a"), sp, 0);
+	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
+			s4_val_new_string ("a"), sp, S4_CMP_CASELESS, 0);
 	s4_resultset_t *set = s4_query (s4, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
@@ -242,7 +243,8 @@ CASE (test_query) {
 	s4_resultset_free (set);
 	s4_cond_free (cond);
 
-	cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property", s4_val_new_string ("b"), sp, 0);
+	cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
+			s4_val_new_string ("b"), sp, S4_CMP_CASELESS, 0);
 	set = s4_query (s4, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);

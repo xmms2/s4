@@ -34,10 +34,11 @@ static int test_cond (s4_condition_t *cond, const char *str)
 	return ret;
 }
 
-static s4_condition_t *create_cond (s4_filter_type_t type, const char *str, int flags)
+static s4_condition_t *create_cond (s4_filter_type_t type, const char *str,
+		s4_cmp_mode_t cmp_mode, int flags)
 {
 	s4_val_t *val = s4_val_new_string (str);
-	s4_condition_t *cond = s4_cond_new_filter (type, str, val, NULL, flags);
+	s4_condition_t *cond = s4_cond_new_filter (type, str, val, NULL, cmp_mode, flags);
 	s4_val_free (val);
 	return cond;
 }
@@ -45,12 +46,12 @@ static s4_condition_t *create_cond (s4_filter_type_t type, const char *str, int 
 CASE (test_equal) {
 	s4_condition_t *cond;
 
-	cond = create_cond (S4_FILTER_EQUAL, "foobar", 0);
+	cond = create_cond (S4_FILTER_EQUAL, "foobar", S4_CMP_CASELESS, 0);
 	TEST_COND (cond, "FOOBAR", 1);
 	TEST_COND (cond, "foobar", 1);
 	s4_cond_free (cond);
 
-	cond = create_cond (S4_FILTER_EQUAL, "foobar", S4_COND_CASESENS);
+	cond = create_cond (S4_FILTER_EQUAL, "foobar", S4_CMP_BINARY, 0);
 	TEST_COND (cond, "foobar", 1);
 	TEST_COND (cond, "FOOBAR", 0);
 	s4_cond_free (cond);
@@ -59,12 +60,12 @@ CASE (test_equal) {
 CASE (test_greater) {
 	s4_condition_t *cond;
 
-	cond = create_cond (S4_FILTER_GREATER, "foobar", 0);
+	cond = create_cond (S4_FILTER_GREATER, "foobar", S4_CMP_CASELESS, 0);
 	TEST_COND (cond, "goobar", 1);
 	TEST_COND (cond, "GOOBAR", 1);
 	s4_cond_free (cond);
 
-	cond = create_cond (S4_FILTER_GREATER, "foobar", S4_COND_CASESENS);
+	cond = create_cond (S4_FILTER_GREATER, "foobar", S4_CMP_BINARY, 0);
 	TEST_COND (cond, "goobar", 1);
 	TEST_COND (cond, "GOOBAR", 0);
 	s4_cond_free (cond);
@@ -73,12 +74,12 @@ CASE (test_greater) {
 CASE (test_smaller) {
 	s4_condition_t *cond;
 
-	cond = create_cond (S4_FILTER_SMALLER, "hoobar", 0);
+	cond = create_cond (S4_FILTER_SMALLER, "hoobar", S4_CMP_CASELESS, 0);
 	TEST_COND (cond, "goobar", 1);
 	TEST_COND (cond, "GOOBAR", 1);
 	s4_cond_free (cond);
 
-	cond = create_cond (S4_FILTER_SMALLER, "HOOBAR", S4_COND_CASESENS);
+	cond = create_cond (S4_FILTER_SMALLER, "HOOBAR", S4_CMP_BINARY, 0);
 	TEST_COND (cond, "goobar", 0);
 	TEST_COND (cond, "GOOBAR", 1);
 	s4_cond_free (cond);
@@ -87,7 +88,7 @@ CASE (test_smaller) {
 CASE (test_match) {
 	s4_condition_t *cond;
 
-	cond = create_cond (S4_FILTER_MATCH, "a?c*", 0);
+	cond = create_cond (S4_FILTER_MATCH, "a?c*", S4_CMP_CASELESS, 0);
 	TEST_COND (cond, "abcd", 1);
 	TEST_COND (cond, "ABCD", 1);
 	TEST_COND (cond, "axc", 1);
@@ -96,7 +97,7 @@ CASE (test_match) {
 	TEST_COND (cond, "BCD", 0);
 	s4_cond_free (cond);
 
-	cond = create_cond (S4_FILTER_MATCH, "a?c*", S4_COND_CASESENS);
+	cond = create_cond (S4_FILTER_MATCH, "a?c*", S4_CMP_BINARY, 0);
 	TEST_COND (cond, "abcd", 1);
 	TEST_COND (cond, "ABCD", 0);
 	TEST_COND (cond, "axc", 1);
@@ -109,7 +110,7 @@ CASE (test_match) {
 CASE (test_exists) {
 	s4_condition_t *cond;
 
-	cond = create_cond (S4_FILTER_EXISTS, "asdf", 0);
+	cond = create_cond (S4_FILTER_EXISTS, "asdf", S4_CMP_CASELESS, 0);
 	TEST_COND (cond, "abc", 1);
 	TEST_COND (cond, "jkl", 1);
 	TEST_COND (cond, "asdf", 1);
@@ -135,15 +136,15 @@ static int test_combiner (s4_condition_t *cond, const char *str)
 CASE (test_and) {
 	s4_condition_t *cond, *a, *b;
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "b", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0);
 	cond = create_combiner (S4_COMBINE_AND, a, b);
 	TEST_COMBINER (cond, "a", 0);
 	TEST_COMBINER (cond, "b", 0);
 	s4_cond_free (cond);
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "a", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	cond = create_combiner (S4_COMBINE_AND, a, b);
 	TEST_COMBINER (cond, "a", 1);
 	TEST_COMBINER (cond, "b", 0);
@@ -153,16 +154,16 @@ CASE (test_and) {
 CASE (test_or) {
 	s4_condition_t *cond, *a, *b;
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "b", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0);
 	cond = create_combiner (S4_COMBINE_OR, a, b);
 	TEST_COMBINER (cond, "a", 1);
 	TEST_COMBINER (cond, "b", 1);
 	TEST_COMBINER (cond, "c", 0);
 	s4_cond_free (cond);
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "a", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	cond = create_combiner (S4_COMBINE_AND, a, b);
 	TEST_COMBINER (cond, "a", 1);
 	TEST_COMBINER (cond, "b", 0);
@@ -172,8 +173,8 @@ CASE (test_or) {
 CASE (test_not) {
 	s4_condition_t *cond, *a, *b;
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "b", 0); /* Dummy, NOT only takes the first operand into account */
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0); /* Dummy, NOT only takes the first operand into account */
 	cond = create_combiner (S4_COMBINE_NOT, b, a);
 	TEST_COMBINER (cond, "a", 0);
 	TEST_COMBINER (cond, "b", 1);
@@ -190,7 +191,7 @@ CASE (test_custom_filter) {
 
 	s4_val_t *val = (void*)0x1234;
 
-	cond = s4_cond_new_custom_filter (simple_filter, val, NULL, "asdf", NULL, 0);
+	cond = s4_cond_new_custom_filter (simple_filter, val, NULL, "asdf", NULL, S4_CMP_CASELESS, 0);
 	CU_ASSERT_FALSE (s4_cond_get_filter_function (cond)(val, cond));
 	CU_ASSERT (s4_cond_get_filter_function (cond)((s4_val_t*)0x4312, cond));
 	s4_cond_free (cond);
@@ -213,8 +214,8 @@ CASE (test_custom_combiner) {
 	s4_condition_t *cond, *a, *b;
 	GList *ops;
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "b", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0);
 	ops = g_list_prepend (NULL, a);
 	ops = g_list_prepend (ops, b);
 	cond = s4_cond_new_custom_combiner (xor_combiner, ops);
@@ -223,8 +224,8 @@ CASE (test_custom_combiner) {
 	TEST_COMBINER (cond, "c", 0);
 	s4_cond_free (cond);
 
-	a = create_cond (S4_FILTER_EQUAL, "a", 0);
-	b = create_cond (S4_FILTER_EQUAL, "a", 0);
+	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
+	b = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	ops = g_list_prepend (NULL, a);
 	ops = g_list_prepend (ops, b);
 	cond = s4_cond_new_custom_combiner (xor_combiner, ops);

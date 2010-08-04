@@ -42,8 +42,8 @@ CASE (test_string) {
 	CU_ASSERT_EQUAL (strcmp (sa, "ASDF"), 0);
 	CU_ASSERT_EQUAL (strcmp (sb, "asdf"), 0);
 
-	CU_ASSERT (s4_val_get_normalized_str (a, &sa));
-	CU_ASSERT (s4_val_get_normalized_str (b, &sb));
+	CU_ASSERT (s4_val_get_casefolded_str (a, &sa));
+	CU_ASSERT (s4_val_get_casefolded_str (b, &sb));
 
 	CU_ASSERT_EQUAL (strcmp (sa, sb), 0);
 
@@ -95,28 +95,42 @@ CASE (test_copy) {
 CASE (test_cmp) {
 	s4_val_t *ia, *ib;
 	s4_val_t *sa, *sb;
+	s4_val_t *is;
 
 	ia = s4_val_new_int (1);
-	ib = s4_val_new_int (2);
+	ib = s4_val_new_int (3);
 	sa = s4_val_new_string ("a");
 	sb = s4_val_new_string ("B");
+	is = s4_val_new_string ("2");
 
-	CU_ASSERT (s4_val_cmp (ia, ib, 0) < 0);
-	CU_ASSERT (s4_val_cmp (ib, ia, 0) > 0);
-	CU_ASSERT (s4_val_cmp (ia, ia, 0) == 0);
-	CU_ASSERT (s4_val_cmp (ia, ib, 1) < 0);
-	CU_ASSERT (s4_val_cmp (ib, ia, 1) > 0);
-	CU_ASSERT (s4_val_cmp (ia, ia, 1) == 0);
+	CU_ASSERT (s4_val_cmp (ia, ib, S4_CMP_CASELESS) < 0);
+	CU_ASSERT (s4_val_cmp (ib, ia, S4_CMP_CASELESS) > 0);
+	CU_ASSERT (s4_val_cmp (ia, ia, S4_CMP_CASELESS) == 0);
+	CU_ASSERT (s4_val_cmp (ia, ib, S4_CMP_BINARY) < 0);
+	CU_ASSERT (s4_val_cmp (ib, ia, S4_CMP_BINARY) > 0);
+	CU_ASSERT (s4_val_cmp (ia, ia, S4_CMP_BINARY) == 0);
+	CU_ASSERT (s4_val_cmp (ia, ib, S4_CMP_COLLATE) < 0);
+	CU_ASSERT (s4_val_cmp (ib, ia, S4_CMP_COLLATE) > 0);
+	CU_ASSERT (s4_val_cmp (ia, ia, S4_CMP_COLLATE) == 0);
 
-	CU_ASSERT (s4_val_cmp (sa, sb, 1) > 0);
-	CU_ASSERT (s4_val_cmp (sb, sa, 1) < 0);
-	CU_ASSERT (s4_val_cmp (sa, sa, 1) == 0);
-	CU_ASSERT (s4_val_cmp (sa, sb, 0) < 0);
-	CU_ASSERT (s4_val_cmp (sb, sa, 0) > 0);
-	CU_ASSERT (s4_val_cmp (sa, sa, 0) == 0);
+	CU_ASSERT (s4_val_cmp (sa, sb, S4_CMP_BINARY) > 0);
+	CU_ASSERT (s4_val_cmp (sb, sa, S4_CMP_BINARY) < 0);
+	CU_ASSERT (s4_val_cmp (sa, sa, S4_CMP_BINARY) == 0);
+	CU_ASSERT (s4_val_cmp (sa, sb, S4_CMP_CASELESS) < 0);
+	CU_ASSERT (s4_val_cmp (sb, sa, S4_CMP_CASELESS) > 0);
+	CU_ASSERT (s4_val_cmp (sa, sa, S4_CMP_CASELESS) == 0);
 
-	CU_ASSERT (s4_val_cmp (sa, ia, 0) > 0);
-	CU_ASSERT (s4_val_cmp (sa, ia, 1) > 0);
-	CU_ASSERT (s4_val_cmp (ib, sb, 0) < 0);
-	CU_ASSERT (s4_val_cmp (ib, sb, 1) < 0);
+	CU_ASSERT (s4_val_cmp (ia, is, S4_CMP_BINARY) > 0);
+	CU_ASSERT (s4_val_cmp (ib, is, S4_CMP_BINARY) > 0);
+	CU_ASSERT (s4_val_cmp (ia, is, S4_CMP_CASELESS) > 0);
+	CU_ASSERT (s4_val_cmp (ib, is, S4_CMP_CASELESS) > 0);
+	CU_ASSERT (s4_val_cmp (is, ia, S4_CMP_BINARY) < 0);
+	CU_ASSERT (s4_val_cmp (is, ib, S4_CMP_BINARY) < 0);
+	CU_ASSERT (s4_val_cmp (is, ia, S4_CMP_CASELESS) < 0);
+	CU_ASSERT (s4_val_cmp (is, ib, S4_CMP_CASELESS) < 0);
+
+	CU_ASSERT (s4_val_cmp (is, ia, S4_CMP_COLLATE) > 0);
+	CU_ASSERT (s4_val_cmp (is, ib, S4_CMP_COLLATE) < 0);
+	CU_ASSERT (s4_val_cmp (ia, is, S4_CMP_COLLATE) < 0);
+	CU_ASSERT (s4_val_cmp (ib, is, S4_CMP_COLLATE) > 0);
 }
