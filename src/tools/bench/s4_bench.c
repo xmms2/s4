@@ -13,13 +13,14 @@
  */
 
 #include "s4.h"
-#include "logging.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
 #include <glib/gstdio.h>
 
 #define ENTRIES 100000
+
+void log_init (GLogLevelFlags log_lev);
 
 long timediff (GTimeVal *prev, GTimeVal *cur)
 {

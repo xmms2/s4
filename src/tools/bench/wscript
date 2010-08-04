@@ -1,0 +1,19 @@
+# encoding: utf-8
+#
+# WAF build scripts for XMMS2
+# Copyright (C) 2006-2009 XMMS2 Team
+
+import Options
+
+def build(bld):
+	bench = bld.new_task_gen('cc', 'program')
+	bench.source = ["s4_bench.c", "logging.c"]
+	bench.target = "s4_bench"
+	bench.install_path = 0
+	bench.uselib_local = "s4"
+	bench.uselib = "glib2 gthread2"
+
+def configure (conf):
+	return True
+def set_options (opt):
+	pass

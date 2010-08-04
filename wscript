@@ -26,6 +26,10 @@ APPNAME='s4'
 srcdir='.'
 blddir = '_build_'
 
+lib_dir = 'src/lib'
+test_dir = 'tests'
+tool_dirs = ['src/tools/bench']
+
 ####
 ## Initialization
 ####
@@ -62,22 +66,20 @@ def configure(conf):
     else:
         conf.env["MANDIR"] = os.path.join(conf.env["PREFIX"], "share", "man")
 
-    conf.env["S4_SUBDIRS"] = ["src"];
+    conf.env["S4_SUBDIRS"] = [lib_dir]
 
     if Options.options.build_tests:
-        conf.env.append_value("S4_SUBDIRS", "tests")
+        conf.env.append_value("S4_SUBDIRS", test_dir)
+    if Options.options.build_tools:
+        conf.env.append_value("S4_SUBDIRS", tool_dirs)
 
     conf.check_tool('misc')
     conf.check_tool('gcc')
-    conf.check_tool('g++')
 
     if Options.options.target_platform:
         Options.platform = Options.options.target_platform
 
     conf.env["VERSION"] = BASEVERSION
-
-    conf.env["CCFLAGS"] = Utils.to_list(conf.env["CCFLAGS"]) + ['-g', '-O0', '-Wall']
-    conf.env["CXXFLAGS"] = Utils.to_list(conf.env["CXXFLAGS"]) + ['-g', '-O0', '-Wall']
 
     if Options.options.bindir:
         conf.env["BINDIR"] = Options.options.bindir
@@ -98,8 +100,6 @@ def configure(conf):
     if Options.options.enable_gcov:
         conf.env.append_value('CCFLAGS', '-fprofile-arcs')
         conf.env.append_value('CCFLAGS', '-ftest-coverage')
-        conf.env.append_value('CXXFLAGS', '-fprofile-arcs')
-        conf.env.append_value('CXXFLAGS', '-ftest-coverage')
         conf.env.append_value('LINKFLAGS', '-fprofile-arcs')
 
     if Options.options.config_prefix:
@@ -205,8 +205,11 @@ def set_options(opt):
                    dest='enable_gcov', help="Enable code coverage analysis")
     opt.add_option('--lcov-report', action="store_true", default=False,
                    dest='build_lcov', help="Builds an lcov report")
+    opt.add_option("--build-tools", action="store_true", default=False,
+                    dest="build_tools",
+                    help="Build S4 tools to verify and recover databases.")
 
-    opt.sub_options("src")
+    opt.sub_options(tool_dirs)
 
 def shutdown():
     if Options.commands['install'] and os.geteuid() == 0:
