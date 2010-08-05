@@ -28,7 +28,7 @@ blddir = '_build_'
 
 lib_dir = 'src/lib'
 test_dir = 'tests'
-tool_dirs = ['src/tools/bench']
+tool_dirs = ['src/tools/bench', 'src/tools/s4']
 
 ####
 ## Initialization
@@ -75,6 +75,7 @@ def configure(conf):
 
     conf.check_tool('misc')
     conf.check_tool('gcc')
+    conf.env.append_value('CCFLAGS', ['-Wall', '-g'])
 
     if Options.options.target_platform:
         Options.platform = Options.options.target_platform
