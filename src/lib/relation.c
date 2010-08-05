@@ -426,6 +426,7 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 
 	for (k = 0; k < fetch_size; k++) {
 		const char *fkey = s4_fetchspec_get_key (fs, k);
+		int flags = s4_fetchspec_get_flags (fs, k);
 		int null = fkey == NULL;
 		s4_result_t *result;
 		s4_sourcepref_t *sp = s4_fetchspec_get_sourcepref (fs, k);
@@ -433,31 +434,33 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 		result = NULL;
 		f = 0;
 
-		if (fkey == l->key || null) {
+		if ((flags & S4_FETCH_PARENT) && (fkey == l->key || null)) {
 			result = s4_result_create (result, l->key, l->val, NULL);
 		}
 
-		do {
-			int src, start, best_src = INT_MAX;
+		if (flags & S4_FETCH_DATA) {
+			do {
+				int src, start, best_src = INT_MAX;
 
-			if (null && l->size > 0) {
-				fkey = l->data[f].key;
-			}
-
-			start = _entry_search (l, fkey);
-
-			for (f = start; f < l->size && l->data[f].key == fkey; f++) {
-				if ((src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
-					best_src = src;
+				if (null && l->size > 0) {
+					fkey = l->data[f].key;
 				}
-			}
-			for (f = start; f < l->size && l->data[f].key == fkey; f++) {
-				if (s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
-					result = s4_result_create (result, l->data[f].key,
-							l->data[f].val, l->data[f].src);
+
+				start = _entry_search (l, fkey);
+
+				for (f = start; f < l->size && l->data[f].key == fkey; f++) {
+					if ((src = s4_sourcepref_get_priority (sp, l->data[f].src)) < best_src) {
+						best_src = src;
+					}
 				}
-			}
-		} while (f < l->size && null);
+				for (f = start; f < l->size && l->data[f].key == fkey; f++) {
+					if (s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
+						result = s4_result_create (result, l->data[f].key,
+								l->data[f].val, l->data[f].src);
+					}
+				}
+			} while (f < l->size && null);
+		}
 
 		s4_resultrow_set_col (row, k, result);
 	}

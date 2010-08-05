@@ -19,6 +19,7 @@
 typedef struct {
 	const char *key;
 	s4_sourcepref_t *pref;
+	int flags;
 } fetch_data_t;
 
 struct s4_fetchspec_St {
@@ -54,10 +55,11 @@ s4_fetchspec_t *s4_fetchspec_create (void)
  * @param key The key to fetch
  * @param sourcepref The sourcepref to use when deciding which key-value pair to fetch
  */
-void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref)
+void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref, int flags)
 {
 	fetch_data_t data;
 	data.key = key;
+	data.flags = flags;
 	if (sourcepref != NULL) {
 		data.pref = s4_sourcepref_ref (sourcepref);
 	} else {
@@ -128,6 +130,14 @@ s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index)
 		return NULL;
 
 	return g_array_index (spec->array, fetch_data_t, index).pref;
+}
+
+int s4_fetchspec_get_flags (s4_fetchspec_t *spec, int index)
+{
+	if (index < 0 || index >= spec->array->len)
+		return 0;
+
+	return g_array_index (spec->array, fetch_data_t, index).flags;
 }
 
 /**

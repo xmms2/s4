@@ -79,7 +79,7 @@ static void check_db (struct db_struct *db)
 {
 	int i, j;
 	s4_fetchspec_t *fs = s4_fetchspec_create ();
-	s4_fetchspec_add (fs, NULL, NULL);
+	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_DATA);
 
 	for (i = 0; db[i].name != NULL; i++) {
 		s4_val_t *name_val = s4_val_new_string (db[i].name);
@@ -228,7 +228,7 @@ CASE (test_query) {
 
 	s4_sourcepref_t *sp = s4_sourcepref_create (sources);
 	s4_fetchspec_t *fs = s4_fetchspec_create ();
-	s4_fetchspec_add (fs, "property", sp);
+	s4_fetchspec_add (fs, "property", sp, S4_FETCH_DATA);
 
 	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
 			s4_val_new_string ("a"), sp, S4_CMP_CASELESS, 0);

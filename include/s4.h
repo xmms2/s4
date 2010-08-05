@@ -139,14 +139,17 @@ filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);
 combine_function_t s4_cond_get_combine_function (s4_condition_t *cond);
 
 /* fetchspec.c */
+#define S4_FETCH_PARENT 1
+#define S4_FETCH_DATA 2
 typedef struct s4_fetchspec_St s4_fetchspec_t;
 
 s4_fetchspec_t *s4_fetchspec_create (void);
-void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref);
+void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref, int flags);
 void s4_fetchspec_free (s4_fetchspec_t *spec);
 int s4_fetchspec_size (s4_fetchspec_t *spec);
 const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
 s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
+int s4_fetchspec_get_flags (s4_fetchspec_t *spec, int index);
 void s4_fetchspec_update_key (s4_t *s4, s4_fetchspec_t *spec);
 
 /* result.c */
