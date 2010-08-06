@@ -71,7 +71,7 @@ s4_resultset_t *s4_resultset_create (int col_count)
 /**
  * Adds a row to a resultset
  * @param set The resultset to add to
- * @param results An array of results to add
+ * @param row The row to add
  */
 void s4_resultset_add_row (s4_resultset_t *set, const s4_resultrow_t *row)
 {

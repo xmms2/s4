@@ -209,7 +209,6 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
  * Creates a new combiner.
  *
  * @param type The combiner type
- * @param operands The operands of the combiner
  * @return A new combiner
  */
 s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type)
@@ -228,7 +227,6 @@ s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type)
  * Creates a new combiner with a user specified combiner function.
  *
  * @param func The combiner function to use
- * @param operands The operands to the combiner
  * @return A new custom combiner
  */
 s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func)
@@ -286,6 +284,7 @@ s4_condition_t *s4_cond_get_operand (s4_condition_t *cond, int operand)
  * @param key The key the condition should check
  * @param value The value to check against
  * @param sourcepref The source preference
+ * @param cmp_mode The comparison mode to use
  * @param flags Condition flags, or 0
  * @return A new filter condition
  */
@@ -323,6 +322,7 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
  * @param free The function that should be called to free userdata
  * @param key The key the condition should check
  * @param sourcepref The source preference
+ * @param cmp_mode The comparison mode to use
  * @param flags Condition flags, or 0
  * @return A new custom filter condition
  */

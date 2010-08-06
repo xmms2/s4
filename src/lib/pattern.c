@@ -462,3 +462,7 @@ s4_pattern_free (s4_pattern_t *pattern)
 	_free_pattern (pattern->neg_pattern);
 	free (pattern);
 }
+
+/**
+ * @}
+ */

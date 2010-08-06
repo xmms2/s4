@@ -59,6 +59,7 @@ s4_fetchspec_t *s4_fetchspec_create (void)
  * @param spec The specification to add to
  * @param key The key to fetch
  * @param sourcepref The sourcepref to use when deciding which key-value pair to fetch
+ * @param flags Flags to decide what to fetch
  */
 void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref, int flags)
 {

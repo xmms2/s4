@@ -75,7 +75,7 @@ s4_val_t *s4_val_new_string (const char *str)
  * the string is not copied.
  *
  * @param str The string to use as the value
- * @param normalized_str The normalized version of str
+ * @param s4 The database this value belongs to
  * @return A new internal string value, must be freed with s4_val_free
  */
 s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4)
