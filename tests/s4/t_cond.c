@@ -119,11 +119,13 @@ CASE (test_exists) {
 
 static s4_condition_t *create_combiner (s4_combine_type_t type, s4_condition_t *op_a, s4_condition_t *op_b)
 {
-	GList *ops = NULL;
-	ops = g_list_prepend (ops, op_a);
-	ops = g_list_prepend (ops, op_b);
+	s4_condition_t *ret = s4_cond_new_combiner (type);
+	s4_cond_add_operand (ret, op_a);
+	s4_cond_add_operand (ret, op_b);
+	s4_cond_unref (op_a);
+	s4_cond_unref (op_b);
 
-	return s4_cond_new_combiner (type, ops);
+	return ret;
 }
 
 #define TEST_COMBINER(c,s,m) ((m)?(CU_ASSERT_FALSE (test_combiner(c,s))):(CU_ASSERT(test_combiner(c,s))))
@@ -175,7 +177,7 @@ CASE (test_not) {
 
 	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0); /* Dummy, NOT only takes the first operand into account */
-	cond = create_combiner (S4_COMBINE_NOT, b, a);
+	cond = create_combiner (S4_COMBINE_NOT, a, b);
 	TEST_COMBINER (cond, "a", 0);
 	TEST_COMBINER (cond, "b", 1);
 	s4_cond_free (cond);
@@ -191,7 +193,8 @@ CASE (test_custom_filter) {
 
 	s4_val_t *val = (void*)0x1234;
 
-	cond = s4_cond_new_custom_filter (simple_filter, val, NULL, "asdf", NULL, S4_CMP_CASELESS, 0);
+	cond = s4_cond_new_custom_filter ((filter_function_t)simple_filter,
+			val, NULL, "asdf", NULL, S4_CMP_CASELESS, 0);
 	CU_ASSERT_FALSE (s4_cond_get_filter_function (cond)(val, cond));
 	CU_ASSERT (s4_cond_get_filter_function (cond)((s4_val_t*)0x4312, cond));
 	s4_cond_free (cond);
@@ -199,10 +202,11 @@ CASE (test_custom_filter) {
 
 static int xor_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	int ret = 1;
-	GList *i = s4_cond_get_operands (cond);
-	for (; i != NULL; i = g_list_next (i)) {
-		int tmp = func (i->data, check_data);
+	int i, ret = 1;
+	s4_condition_t *op;
+
+	for (i = 0; (op = s4_cond_get_operand (cond, i)) != NULL; i++) {
+		int tmp = func (op, check_data);
 
 		ret = !!ret ^ !!tmp;
 	}
@@ -212,13 +216,14 @@ static int xor_combiner (s4_condition_t *cond, check_function_t func, void *chec
 
 CASE (test_custom_combiner) {
 	s4_condition_t *cond, *a, *b;
-	GList *ops;
 
 	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	b = create_cond (S4_FILTER_EQUAL, "b", S4_CMP_CASELESS, 0);
-	ops = g_list_prepend (NULL, a);
-	ops = g_list_prepend (ops, b);
-	cond = s4_cond_new_custom_combiner (xor_combiner, ops);
+	cond = s4_cond_new_custom_combiner (xor_combiner);
+	s4_cond_add_operand (cond, a);
+	s4_cond_add_operand (cond, b);
+	s4_cond_unref (a);
+	s4_cond_unref (b);
 	TEST_COMBINER (cond, "a", 1);
 	TEST_COMBINER (cond, "b", 1);
 	TEST_COMBINER (cond, "c", 0);
@@ -226,9 +231,11 @@ CASE (test_custom_combiner) {
 
 	a = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
 	b = create_cond (S4_FILTER_EQUAL, "a", S4_CMP_CASELESS, 0);
-	ops = g_list_prepend (NULL, a);
-	ops = g_list_prepend (ops, b);
-	cond = s4_cond_new_custom_combiner (xor_combiner, ops);
+	cond = s4_cond_new_custom_combiner (xor_combiner);
+	s4_cond_add_operand (cond, a);
+	s4_cond_add_operand (cond, b);
+	s4_cond_unref (a);
+	s4_cond_unref (b);
 	TEST_COMBINER (cond, "a", 0);
 	TEST_COMBINER (cond, "b", 0);
 	s4_cond_free (cond);
