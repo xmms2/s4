@@ -6,26 +6,33 @@
 #include <glib.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
+
+typedef struct list_St list_t;
 
 extern int yylex (void);
 extern void init_lexer (char *lines[], int line_count);
 
 static void yyerror (const char *);
 static void print_value (const s4_val_t *value, int newline);
-static void print_list (GList *list);
+static void print_list (list_t *list);
 static void print_result (const s4_resultset_t *res);
 static void print_cond (s4_condition_t *cond);
 static void print_fetch (s4_fetchspec_t *fetch);
 static void print_vars (void);
 static void print_help (void);
+static void ref_list (list_t *list);
+static void unref_list (list_t *list);
+static list_t *create_list (GList *data);
 static GList *result_to_list (GList *prev, const s4_result_t *res);
 static GList *rows_to_list (const s4_resultset_t *set, int col);
 static GList *cols_to_list (const s4_resultset_t *set, int row);
 static GList *set_to_list (const s4_resultset_t *set);
-static void add_or_del (int (*func)(), GList *a, GList *b);
+static void add_or_del (int (*func)(), list_t *a, list_t *b);
 static void set_var (const char *key, const char *val);
 static const char *get_var (const char *key);
 static void print_set_var (const char *key);
+static void cleanup (void);
 
 GHashTable *cond_table, *res_table, *list_table, *fetch_table;
 char **lines;
@@ -36,11 +43,16 @@ const char *user_vars[][2] = {{"default_source", "s4"}, {NULL, NULL}};
 %}
 
 %code requires {
+#include <glib.h>
 typedef struct {
-	const char *key;
-	const s4_val_t *val;
-	const char *src;
+	char *key;
+	s4_val_t *val;
+	char *src;
 } list_data_t;
+struct list_St {
+	GList *list;
+	int refs;
+};
 }
 
 %code provides {
@@ -55,13 +67,14 @@ typedef struct {
 	s4_filter_type_t filter_type;
 	s4_resultset_t *result;
 	s4_fetchspec_t *fetch;
-	GList *list;
+	struct list_St *list;
 	list_data_t *list_data;
+	GList *list_datas;
 }
 
 %token <string> STRING QUOTED_STRING COND_VAR LIST_VAR RESULT_VAR FETCH_VAR
 %token <number> INT
-%token INFO QUERY ADD DEL VARS SET HELP
+%token INFO QUERY ADD DEL VARS SET HELP EXIT
 
 %type <value> value
 %type <condition> cond
@@ -69,8 +82,18 @@ typedef struct {
 %type <filter_type> filter_type
 %type <result> result
 %type <fetch> fetch fetch_list
-%type <list> list list_datas
+%type <list> list
+%type <list_datas> list_datas
 %type <list_data> list_data
+
+%destructor { free ($$); } <string>
+%destructor { s4_val_free ($$); } <value>
+%destructor { s4_cond_unref ($$); } <condition>
+%destructor { s4_resultset_unref ($$); } <result>
+%destructor { s4_fetchspec_unref ($$); } <fetch>
+%destructor { free ($$); } <list_data>
+%destructor { unref_list (create_list ($$)); } <list_datas>
+%destructor { unref_list ($$); } <list>
 
 %error-verbose
 %locations
@@ -86,29 +109,30 @@ input: command ';'
 	 ;
 
 command: /* Empty */
-	   | cond { print_cond ($1); }
-	   | list { print_list ($1); }
-	   | result { print_result ($1); }
-	   | fetch_list { print_fetch ($1); }
+	   | cond { print_cond ($1); s4_cond_unref ($1); }
+	   | list { print_list ($1); unref_list ($1); }
+	   | result { print_result ($1); s4_resultset_unref ($1); }
+	   | fetch_list { print_fetch ($1); s4_fetchspec_unref ($1); }
 	   | add
 	   | del
 	   | set
 	   | HELP { print_help (); }
 	   | VARS { print_vars (); }
+	   | EXIT { cleanup (); exit (0); }
 	   | COND_VAR '=' cond { g_hash_table_insert (cond_table, $1, $3); }
 	   | LIST_VAR '=' list { g_hash_table_insert (list_table, $1, $3); }
 	   | FETCH_VAR '=' fetch_list { g_hash_table_insert (fetch_table, $1, $3); }
 	   | RESULT_VAR '=' result { g_hash_table_insert (res_table, $1, $3); }
 	   ;
 
-set: SET string string { set_var ($2, $3); }
-   | SET string { print_set_var ($2); }
+set: SET string string { set_var ($2, $3); free ($2); }
+   | SET string { print_set_var ($2); free ($2); }
    | SET { print_set_var (NULL); }
 
-add: ADD list ',' list { add_or_del (s4_add, $2, $4); }
+add: ADD list ',' list { add_or_del (s4_add, $2, $4); unref_list ($2); unref_list ($4); }
    ;
 
-del: DEL list ',' list { add_or_del (s4_del, $2, $4); }
+del: DEL list ',' list { add_or_del (s4_del, $2, $4); unref_list ($2); unref_list ($4); }
    ;
 
 list_data: string value string
@@ -123,7 +147,7 @@ list_data: string value string
 			 $$ = malloc (sizeof (list_data_t));
 			 $$->key = $1;
 			 $$->val = $2;
-			 $$->src = get_var ("default_source");
+			 $$->src = strdup (get_var ("default_source"));
 		 }
 		 ;
 
@@ -139,13 +163,30 @@ list: LIST_VAR
 			yyerror ("Undefined list variable");
 			YYERROR;
 		}
+		ref_list ($$);
 	}
-	| '[' list_datas ']' { $$ = $2; }
-	| list_data { $$ = g_list_prepend (NULL, $1); }
-	| result '[' INT ',' INT ']' { $$ = result_to_list (NULL, s4_resultset_get_result ($1, $3, $5)); }
-	| result '[' '_' ',' INT ']' { $$ = rows_to_list ($1, $5); }
-	| result '[' INT ',' '_' ']' { $$ = cols_to_list ($1, $3); }
-	| result '[' '_' ',' '_' ']' { $$ = set_to_list ($1); }
+	| '[' list_datas ']' { $$ = create_list ($2); }
+	| list_data { $$ = create_list (g_list_prepend (NULL, $1)); }
+	| result '[' INT ',' INT ']'
+	{
+		$$ = create_list (result_to_list (NULL, s4_resultset_get_result ($1, $3, $5)));
+		s4_resultset_unref ($1);
+	}
+	| result '[' '_' ',' INT ']'
+	{
+		$$ = create_list (rows_to_list ($1, $5));
+		s4_resultset_unref ($1);
+	}
+	| result '[' INT ',' '_' ']'
+	{
+		$$ = create_list (cols_to_list ($1, $3));
+		s4_resultset_unref ($1);
+	}
+	| result '[' '_' ',' '_' ']'
+	{
+		$$ = create_list (set_to_list ($1));
+		s4_resultset_unref ($1);
+	}
 	;
 
 
@@ -174,7 +215,7 @@ fetch: string
 fetch_list: '[' fetch ']' { $$ = $2; }
 		  | FETCH_VAR
 		  {
-			  $$ = g_hash_table_lookup (fetch_table, $1);
+			  $$ = s4_fetchspec_ref (g_hash_table_lookup (fetch_table, $1));
 			  free ($1);
 			  if ($$ == NULL) {
 				  yyerror ("Undefined list variable");
@@ -195,7 +236,7 @@ fetch_list: '[' fetch ']' { $$ = $2; }
 
 result: RESULT_VAR
   	  {
-		  $$ = g_hash_table_lookup (res_table, $1);
+		  $$ = s4_resultset_ref (g_hash_table_lookup (res_table, $1));
 		  free ($1);
 		  if ($$ == NULL) {
 			  yyerror ("Undefined result variable");
@@ -207,6 +248,8 @@ result: RESULT_VAR
 		  const int order[2] = {1, 0};
 		  $$ = s4_query (s4, $2,  $3);
 		  s4_resultset_sort ($$, order);
+		  s4_cond_unref ($3);
+		  s4_fetchspec_unref ($2);
 	  }
 	  ;
 
@@ -225,7 +268,7 @@ filter_type: '=' { $$ =  S4_FILTER_EQUAL; }
 
 cond: COND_VAR
 	{
-		$$ = g_hash_table_lookup (cond_table, $1);
+		$$ = s4_cond_ref (g_hash_table_lookup (cond_table, $1));
 		free ($1);
 		if ($$ == NULL) {
 			yyerror ("Undefined condition variable");
@@ -238,25 +281,35 @@ cond: COND_VAR
 	}
 	| cond '&' cond
 	{
-		$$ = s4_cond_new_combiner (S4_COMBINE_AND,
-			g_list_prepend (g_list_prepend (NULL, $3), $1));
+		$$ = s4_cond_new_combiner (S4_COMBINE_AND);
+		s4_cond_add_operand ($$, $1);
+		s4_cond_add_operand ($$, $3);
+		s4_cond_unref ($1);
+		s4_cond_unref ($3);
 	}
 	| cond '|' cond
 	{
-		$$ = s4_cond_new_combiner (S4_COMBINE_OR,
-			g_list_prepend (g_list_prepend (NULL, $3), $1));
+		$$ = s4_cond_new_combiner (S4_COMBINE_OR);
+		s4_cond_add_operand ($$, $1);
+		s4_cond_add_operand ($$, $3);
+		s4_cond_unref ($1);
+		s4_cond_unref ($3);
 	}
 	| '!' cond
 	{
-		$$ = s4_cond_new_combiner (S4_COMBINE_NOT, g_list_prepend (NULL, $2));
+		$$ = s4_cond_new_combiner (S4_COMBINE_NOT);
+		s4_cond_add_operand ($$, $2);
+		s4_cond_unref ($2);
 	}
 	| STRING filter_type value
 	{
 		$$ = s4_cond_new_filter ($2, $1, $3, NULL, S4_CMP_CASELESS, 0);
+		s4_val_free ($3);
 	}
 	| filter_type value
 	{
 		$$ = s4_cond_new_filter ($1, NULL, $2, NULL, S4_CMP_CASELESS, 0);
+		s4_val_free ($2);
 	}
 	| '+' STRING
 	{
@@ -288,9 +341,10 @@ void yyerror (const char *str)
 	}
 }
 
-void print_list (GList *list)
+void print_list (list_t *l)
 {
 	list_data_t *data;
+	GList *list = l->list;
 	int first = 1;
 
 	printf ("list [");
@@ -396,44 +450,83 @@ void print_help (void)
 {
 	printf("All statements must end with a semicolon\n\n"
 			"Statements with no value:\n"
-			".add <list>, <list>   - Adds every key,val,src in the second list as\n"
-			"                        attributes to every key,val in the first list\n"
-			".del <list>, <list>   - Deletes every key,val,src in the second list as\n"
-			"                        attributes to every key,val in the first list\n"
+			".add <list>, <list>   - For every (key, val) from the first list it adds\n"
+			"                        the attributes (key, val, src) from the second list\n"
+			".del <list>, <list>   - For every (key, val) from the first list it deletes\n"
+			"                        the attributes (key, val, src) from the second list\n"
+			".exit                 - Exit the program\n"
 			".help                 - Prints this help\n"
 			".set key value        - Sets the option key to val\n"
 			".set key              - Shows the value of the key\n"
 			".set                  - Shows the value of all keys\n"
 			".vars                 - Prints all bound variables\n\n"
-			"Conditions (<cond>):\n"
 			"?var = <cond>         - Assigns cond to the condition variable var\n"
+			"%%var = <fetch>        - Assigns fetch to the fetch variable var\n"
+			"@var = <result>       - Assigns var to something returning result\n"
+			"$var = <list>           - Assigns the list to the list variable var\n\n"
+			"Conditions (<cond>):\n"
 			"?var                  - Returns the condition bound to var\n"
-			"key = value           - Matches all entries with key = value\n"
+			"key = value           - Matches all entries where key equals value\n"
 			"key ~ value           - Matches all entries where key matches value\n"
-			"key < value           - Matches all entries with key < value\n"
-			"key > value           - Matches all entries with key > value\n"
+			"key < value           - Matches all entries where key is smaller than value\n"
+			"key > value           - Matches all entries where key is greater than value\n"
+			"= value               - Matches all entries where one or more keys equals value\n"
+			"~ value               - Matches all entries where one or more keys matches value\n"
+			"< value               - Matches all entries where one or more keys is smaller than value\n"
+			"> value               - Matches all entries where one or more keys is greater than value\n"
 			"+key                  - Matches all entries that has key\n"
+			"+                     - Matches everything\n"
 			"!cond                 - Matches everything cond does not match\n"
 			"cond1 & cond2         - Matches if both cond1 and cond2 matches\n"
 			"cond1 | cond2         - Matches if cond1 or cond2 matches\n\n"
 			"Fetch specification (<fetch>):\n"
-			"%%var = <fetch>        - Assigns fetch to the fetch variable var\n"
 			"%%var                  - Returns the fetch spec bound to var\n"
 			"[key1, .., keyn]      - Fetches keys 1 through n from matching entries\n"
 			"key                   - Fetches key from matching entries\n"
 			"_                     - Fetches everything from matching entries\n\n"
 			"Results (<cond>):\n"
 			".query <fetch> <cond> - Queries the database, returns a result\n\n"
-			"@var = <result>       - Assigns var to something returning result\n"
 			"@var                  - Returns the result bound to var\n\n"
 			"Lists (<list>):\n"
-			"$var <list>           - Assigns the list to the list variable var\n"
 			"$var                  - Returns the list bound to the variable var\n"
 			"<result>[row, col]    - Returns the list at (row,col). If either row\n"
 			"                        or col is _, it will take all rows or cols\n"
 			"[key val src, ...]    - Creates a list\n"
 			"[key val, ...]        - Creates a list where source is set to default_source\n"
 			);
+}
+
+void ref_list (list_t *list)
+{
+	list->refs++;
+}
+
+void unref_list (list_t *list)
+{
+	list->refs--;
+	if (list->refs <= 0) {
+		GList *l = list->list;
+		for (; l != NULL; l = g_list_next (l)) {
+			list_data_t *data = l->data;
+			free (data->key);
+			if (data->src != NULL)
+				free (data->src);
+			s4_val_free (data->val);
+			free (l->data);
+		}
+
+		g_list_free (list->list);
+		free (list);
+	}
+}
+
+list_t *create_list (GList *data)
+{
+	list_t *ret = malloc (sizeof (list_t));
+	ret->refs = 1;
+	ret->list = data;
+
+	return ret;
 }
 
 GList *result_to_list (GList *prev, const s4_result_t *res)
@@ -443,9 +536,11 @@ GList *result_to_list (GList *prev, const s4_result_t *res)
 
 	for (; res != NULL; res = s4_result_next (res)) {
 		data = malloc (sizeof (list_data_t));
-		data->key = s4_result_get_key (res);
-		data->val = s4_result_get_val (res);
-		data->src = s4_result_get_src (res);
+		data->key = strdup (s4_result_get_key (res));
+		data->val = s4_val_copy (s4_result_get_val (res));
+		data->src = (char*)s4_result_get_src (res);
+		if (data->src != NULL)
+			data->src = strdup (data->src);
 		ret = g_list_prepend (ret, data);
 	}
 
@@ -490,15 +585,14 @@ GList *set_to_list (const s4_resultset_t *set)
 	return ret;
 }
 
-void add_or_del (int (*func)(), GList *a, GList *b)
+void add_or_del (int (*func)(), list_t *list_a, list_t *list_b)
 {
 	list_data_t *da, *db;
-	GList *tmp = b;
+	GList *a, *b;
 
-	for (; a != NULL; a = g_list_next (a)) {
+	for (a = list_a->list; a != NULL; a = g_list_next (a)) {
 		da = a->data;
-		b = tmp;
-		for (; b != NULL; b = g_list_next (b)) {
+		for (b = list_b->list; b != NULL; b = g_list_next (b)) {
 			db = b->data;
 			if (!func (s4, da->key, da->val, db->key, db->val, db->src)) {
 				printf ("failed on %s ", da->key);
@@ -601,18 +695,35 @@ static char **rl_get_lines (int *line_co)
 	return lines;
 }
 
+void cleanup ()
+{
+	s4_close (s4);
+
+	g_hash_table_destroy (cond_table);
+	g_hash_table_destroy (fetch_table);
+	g_hash_table_destroy (list_table);
+	g_hash_table_destroy (res_table);
+}
+
 int main(int argc, const char *argv[])
 {
 	int line_count;
 
+	if (argc < 2) {
+		printf("Not enough arguments\nUsage: %s <s4-file>\n", argv[0]);
+		return 1;
+	}
+
+	printf ("S4 CLI tool\nEnter \".help;\" for instructions\n");
+
 	cond_table = g_hash_table_new_full (g_str_hash, g_str_equal,
-		free, (GDestroyNotify)s4_cond_free);
+		free, (GDestroyNotify)s4_cond_unref);
 	list_table = g_hash_table_new_full (g_str_hash, g_str_equal,
-		free, (GDestroyNotify)g_list_free);
+		free, (GDestroyNotify)unref_list);
 	res_table = g_hash_table_new_full (g_str_hash, g_str_equal,
 		free, (GDestroyNotify)s4_resultset_free);
 	fetch_table = g_hash_table_new_full (g_str_hash, g_str_equal,
-		free, (GDestroyNotify)s4_fetchspec_free);
+		free, (GDestroyNotify)s4_fetchspec_unref);
 
 	g_thread_init (NULL);
 
@@ -654,7 +765,7 @@ int main(int argc, const char *argv[])
 		yyparse ();
 	}
 
-	s4_close (s4);
+	cleanup ();
 
 	return 0;
 }

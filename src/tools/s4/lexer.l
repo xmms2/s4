@@ -30,6 +30,7 @@ INT [0-9]+
 \.vars|\.v return VARS;
 \.set return SET;
 \.help|\.h|\.\? return HELP;
+\.exit|\.e return EXIT;
 {INT} yylval.number = atoi (yytext); return INT;
 {STRING} yylval.string = strdup (yytext); return STRING;
 {QUOTED_STRING} yylval.string = process_string (yytext + 1); return QUOTED_STRING;
