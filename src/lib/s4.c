@@ -37,6 +37,7 @@ static GStaticPrivate _errno = G_STATIC_PRIVATE_INIT;
 typedef struct {
 	char magic[S4_MAGIC_LEN];
 	int32_t version;
+	unsigned char uuid[16];
 	log_number_t last_checkpoint;
 } s4_header_t;
 
@@ -134,6 +135,7 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 {
 	FILE *file = fopen (filename, "r");
 	s4_header_t hdr;
+	int i;
 
 	if (file == NULL) {
 		int ret = 0;
@@ -142,6 +144,8 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 				if (flags & S4_EXISTS) {
 					s4_set_errno (S4E_NOENT);
 					ret = -1;
+				} else {
+					s4_create_uuid (s4->uuid);
 				}
 				break;
 			default:
@@ -170,6 +174,9 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 	}
 
 	s4->last_checkpoint = hdr.last_checkpoint;
+	for (i = 0; i < 16; i++) {
+		s4->uuid[i] = hdr.uuid[i];
+	}
 
 	GHashTable *strings = _read_string (s4, file);
 	if (strings == NULL || _read_relations (s4, file, strings) == -1) {
@@ -287,6 +294,7 @@ static void _entry_to_pair (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 static int _write_file (s4_t *s4, const char *filename)
 {
 	int32_t i = -1;
+	int j;
 	FILE *file = fopen (filename, "w");
 	s4_header_t hdr;
 	save_data_t sd;
@@ -302,6 +310,9 @@ static int _write_file (s4_t *s4, const char *filename)
 
 	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
 	hdr.version = S4_VERSION;
+	for (j = 0; j < 16; j++) {
+		hdr.uuid[j] = s4->uuid[j];
+	}
 	hdr.last_checkpoint = s4->last_checkpoint;
 
 	fwrite (&hdr, sizeof (s4_header_t), 1, file);

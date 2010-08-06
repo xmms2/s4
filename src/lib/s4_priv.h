@@ -47,6 +47,7 @@ struct s4_St {
 	GThread *sync_thread;
 
 	char *filename;
+	unsigned char uuid[16];
 };
 
 typedef struct str_St str_t;

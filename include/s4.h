@@ -81,6 +81,11 @@ int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_t *val_a,
 			const char *key_b, const s4_val_t *val_b, const char *src, void *data), void *data);
 
+/* uuid.c */
+void s4_create_uuid (unsigned char uuid[16]);
+void s4_get_uuid (s4_t *s4, unsigned char uuid[16]);
+char *s4_get_uuid_string (s4_t* s4);
+
 /* sourcepref.c */
 typedef struct s4_sourcepref_St s4_sourcepref_t;
 
