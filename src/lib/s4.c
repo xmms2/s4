@@ -177,6 +177,7 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 		s4_set_errno (S4E_INCONS);
 		return -1;
 	}
+	g_hash_table_destroy (strings);
 
 	fclose (file);
 	return 0;
