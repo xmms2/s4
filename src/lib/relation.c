@@ -488,7 +488,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 	s4_index_t *index;
 	s4_resultset_t *ret = NULL;
 
-	s4_cond_update_key (s4, cond);
+	s4_cond_update_key (cond, s4);
 	s4_fetchspec_update_key (s4, fs);
 
 	if (s4_cond_is_filter (cond)

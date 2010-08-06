@@ -93,7 +93,7 @@ s4_result_t *s4_result_create (s4_result_t *next, const char *key, const s4_val_
 void s4_result_free (s4_result_t *res);
 
 s4_resultrow_t *s4_resultrow_create (int colcount);
-void s4_resultrow_ref (s4_resultrow_t *row);
+s4_resultrow_t *s4_resultrow_ref (s4_resultrow_t *row);
 void s4_resultrow_unref (s4_resultrow_t *row);
 
 void _free_relations (s4_t *s4);

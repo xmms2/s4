@@ -13,6 +13,7 @@
  */
 
 #include "s4_priv.h"
+#include "logging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,10 +24,11 @@ typedef enum {
 
 struct s4_condition_St {
 	s4_cond_type_t type;
+	int ref_count;
 	union {
 		struct {
 			combine_function_t func;
-			GList *operands;
+			GPtrArray *operands;
 		} combine;
 		struct {
 			filter_function_t func;
@@ -37,6 +39,7 @@ struct s4_condition_St {
 			s4_cmp_mode_t cmp_mode;
 			int flags;
 			int monotonic;
+			int const_key;
 		} filter;
 	} u;
 };
@@ -71,10 +74,10 @@ static int everything (void)
  */
 static int or_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	int ret = 1;
-	GList *i = cond->u.combine.operands;
-	for (;ret && i != NULL; i = g_list_next (i)) {
-		ret = func (i->data, check_data);
+	int i, ret = 1;
+
+	for (i = 0; ret && i < cond->u.combine.operands->len; i++) {
+		ret = func (g_ptr_array_index (cond->u.combine.operands, i), check_data);
 	}
 
 	return ret;
@@ -85,10 +88,10 @@ static int or_combiner (s4_condition_t *cond, check_function_t func, void *check
  */
 static int and_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	int ret = 0;
-	GList *i = cond->u.combine.operands;
-	for (;!ret && i != NULL; i = g_list_next (i)) {
-		ret = func (i->data, check_data);
+	int i, ret = 0;
+
+	for (i = 0; !ret && i < cond->u.combine.operands->len; i++) {
+		ret = func (g_ptr_array_index (cond->u.combine.operands, i), check_data);
 	}
 
 	return ret;
@@ -99,7 +102,7 @@ static int and_combiner (s4_condition_t *cond, check_function_t func, void *chec
  */
 static int not_combiner (s4_condition_t *cond, check_function_t func, void *check_data)
 {
-	return !func(cond->u.combine.operands->data, check_data);
+	return !func(cond->u.combine.operands->pdata[0], check_data);
 }
 
 /*
@@ -209,12 +212,13 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
  * @param operands The operands of the combiner
  * @return A new combiner
  */
-s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type, GList *operands)
+s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_COMBINER;
-	cond->u.combine.operands = operands;
+	cond->ref_count = 1;
+	cond->u.combine.operands = g_ptr_array_new_with_free_func ((GDestroyNotify)s4_cond_unref);
 	cond->u.combine.func = _get_combine_function (type);
 
 	return cond;
@@ -227,15 +231,52 @@ s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type, GList *operands)
  * @param operands The operands to the combiner
  * @return A new custom combiner
  */
-s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func, GList *operands)
+s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_COMBINER;
-	cond->u.combine.operands = operands;
+	cond->ref_count = 1;
+	cond->u.combine.operands = g_ptr_array_new_with_free_func ((GDestroyNotify)s4_cond_unref);
 	cond->u.combine.func = func;
 
 	return cond;
+}
+
+/**
+ * Adds and references an operand to a combiner condition.
+ *
+ * @param cond The condition to add to
+ * @param operand The operand to add
+ */
+void s4_cond_add_operand (s4_condition_t *cond, s4_condition_t *operand)
+{
+	if (cond->type == S4_COND_COMBINER) {
+		g_ptr_array_add (cond->u.combine.operands, s4_cond_ref (operand));
+	}
+}
+
+/**
+ * Gets an operand from a combiner condition.
+ *
+ * @param cond The condition to get the operand from
+ * @param operand The index of the operand to get
+ * @return The operand, or NULL if the index is out of bounds
+ * or cond is not a combiner condition. The reference is still
+ * held by cond, so you must not call s4_cond_unref on the
+ * returned condition.
+ */
+s4_condition_t *s4_cond_get_operand (s4_condition_t *cond, int operand)
+{
+	s4_condition_t *ret = NULL;
+
+	if (cond->type == S4_COND_COMBINER
+			&& operand >= 0
+			&& operand < cond->u.combine.operands->len) {
+		ret = g_ptr_array_index (cond->u.combine.operands, operand);
+	}
+
+	return ret;
 }
 
 /**
@@ -254,9 +295,11 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_FILTER;
-	cond->u.filter.key = key;
+	cond->ref_count = 1;
+	cond->u.filter.key = key==NULL?NULL:strdup (key);
 	cond->u.filter.flags = flags;
 	cond->u.filter.cmp_mode = cmp_mode;
+	cond->u.filter.const_key = 0;
 
 	if (sourcepref != NULL) {
 		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
@@ -290,13 +333,15 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_FILTER;
-	cond->u.filter.key = key;
+	cond->ref_count = 1;
+	cond->u.filter.key = key==NULL?NULL:strdup (key);
 	cond->u.filter.flags = flags;
 	cond->u.filter.func = func;
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
 	cond->u.filter.monotonic = 0;
 	cond->u.filter.cmp_mode = cmp_mode;
+	cond->u.filter.const_key = 0;
 
 	if (sourcepref != NULL) {
 		cond->u.filter.sp = s4_sourcepref_ref (sourcepref);
@@ -381,16 +426,45 @@ void *s4_cond_get_funcdata (s4_condition_t *cond)
 void s4_cond_free (s4_condition_t *cond)
 {
 	if (cond->type == S4_COND_COMBINER) {
-		GList *i;
-		for (i = cond->u.combine.operands; i != NULL; i = g_list_next (i))
-			s4_cond_free (i->data);
+		g_ptr_array_free (cond->u.combine.operands, TRUE);
 		free (cond);
 	} else if (cond->type == S4_COND_FILTER) {
 		if (cond->u.filter.free_func != NULL)
 			cond->u.filter.free_func (cond->u.filter.funcdata);
 		if (cond->u.filter.sp != NULL)
 			s4_sourcepref_unref (cond->u.filter.sp);
+		if (!cond->u.filter.const_key && cond->u.filter.key != NULL)
+			free ((char*)cond->u.filter.key);
 		free (cond);
+	}
+}
+
+/**
+ * Increments the reference count of a condition.
+ * @param cond The condition to reference
+ * @return The condition given
+ */
+s4_condition_t *s4_cond_ref (s4_condition_t *cond)
+{
+	if (cond != NULL)
+		cond->ref_count++;
+	return cond;
+}
+
+/**
+ * Decrements the reference count of a condition. If the reference
+ * count is 0 after this, the condition is freed.
+ * @param cond The condition to decrement the count of
+ */
+void s4_cond_unref (s4_condition_t *cond)
+{
+	if (cond->ref_count <= 0) {
+		S4_ERROR ("s4_cond_unref: ref_count <= 0");
+		return;
+	}
+	cond->ref_count--;
+	if (cond->ref_count == 0) {
+		s4_cond_free (cond);
 	}
 }
 
@@ -450,20 +524,17 @@ int s4_cond_get_cmp_mode (s4_condition_t *cond)
  * @param s4 The database to optimize for
  * @param cond The condition to update
  */
-void s4_cond_update_key (s4_t *s4, s4_condition_t *cond)
+void s4_cond_update_key (s4_condition_t *cond, s4_t *s4)
 {
 	if (cond->type == S4_COND_COMBINER) {
-		GList *i;
-		for (i = cond->u.combine.operands; i != NULL; i = g_list_next (i))
-			s4_cond_update_key (s4, i->data);
+		g_ptr_array_foreach (cond->u.combine.operands, (GFunc)s4_cond_update_key, s4);
 	} else if (cond->type == S4_COND_FILTER) {
-		cond->u.filter.key = _string_lookup (s4, cond->u.filter.key);
+		const char *new_key = _string_lookup (s4, cond->u.filter.key);
+		if (!cond->u.filter.const_key)
+			free ((void*)cond->u.filter.key);
+		cond->u.filter.key = new_key;
+		cond->u.filter.const_key = 1;
 	}
-}
-
-GList *s4_cond_get_operands (s4_condition_t *cond)
-{
-	return cond->u.combine.operands;
 }
 
 /**

@@ -14,12 +14,14 @@
 
 #include <s4.h>
 #include "s4_priv.h"
+#include "logging.h"
 #include <stdlib.h>
 #include <glib.h>
 
 struct s4_resultset_St {
 	int col_count;
 	int row_count;
+	int ref_count;
 
 	GPtrArray *results;
 };
@@ -53,10 +55,11 @@ s4_resultset_t *s4_resultset_create (int col_count)
 {
 	s4_resultset_t *ret = malloc (sizeof (s4_resultset_t));
 
+	ret->ref_count = 1;
 	ret->col_count = col_count;
 	ret->row_count = 0;
 
-	ret->results = g_ptr_array_new ();
+	ret->results = g_ptr_array_new_with_free_func ((GDestroyNotify)s4_resultrow_unref);
 
 	return ret;
 }
@@ -182,15 +185,26 @@ void s4_resultset_shuffle (const s4_resultset_t *set)
  */
 void s4_resultset_free (s4_resultset_t *set)
 {
-	int i;
-
-	for (i = 0; i < set->row_count; i++) {
-		s4_resultrow_t *row = g_ptr_array_index (set->results, i);
-		s4_resultrow_unref (row);
-	}
-
 	g_ptr_array_free (set->results, TRUE);
 	free (set);
+}
+
+s4_resultset_t *s4_resultset_ref (s4_resultset_t *set)
+{
+	if (set != NULL)
+		set->ref_count++;
+	return set;
+
+}
+void s4_resultset_unref (s4_resultset_t *set)
+{
+	if (set->ref_count <= 0) {
+		S4_ERROR ("s4_resultset_unref: ref_count <= 0");
+		return;
+	}
+	set->ref_count--;
+	if (set->ref_count == 0)
+		s4_resultset_free (set);
 }
 
 /**
@@ -247,9 +261,11 @@ int s4_resultrow_get_col (const s4_resultrow_t *row, int col_no, const s4_result
  * References a resultrow
  * @param row The row to reference
  */
-void s4_resultrow_ref (s4_resultrow_t *row)
+s4_resultrow_t *s4_resultrow_ref (s4_resultrow_t *row)
 {
-	row->refs++;
+	if (row != NULL)
+		row->refs++;
+	return row;
 }
 
 /**
@@ -258,6 +274,10 @@ void s4_resultrow_ref (s4_resultrow_t *row)
  */
 void s4_resultrow_unref (s4_resultrow_t *row)
 {
+	if (row->refs <= 0) {
+		S4_ERROR ("s4_resultrow_unref: ref_count <= 0");
+		return;
+	}
 	row->refs--;
 
 	if (row->refs <= 0) {

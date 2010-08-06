@@ -13,6 +13,7 @@
  */
 
 #include "s4_priv.h"
+#include "logging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -20,9 +21,11 @@ typedef struct {
 	const char *key;
 	s4_sourcepref_t *pref;
 	int flags;
+	int const_key;
 } fetch_data_t;
 
 struct s4_fetchspec_St {
+	int ref_count;
 	GArray *array;
 };
 
@@ -42,6 +45,8 @@ struct s4_fetchspec_St {
 s4_fetchspec_t *s4_fetchspec_create (void)
 {
 	s4_fetchspec_t *ret = malloc (sizeof (s4_fetchspec_t));
+
+	ret->ref_count = 1;
 	ret->array = g_array_new (FALSE, FALSE, sizeof (fetch_data_t));
 
 	return ret;
@@ -58,8 +63,13 @@ s4_fetchspec_t *s4_fetchspec_create (void)
 void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref, int flags)
 {
 	fetch_data_t data;
-	data.key = key;
 	data.flags = flags;
+	data.const_key = 0;
+	if (key == NULL) {
+		data.key = NULL;
+	} else {
+		data.key = strdup (key);
+	}
 	if (sourcepref != NULL) {
 		data.pref = s4_sourcepref_ref (sourcepref);
 	} else {
@@ -72,9 +82,16 @@ void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *s
 void s4_fetchspec_update_key (s4_t *s4, s4_fetchspec_t *spec)
 {
 	int i;
-	for (i = 0; i < spec->array->len; i++)
-		g_array_index (spec->array, fetch_data_t, i).key =
-			_string_lookup (s4, g_array_index (spec->array, fetch_data_t, i).key);
+	for (i = 0; i < spec->array->len; i++) {
+		fetch_data_t *data = &g_array_index (spec->array, fetch_data_t, i);
+		const char *new_key = _string_lookup (s4, data->key);
+
+		if (!data->const_key)
+			free ((void*)data->key);
+
+		data->key = new_key;
+		data->const_key = 1;
+	}
 }
 
 /**
@@ -85,13 +102,44 @@ void s4_fetchspec_free (s4_fetchspec_t *spec)
 {
 	int i;
 	for (i = 0; i < spec->array->len; i++) {
-		s4_sourcepref_t *sp = g_array_index (spec->array, fetch_data_t, i).pref;
-		if (sp != NULL) {
-			s4_sourcepref_unref (sp);
+		fetch_data_t *data = &g_array_index (spec->array, fetch_data_t, i);
+		if (data->pref != NULL) {
+			s4_sourcepref_unref (data->pref);
+		}
+		if (data->key != NULL && !data->const_key) {
+			free ((void*)data->key);
 		}
 	}
 	g_array_free (spec->array, TRUE);
 	free (spec);
+}
+
+/*
+ * Increments the reference count of a fetch specification
+ * @param spec The spec to increment the count of
+ * @return The specification
+ */
+s4_fetchspec_t *s4_fetchspec_ref (s4_fetchspec_t *spec)
+{
+	if (spec != NULL)
+		spec->ref_count++;
+	return spec;
+}
+
+/*
+ * Decrements the reference count of the spec. If the count reaches zero
+ * the spec is freed.
+ * @param spec The spec to decrement the count of
+ */
+void s4_fetchspec_unref (s4_fetchspec_t *spec)
+{
+	if (spec->ref_count <= 0) {
+		S4_ERROR ("s4_fetchspec_unref: refcount <= 0");
+	}
+	spec->ref_count--;
+	if (spec->ref_count == 0) {
+		s4_fetchspec_free (spec);
+	}
 }
 
 /**

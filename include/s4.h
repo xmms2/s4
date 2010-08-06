@@ -15,7 +15,6 @@
 #ifndef _S4_H
 #define _S4_H
 
-#include <glib.h>
 #include <stdint.h>
 
 /* Flags */
@@ -113,8 +112,10 @@ typedef int (*filter_function_t)(const s4_val_t *value, s4_condition_t* data);
 typedef int (*combine_function_t)(s4_condition_t *cond, check_function_t func, void *check_data);
 typedef void (*free_func_t)(void*);
 
-s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type, GList *operands);
-s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func, GList *operands);
+s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type);
+s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func);
+void s4_cond_add_operand (s4_condition_t *cond, s4_condition_t *op);
+s4_condition_t *s4_cond_get_operand (s4_condition_t *cond, int op);
 
 s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
 		s4_val_t *value, s4_sourcepref_t *sourcepref, s4_cmp_mode_t mode, int flags);
@@ -130,11 +131,12 @@ const char *s4_cond_get_key (s4_condition_t *cond);
 s4_sourcepref_t *s4_cond_get_sourcepref (s4_condition_t *cond);
 int s4_cond_is_monotonic (s4_condition_t *cond);
 void *s4_cond_get_funcdata (s4_condition_t *cond);
-GList *s4_cond_get_operands (s4_condition_t *cond);
-void s4_cond_update_key (s4_t *s4, s4_condition_t *cond);
+void s4_cond_update_key (s4_condition_t *cond, s4_t *s4);
 int s4_cond_get_cmp_mode (s4_condition_t *cond);
 
 void s4_cond_free (s4_condition_t *cond);
+s4_condition_t *s4_cond_ref (s4_condition_t *cond);
+void s4_cond_unref (s4_condition_t *cond);
 filter_function_t s4_cond_get_filter_function (s4_condition_t *cond);
 combine_function_t s4_cond_get_combine_function (s4_condition_t *cond);
 
@@ -146,6 +148,8 @@ typedef struct s4_fetchspec_St s4_fetchspec_t;
 s4_fetchspec_t *s4_fetchspec_create (void);
 void s4_fetchspec_add (s4_fetchspec_t *spec, const char *key, s4_sourcepref_t *sourcepref, int flags);
 void s4_fetchspec_free (s4_fetchspec_t *spec);
+s4_fetchspec_t *s4_fetchspec_ref (s4_fetchspec_t *spec);
+void s4_fetchspec_unref (s4_fetchspec_t *spec);
 int s4_fetchspec_size (s4_fetchspec_t *spec);
 const char *s4_fetchspec_get_key (s4_fetchspec_t *spec, int index);
 s4_sourcepref_t *s4_fetchspec_get_sourcepref (s4_fetchspec_t *spec, int index);
@@ -174,6 +178,8 @@ const s4_result_t *s4_resultset_get_result (const s4_resultset_t *set, int row, 
 int s4_resultset_get_colcount (const s4_resultset_t *set);
 int s4_resultset_get_rowcount (const s4_resultset_t *set);
 void s4_resultset_free (s4_resultset_t *set);
+s4_resultset_t *s4_resultset_ref (s4_resultset_t *set);
+void s4_resultset_unref (s4_resultset_t *set);
 void s4_resultset_sort (const s4_resultset_t *set, const int *order);
 void s4_resultset_shuffle (const s4_resultset_t *set);
 
