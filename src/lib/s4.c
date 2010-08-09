@@ -313,7 +313,7 @@ static int _write_file (s4_t *s4, const char *filename)
 	for (j = 0; j < 16; j++) {
 		hdr.uuid[j] = s4->uuid[j];
 	}
-	hdr.last_checkpoint = s4->last_checkpoint;
+	hdr.last_checkpoint = s4->last_synced;
 
 	fwrite (&hdr, sizeof (s4_header_t), 1, file);
 	_write_strings (sd.strings, file);
