@@ -332,15 +332,18 @@ static void *_sync_thread (s4_t *s4)
 {
 	char *tmpfile = g_strconcat (s4->filename, ".chkpnt", NULL);
 	g_mutex_lock (s4->log_lock);
-	while (s4->sync_thread_run) {
-		g_cond_wait (s4->sync_cond, s4->log_lock);
+	while (s4->sync_thread_run || s4->last_checkpoint < s4->last_logpoint) {
+		if (s4->sync_thread_run)
+			g_cond_wait (s4->sync_cond, s4->log_lock);
 		s4->last_synced = s4->last_logpoint;
 		g_mutex_unlock (s4->log_lock);
 
 		if (_write_file (s4, tmpfile)) {
 			S4_ERROR ("sync thread could not write file");
+			g_remove (tmpfile);
+		} else {
+			g_rename (tmpfile, s4->filename);
 		}
-		g_rename (tmpfile, s4->filename);
 
 		g_mutex_lock (s4->log_lock);
 		s4->last_checkpoint = s4->last_synced;
