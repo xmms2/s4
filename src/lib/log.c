@@ -215,7 +215,7 @@ static int _log_redo (s4_t *s4, FILE *logfile)
 	while (fread (&hdr, sizeof (struct log_header), 1, logfile) == 1
 			&& (hdr.type == LOG_ENTRY_ADD
 				|| hdr.type == LOG_ENTRY_DEL
-				|| hdr.type != LOG_ENTRY_WRAP)
+				|| hdr.type == LOG_ENTRY_WRAP)
 			&& hdr.num == (expected = pos + round * LOG_SIZE)) {
 
 		if (hdr.type == LOG_ENTRY_WRAP) {
@@ -248,6 +248,7 @@ static int _log_redo (s4_t *s4, FILE *logfile)
 		}
 	}
 
+	fseek (logfile, -sizeof (struct log_header), SEEK_CUR);
 	s4->last_logpoint = expected;
 
 	return 0;
