@@ -10,9 +10,6 @@
 
 typedef struct list_St list_t;
 
-extern int yylex (void);
-extern void init_lexer (char *lines[], int line_count);
-
 static void yyerror (const char *);
 static void print_value (const s4_val_t *value, int newline);
 static void print_list (list_t *list);
@@ -28,7 +25,10 @@ static GList *result_to_list (GList *prev, const s4_result_t *res);
 static GList *rows_to_list (const s4_resultset_t *set, int col);
 static GList *cols_to_list (const s4_resultset_t *set, int row);
 static GList *set_to_list (const s4_resultset_t *set);
-static void add_or_del (int (*func)(), list_t *a, list_t *b);
+static void add_or_del (int (*func)(s4_t *s4, const char *,
+									const s4_val_t*, const char *,
+									const s4_val_t*, const char *),
+						list_t *list_a, list_t *list_b);
 static void set_var (const char *key, const char *val);
 static const char *get_var (const char *key);
 static void print_set_var (const char *key);
@@ -57,6 +57,9 @@ struct list_St {
 
 %code provides {
 #define MAX_LINE_COUNT 128
+
+void init_lexer (char *lines[], int line_count);
+int yylex (void);
 }
 
 %union {
@@ -585,7 +588,10 @@ GList *set_to_list (const s4_resultset_t *set)
 	return ret;
 }
 
-void add_or_del (int (*func)(), list_t *list_a, list_t *list_b)
+static void add_or_del (int (*func)(s4_t *s4, const char *,
+									const s4_val_t*, const char *,
+									const s4_val_t*, const char *),
+						list_t *list_a, list_t *list_b)
 {
 	list_data_t *da, *db;
 	GList *a, *b;
@@ -663,12 +669,14 @@ static void strip (char *line)
 
 static char *rl_get_line (int first)
 {
-	char *ret = "";
+	char *ret = NULL;
 
-	while (ret != NULL && !strlen (ret)) {
+	do {
+		if (ret != NULL)
+			free (ret);
 		ret = readline (first?"s4> ":"..> ");
 		strip (ret);
-	}
+	} while (ret != NULL && !strlen (ret));
 
 	add_history (ret);
 
