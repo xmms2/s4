@@ -31,6 +31,9 @@ INT [0-9]+
 \.set return SET;
 \.help|\.h|\.\? return HELP;
 \.exit|\.e return EXIT;
+\<= return LE_EQ;
+\>= return GR_EQ;
+!= return NOT_EQ;
 {INT} yylval.number = atoi (yytext); return INT;
 {STRING} yylval.string = strdup (yytext); return STRING;
 {QUOTED_STRING} yylval.string = process_string (yytext + 1); return QUOTED_STRING;

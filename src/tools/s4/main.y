@@ -77,7 +77,7 @@ int yylex (void);
 
 %token <string> STRING QUOTED_STRING COND_VAR LIST_VAR RESULT_VAR FETCH_VAR
 %token <number> INT
-%token INFO QUERY ADD DEL VARS SET HELP EXIT
+%token INFO QUERY ADD DEL VARS SET HELP EXIT GR_EQ LE_EQ NOT_EQ
 
 %type <value> value
 %type <condition> cond
@@ -267,6 +267,10 @@ filter_type: '=' { $$ =  S4_FILTER_EQUAL; }
 		   | '~' { $$ =  S4_FILTER_MATCH; }
 		   | '<' { $$ =  S4_FILTER_SMALLER; }
 		   | '>' { $$ =  S4_FILTER_GREATER; }
+		   | '^' { $$ =  S4_FILTER_TOKEN; }
+		   | LE_EQ { $$ =  S4_FILTER_SMALLEREQ; }
+		   | GR_EQ { $$ =  S4_FILTER_GREATEREQ; }
+		   | NOT_EQ { $$ =  S4_FILTER_NOTEQUAL; }
 		   ;
 
 cond: COND_VAR
@@ -473,10 +477,18 @@ void print_help (void)
 			"key ~ value           - Matches all entries where key matches value\n"
 			"key < value           - Matches all entries where key is smaller than value\n"
 			"key > value           - Matches all entries where key is greater than value\n"
+			"key ^ token           - Matches all entries where key has a token equal to token\n"
+			"key != value          - Matches all entries where key does not equal value\n"
+			"key <= value          - Matches all entries where key is smaller or equal to value\n"
+			"key >= value          - Matches all entries where key is greater or equal to value\n"
 			"= value               - Matches all entries where one or more keys equals value\n"
 			"~ value               - Matches all entries where one or more keys matches value\n"
 			"< value               - Matches all entries where one or more keys is smaller than value\n"
 			"> value               - Matches all entries where one or more keys is greater than value\n"
+			"^ token               - Matches all entries where one or more keys has token\n"
+			"!= value              - Matches all entries where one or more keys does not equal value\n"
+			"<= value              - Matches all entries where one or more keys is smaller or equal to value\n"
+			">= value              - Matches all entries where one or more keys is greater or equal to value\n"
 			"+key                  - Matches all entries that has key\n"
 			"+                     - Matches everything\n"
 			"!cond                 - Matches everything cond does not match\n"
