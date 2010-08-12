@@ -482,6 +482,11 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 	s4->sync_thread_run = 1;
 	s4->sync_thread = g_thread_create ((GThreadFunc)_sync_thread, s4, TRUE, NULL);
 
+	/* Write the file right away in case we have opened a new file
+	 * or we redid something in the log that was not in the file
+	 */
+	g_cond_signal (s4->sync_cond);
+
 	return s4;
 }
 
