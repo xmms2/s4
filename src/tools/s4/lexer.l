@@ -16,19 +16,18 @@ int cur_line, cur_col, buffer_line_count;
 	yylloc.last_column = cur_col;}
 %}
 
-STRING_CHAR [[:alnum:]]
-STRING [[:alnum:]][[:alnum:]_]*
 QUOTED_STRING \"([^\\\"]|\\\"|\\[^x]|\\x[a-fA-F0-9]{2})*\"
 INT [0-9]+
+STRING [[:alnum:]\*][[:alnum:]\*\?\/_]*
 
 %%
 
-\.add|\.a return ADD; 
+\.add|\.a return ADD;
 \.del|\.d return DEL;
 \.info|\.i return INFO;
 \.query|\.q return QUERY;
 \.vars|\.v return VARS;
-\.set return SET;
+\.set|\.s return SET;
 \.help|\.h|\.\? return HELP;
 \.exit|\.e return EXIT;
 \<= return LE_EQ;
@@ -41,6 +40,7 @@ INT [0-9]+
 \@{STRING} yylval.string = strdup (yytext + 1); return RESULT_VAR;
 \${STRING} yylval.string = strdup (yytext + 1); return LIST_VAR;
 \%{STRING} yylval.string = strdup (yytext + 1); return FETCH_VAR;
+\#{STRING} yylval.string = strdup (yytext + 1); return PREF_VAR;
 [[:space:]]+
 . return yytext[0];
 

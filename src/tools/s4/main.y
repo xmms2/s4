@@ -34,7 +34,7 @@ static const char *get_var (const char *key);
 static void print_set_var (const char *key);
 static void cleanup (void);
 
-GHashTable *cond_table, *res_table, *list_table, *fetch_table;
+GHashTable *cond_table, *res_table, *list_table, *fetch_table, *pref_table;
 char **lines;
 s4_t *s4;
 
@@ -70,24 +70,27 @@ int yylex (void);
 	s4_filter_type_t filter_type;
 	s4_resultset_t *result;
 	s4_fetchspec_t *fetch;
+	s4_sourcepref_t *sourcepref;
 	struct list_St *list;
 	list_data_t *list_data;
-	GList *list_datas;
+	GList *list_datas, *sourcepref_list;
 }
 
-%token <string> STRING QUOTED_STRING COND_VAR LIST_VAR RESULT_VAR FETCH_VAR
+%token <string> STRING QUOTED_STRING COND_VAR LIST_VAR RESULT_VAR FETCH_VAR PREF_VAR
 %token <number> INT
 %token INFO QUERY ADD DEL VARS SET HELP EXIT GR_EQ LE_EQ NOT_EQ
 
 %type <value> value
 %type <condition> cond
-%type <string> string
+%type <string> string fetch_key
 %type <filter_type> filter_type
 %type <result> result
-%type <fetch> fetch fetch_list
+%type <fetch> fetch fetch_list fetch_item
 %type <list> list
 %type <list_datas> list_datas
 %type <list_data> list_data
+%type <sourcepref_list> pref_data
+%type <sourcepref> pref pref_or_not
 
 %destructor { free ($$); } <string>
 %destructor { s4_val_free ($$); } <value>
@@ -97,6 +100,8 @@ int yylex (void);
 %destructor { free ($$); } <list_data>
 %destructor { unref_list (create_list ($$)); } <list_datas>
 %destructor { unref_list ($$); } <list>
+%destructor { s4_sourcepref_unref ($$); } <sourcepref>
+%destructor { for (; $$ != NULL; $$ = g_list_delete_link ($$, $$)) free ($$->data); } <sourcepref_list>
 
 %error-verbose
 %locations
@@ -125,6 +130,7 @@ command: /* Empty */
 	   | COND_VAR '=' cond { g_hash_table_insert (cond_table, $1, $3); }
 	   | LIST_VAR '=' list { g_hash_table_insert (list_table, $1, $3); }
 	   | FETCH_VAR '=' fetch_list { g_hash_table_insert (fetch_table, $1, $3); }
+	   | PREF_VAR '=' pref { g_hash_table_insert (pref_table, $1, $3); }
 	   | RESULT_VAR '=' result { g_hash_table_insert (res_table, $1, $3); }
 	   ;
 
@@ -137,6 +143,38 @@ add: ADD list ',' list { add_or_del (s4_add, $2, $4); unref_list ($2); unref_lis
 
 del: DEL list ',' list { add_or_del (s4_del, $2, $4); unref_list ($2); unref_list ($4); }
    ;
+
+pref_data: string { $$ = g_list_prepend (NULL, $1); }
+		 | pref_data ':' string { $$ = g_list_prepend ($1, $3); }
+
+pref: PREF_VAR
+	{
+		$$ = g_hash_table_lookup (pref_table, $1);
+		free ($1);
+		if ($$ == NULL) {
+			yyerror ("Undefined source preference variable");
+			YYERROR;
+		}
+		s4_sourcepref_ref ($$);
+	}
+	| ':' pref_data
+	{
+		int i, len = g_list_length ($2);
+		char **sources = malloc (sizeof (char*) * (len + 1));
+
+		$2 = g_list_reverse ($2);
+
+		for (i = 0; $2 != NULL; $2 = g_list_delete_link ($2, $2), i++) {
+			sources[i] = $2->data;
+		}
+		sources[len] = NULL;
+
+		$$ = s4_sourcepref_create ((const char **)sources);
+		for (i = 0; i < len; i++) {
+			free (sources[i]);
+		}
+		free (sources);
+	}
 
 list_data: string value string
 		 {
@@ -192,23 +230,22 @@ list: LIST_VAR
 	}
 	;
 
+fetch_key: string
+		 | '_' { $$ = NULL; }
 
-fetch: string
-	 {
-		 $$ = s4_fetchspec_create ();
-		 s4_fetchspec_add ($$, $1, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
-	 }
-	 | '_'
-	 {
-		 $$ = s4_fetchspec_create ();
-		 s4_fetchspec_add ($$, NULL, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
-	 }
-	 | fetch ',' '_'
-	 {
-		 $$ = $1;
-		 s4_fetchspec_add ($$, NULL, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
-	 }
-	 | fetch ',' string
+fetch_item: fetch_key pref_or_not
+		  {
+			  $$ = s4_fetchspec_create ();
+			  s4_fetchspec_add ($$, $1, $2, S4_FETCH_PARENT | S4_FETCH_DATA);
+			  if ($2 != NULL)
+				  s4_sourcepref_unref ($2);
+			  if ($1 != NULL)
+				  free ($1);
+		  }
+		  ;
+
+fetch: fetch_item
+	 | fetch ',' fetch_key
 	 {
 		 $$ = $1;
 		 s4_fetchspec_add ($$, $3, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
@@ -225,16 +262,7 @@ fetch_list: '[' fetch ']' { $$ = $2; }
 				  YYERROR;
 			  }
 		  }
-		  | '_'
-		  {
-			  $$ = s4_fetchspec_create ();
-			  s4_fetchspec_add ($$, NULL, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
-		  }
-		  | string
-		  {
-			  $$ = s4_fetchspec_create ();
-			  s4_fetchspec_add ($$, $1, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
-		  }
+		  | fetch_item
 		  ;
 
 result: RESULT_VAR
@@ -273,6 +301,10 @@ filter_type: '=' { $$ =  S4_FILTER_EQUAL; }
 		   | NOT_EQ { $$ =  S4_FILTER_NOTEQUAL; }
 		   ;
 
+pref_or_not: pref
+		   | /* Nothing */ { $$ = NULL; }
+		   ;
+
 cond: COND_VAR
 	{
 		$$ = s4_cond_ref (g_hash_table_lookup (cond_table, $1));
@@ -308,23 +340,31 @@ cond: COND_VAR
 		s4_cond_add_operand ($$, $2);
 		s4_cond_unref ($2);
 	}
-	| STRING filter_type value
+	| string filter_type value pref_or_not
 	{
-		$$ = s4_cond_new_filter ($2, $1, $3, NULL, S4_CMP_CASELESS, 0);
+		$$ = s4_cond_new_filter ($2, $1, $3, $4, S4_CMP_CASELESS, 0);
 		s4_val_free ($3);
+		if ($4 != NULL)
+			s4_sourcepref_unref ($4);
 	}
-	| filter_type value
+	| filter_type value pref_or_not
 	{
-		$$ = s4_cond_new_filter ($1, NULL, $2, NULL, S4_CMP_CASELESS, 0);
+		$$ = s4_cond_new_filter ($1, NULL, $2, $3, S4_CMP_CASELESS, 0);
 		s4_val_free ($2);
+		if ($3 != NULL)
+			s4_sourcepref_unref ($3);
 	}
-	| '+' STRING
+	| '+' string pref_or_not
 	{
-		$$ = s4_cond_new_filter (S4_FILTER_EXISTS, $2, NULL, NULL, S4_CMP_BINARY, 0);
+		$$ = s4_cond_new_filter (S4_FILTER_EXISTS, $2, NULL, $3, S4_CMP_BINARY, 0);
+		if ($3 != NULL)
+			s4_sourcepref_unref ($3);
 	}
-	| '+'
+	| '+' pref_or_not
 	{
-		$$ = s4_cond_new_filter (S4_FILTER_EXISTS, NULL, NULL, NULL, S4_CMP_BINARY, 0);
+		$$ = s4_cond_new_filter (S4_FILTER_EXISTS, NULL, NULL, $2, S4_CMP_BINARY, 0);
+		if ($2 != NULL)
+			s4_sourcepref_unref ($2);
 	}
 	;
 
@@ -470,9 +510,14 @@ void print_help (void)
 			"?var = <cond>         - Assigns cond to the condition variable var\n"
 			"%%var = <fetch>        - Assigns fetch to the fetch variable var\n"
 			"@var = <result>       - Assigns var to something returning result\n"
-			"$var = <list>         - Assigns the list to the list variable var\n\n"
+			"$var = <list>         - Assigns the list to the list variable var\n"
+			"#var = <pref>         - Assigns the pref to the souce preference variable var\n\n"
 			"Conditions (<cond>):\n"
 			"?var                  - Returns the condition bound to var\n"
+			"!cond                 - Matches everything cond does not match\n"
+			"cond1 & cond2         - Matches if both cond1 and cond2 matches\n"
+			"cond1 | cond2         - Matches if cond1 or cond2 matches\n\n"
+			"Filter conditions\n"
 			"key = value           - Matches all entries where key equals value\n"
 			"key ~ value           - Matches all entries where key matches value\n"
 			"key < value           - Matches all entries where key is smaller than value\n"
@@ -491,13 +536,14 @@ void print_help (void)
 			">= value              - Matches all entries where one or more keys is greater or equal to value\n"
 			"+key                  - Matches all entries that has key\n"
 			"+                     - Matches everything\n"
-			"!cond                 - Matches everything cond does not match\n"
-			"cond1 & cond2         - Matches if both cond1 and cond2 matches\n"
-			"cond1 | cond2         - Matches if cond1 or cond2 matches\n\n"
+			"<pref> may be added after all filter conditions to use a source preference to only match\n"
+			"against the highest priority source in the source preference\n\n"
 			"Fetch specification (<fetch>):\n"
 			"%%var                  - Returns the fetch spec bound to var\n"
-			"[key1, .., keyn]      - Fetches keys 1 through n from matching entries\n"
+			"[key1, ..., keyn]      - Fetches keys 1 through n from matching entries\n"
+			"[key1 <pref>,...]     - Fetches key1 using the source preference given\n"
 			"key                   - Fetches key from matching entries\n"
+			"key <pref>            - Fetches key using the source preference given\n"
 			"_                     - Fetches everything from matching entries\n\n"
 			"Results (<result>):\n"
 			".query <fetch> <cond> - Queries the database, returns a result\n\n"
@@ -507,7 +553,20 @@ void print_help (void)
 			"<result>[row, col]    - Returns the list at (row,col). If either row\n"
 			"                        or col is _, it will take all rows or cols\n"
 			"[key val src, ...]    - Creates a list\n"
-			"[key val, ...]        - Creates a list where source is set to default_source\n"
+			"[key val, ...]        - Creates a list where source is set to default_source\n\n"
+			"Source preferences (<pref>):\n"
+			"#var                  - Returns the source preference bound to var\n"
+			":src1:src2:...:srcn   - Creates a new source preference where src1 has the highest priority,\n"
+			"                        src2 seconds highest and so on\n\n"
+			"Shorthand:\n"
+			".q = .query\n"
+			".a = .add\n"
+			".d = .del\n"
+			".v = .vars\n"
+			".h = .help\n"
+			".? = .help\n"
+			".s = .set\n"
+			".e = .exit\n"
 			);
 }
 
@@ -744,6 +803,8 @@ int main(int argc, const char *argv[])
 		free, (GDestroyNotify)s4_resultset_free);
 	fetch_table = g_hash_table_new_full (g_str_hash, g_str_equal,
 		free, (GDestroyNotify)s4_fetchspec_unref);
+	pref_table = g_hash_table_new_full (g_str_hash, g_str_equal,
+		free, (GDestroyNotify)s4_sourcepref_unref);
 
 	g_thread_init (NULL);
 
