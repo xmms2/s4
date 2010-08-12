@@ -16,6 +16,7 @@
 #include "logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 typedef enum {
 	S4_COND_COMBINER,
@@ -129,12 +130,36 @@ static int equal_filter (const s4_val_t *value, s4_condition_t *cond)
 	return s4_val_cmp (value, d, cond->u.filter.cmp_mode);
 }
 /*
+ * A filter that checks if the given and checked value are different
+ */
+static int notequal_filter (const s4_val_t *value, s4_condition_t *cond)
+{
+	s4_val_t *d = cond->u.filter.funcdata;
+	return !s4_val_cmp (value, d, cond->u.filter.cmp_mode);
+}
+/*
  * A filter that checks if the checked value is greater than the given value
  */
 static int greater_filter (const s4_val_t *value, s4_condition_t* cond)
 {
 	s4_val_t *d = cond->u.filter.funcdata;
 	return -(s4_val_cmp (value, d, cond->u.filter.cmp_mode) <= 0);
+}
+/*
+ * A filter that checks if the checked value is smaller or equal than the given value
+ */
+static int smallereq_filter (const s4_val_t *value, s4_condition_t *cond)
+{
+	s4_val_t *d = cond->u.filter.funcdata;
+	return s4_val_cmp (value, d, cond->u.filter.cmp_mode) > 0;
+}
+/*
+ * A filter that checks if the checked value is greater or equal than the given value
+ */
+static int greatereq_filter (const s4_val_t *value, s4_condition_t* cond)
+{
+	s4_val_t *d = cond->u.filter.funcdata;
+	return -(s4_val_cmp (value, d, cond->u.filter.cmp_mode) < 0);
 }
 /*
  * A filter that checks if the checked value is smaller than the given value
@@ -154,6 +179,54 @@ static int match_filter (const s4_val_t *value, s4_condition_t *cond)
 	return !s4_pattern_match (p, value);
 }
 
+/* A token filter. Checks if the passed value contains a token */
+static int token_filter (const s4_val_t *value, s4_condition_t *cond)
+{
+	const char *token = cond->u.filter.funcdata;
+	const char *s;
+	int32_t i;
+	s4_cmp_mode_t mode = cond->u.filter.cmp_mode;
+
+	if ((mode == S4_CMP_CASELESS && s4_val_get_casefolded_str (value, &s)) ||
+			s4_val_get_str (value, &s)) {
+		while (*s) {
+			/* Skip whitespaces */
+			for (; isspace (*s); s++);
+
+			/* Compare token */
+			for (i = 0; *s && *s == token[i] && token[i] != '*'; i++, s++);
+
+			/* Check if it matched */
+			if (token[i] == '*' || (!token[i] && (isspace (*s) || !*s))) {
+				return 0;
+			}
+
+			/* Eat the rest of the token */
+			for (; *s && !isspace (*s); s++);
+		}
+	} else if (s4_val_get_int (value, &i)) {
+		char *end;
+		int32_t j = strtol (token, &end, 10);
+
+		if (end != token) {
+			/* If the token is just a number we have to have an exact match */
+			if (*end == '\0' && j == i) {
+				return 0;
+			/* If the character after the last digit is a star we have to
+			 * shift the number until it has the right number of digits
+			 */
+			} else if (*end == '*') {
+				for (; i > j; i /= 10);
+				if (i == j) {
+					return 0;
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
 /*
  * Sets the correct function and function data based on filter type
  */
@@ -166,6 +239,12 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 			cond->u.filter.free_func = (free_func_t)s4_val_free;
 			cond->u.filter.monotonic = 1;
 			break;
+		case S4_FILTER_NOTEQUAL:
+			cond->u.filter.func = notequal_filter;
+			cond->u.filter.funcdata = s4_val_copy (val);
+			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.monotonic = 0;
+			break;
 		case S4_FILTER_GREATER:
 			cond->u.filter.func = greater_filter;
 			cond->u.filter.funcdata = s4_val_copy (val);
@@ -174,6 +253,18 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 			break;
 		case S4_FILTER_SMALLER:
 			cond->u.filter.func = smaller_filter;
+			cond->u.filter.funcdata = s4_val_copy (val);
+			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.monotonic = 1;
+			break;
+		case S4_FILTER_GREATEREQ:
+			cond->u.filter.func = greatereq_filter;
+			cond->u.filter.funcdata = s4_val_copy (val);
+			cond->u.filter.free_func = (free_func_t)s4_val_free;
+			cond->u.filter.monotonic = 1;
+			break;
+		case S4_FILTER_SMALLEREQ:
+			cond->u.filter.func = smallereq_filter;
 			cond->u.filter.funcdata = s4_val_copy (val);
 			cond->u.filter.free_func = (free_func_t)s4_val_free;
 			cond->u.filter.monotonic = 1;
@@ -201,6 +292,25 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 			cond->u.filter.funcdata = NULL;
 			cond->u.filter.free_func = NULL;
 			cond->u.filter.monotonic = 1;
+			break;
+		case S4_FILTER_TOKEN:
+			{
+				const char *str;
+				char *s;
+				int32_t i;
+
+				if (s4_val_get_str (val, &str)) {
+					s = g_strdup (str);
+				} else {
+					s4_val_get_int (val, &i);
+					s = g_strdup_printf ("%i", i);
+				}
+
+				cond->u.filter.func = token_filter;
+				cond->u.filter.funcdata = s;
+				cond->u.filter.free_func = (free_func_t)g_free;
+				cond->u.filter.monotonic = 0;
+			}
 			break;
 	}
 }

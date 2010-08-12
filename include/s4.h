@@ -89,10 +89,14 @@ int s4_sourcepref_get_priority (s4_sourcepref_t *sp, const char *src);
 /* cond.c */
 typedef enum {
 	S4_FILTER_EQUAL,
+	S4_FILTER_NOTEQUAL,
 	S4_FILTER_GREATER,
 	S4_FILTER_SMALLER,
+	S4_FILTER_GREATEREQ,
+	S4_FILTER_SMALLEREQ,
 	S4_FILTER_MATCH,
-	S4_FILTER_EXISTS
+	S4_FILTER_EXISTS,
+	S4_FILTER_TOKEN
 } s4_filter_type_t;
 
 typedef enum {
