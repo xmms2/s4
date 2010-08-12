@@ -396,8 +396,9 @@ static int _check_cond (s4_condition_t *cond, void *d)
 						best_src = src;
 					}
 				}
-				for (i = start; best_src != INT_MAX && i < l->size && ret && l->data[i].key == key; i++) {
-					if (s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
+				for (i = start; i < l->size && ret && l->data[i].key == key; i++) {
+					if (best_src < INT_MAX &&
+							s4_sourcepref_get_priority (sp, l->data[i].src) == best_src) {
 						ret = s4_cond_get_filter_function (cond)(l->data[i].val, cond);
 					}
 				}
@@ -454,7 +455,8 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
 					}
 				}
 				for (f = start; f < l->size && l->data[f].key == fkey; f++) {
-					if (s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
+					if (best_src < INT_MAX &&
+							s4_sourcepref_get_priority (sp, l->data[f].src) == best_src) {
 						result = s4_result_create (result, l->data[f].key,
 								l->data[f].val, l->data[f].src);
 					}
