@@ -18,14 +18,8 @@
 #include <stdint.h>
 
 /* Flags */
-#define S4_RECOVER          1 << 0
-#define S4_VERIFY           1 << 1
-#define S4_VERIFY_THOROUGH  1 << 2
-#define S4_VERIFY_REFCOUNT  1 << 3
-#define S4_VERIFY_MASK      (S4_VERIFY_THOROUGH | S4_VERIFY_REFCOUNT)
-#define S4_NEW              1 << 4
-#define S4_EXISTS           1 << 5
-#define S4_SYNC_THREAD      1 << 6
+#define S4_NEW              1 << 0
+#define S4_EXISTS           1 << 1
 
 /**
  * Error codes
@@ -69,8 +63,6 @@ int s4_val_cmp (const s4_val_t *v1, const s4_val_t *v2, s4_cmp_mode_t mode);
 /* s4.c */
 s4_t *s4_open (const char *name, const char **indices, int flags);
 int s4_close (s4_t *s4);
-int s4_verify (s4_t *s4, int flags);
-int s4_recover (s4_t *s4, const char *name);
 void s4_sync (s4_t *s4);
 s4_errno_t s4_errno (void);
 
