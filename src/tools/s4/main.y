@@ -123,7 +123,7 @@ input: command ';'
 	 ;
 
 command: /* Empty */
-	   | cond { print_cond ($1); s4_cond_unref ($1); }
+	   | cond { print_cond ($1); printf ("\n"); s4_cond_unref ($1); }
 	   | list { print_list ($1); unref_list ($1); }
 	   | result { print_result ($1); s4_resultset_unref ($1); }
 	   | fetch_list { print_fetch ($1); s4_fetchspec_unref ($1); }
@@ -430,7 +430,56 @@ void print_result (const s4_resultset_t *set)
 
 void print_cond (s4_condition_t *cond)
 {
-	printf ("TODO: Implement\n");
+	int i;
+	const char *operation;
+	s4_condition_t *operand;
+
+	if (s4_cond_is_filter (cond)) {
+		switch (s4_cond_get_filter_type (cond)) {
+		case S4_FILTER_EQUAL: operation = "="; break;
+		case S4_FILTER_NOTEQUAL: operation = "!="; break;
+		case S4_FILTER_SMALLER: operation = "<"; break;
+		case S4_FILTER_GREATER: operation = ">"; break;
+		case S4_FILTER_SMALLEREQ: operation = "<="; break;
+		case S4_FILTER_GREATEREQ: operation = ">="; break;
+		case S4_FILTER_MATCH: operation = "~"; break;
+		case S4_FILTER_EXISTS: operation = "+"; break;
+		case S4_FILTER_TOKEN: operation = "^"; break;
+		default: operation = "unknown filter"; break;
+		}
+		if (s4_cond_get_key (cond) != NULL) {
+			printf ("%s %s", s4_cond_get_key (cond), operation);
+		} else {
+			printf ("%s", operation);
+		}
+		if (s4_cond_get_filter_type (cond) == S4_FILTER_MATCH) {
+			printf (" pattern");
+		} else if (s4_cond_get_filter_type (cond) == S4_FILTER_TOKEN) {
+			printf (" %s", (const char *)s4_cond_get_funcdata (cond));
+		} else if (s4_cond_get_filter_type (cond) != S4_FILTER_EXISTS) {
+			printf (" ");
+			print_value (s4_cond_get_funcdata (cond), 0);
+		}
+	} else {
+		switch (s4_cond_get_combiner_type (cond)) {
+		case S4_COMBINE_AND: operation = "&"; break;
+		case S4_COMBINE_NOT: operation = "!"; break;
+		case S4_COMBINE_OR: operation = "|"; break;
+		default: operation = "unknown combiner"; break;
+		}
+
+		if (s4_cond_get_combiner_type (cond) == S4_COMBINE_NOT) {
+			printf ("!(");
+		} else {
+			printf ("(");
+		}
+		for (i = 0; (operand = s4_cond_get_operand (cond, i)) != NULL; i++) {
+			if (i != 0)
+				printf (") %s (", operation);
+			print_cond (operand);
+		}
+		printf (")");
+	}
 }
 
 void print_value (const s4_val_t *val, int newline)
@@ -469,6 +518,7 @@ void print_vars ()
 	while (g_hash_table_iter_next (&iter, (void**)&str, &val)) {
 		printf ("%s: ", str);
 		print_cond (val);
+		printf ("\n");
 	}
 
 	g_hash_table_iter_init (&iter, fetch_table);
