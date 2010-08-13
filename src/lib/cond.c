@@ -28,10 +28,12 @@ struct s4_condition_St {
 	int ref_count;
 	union {
 		struct {
+			s4_combine_type_t type;
 			combine_function_t func;
 			GPtrArray *operands;
 		} combine;
 		struct {
+			s4_filter_type_t type;
 			filter_function_t func;
 			void *funcdata;
 			free_func_t free_func;
@@ -117,6 +119,8 @@ static combine_function_t _get_combine_function (s4_combine_type_t type) {
 			return and_combiner;
 		case S4_COMBINE_NOT:
 			return not_combiner;
+		default:
+			break;
 	}
 	return (combine_function_t)never;
 }
@@ -312,6 +316,12 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 				cond->u.filter.monotonic = 0;
 			}
 			break;
+		default: /* Unknown filter type */
+			cond->u.filter.func = (filter_function_t)never;
+			cond->u.filter.funcdata = NULL;
+			cond->u.filter.free_func = NULL;
+			cond->u.filter.monotonic = 0;
+			break;
 	}
 }
 
@@ -326,6 +336,7 @@ s4_condition_t *s4_cond_new_combiner (s4_combine_type_t type)
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_COMBINER;
+	cond->u.combine.type = type;
 	cond->ref_count = 1;
 	cond->u.combine.operands = g_ptr_array_new_with_free_func ((GDestroyNotify)s4_cond_unref);
 	cond->u.combine.func = _get_combine_function (type);
@@ -344,6 +355,7 @@ s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func)
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_COMBINER;
+	cond->u.combine.type = S4_COMBINE_CUSTOM;
 	cond->ref_count = 1;
 	cond->u.combine.operands = g_ptr_array_new_with_free_func ((GDestroyNotify)s4_cond_unref);
 	cond->u.combine.func = func;
@@ -404,6 +416,7 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_FILTER;
+	cond->u.filter.type = type;
 	cond->ref_count = 1;
 	cond->u.filter.key = key==NULL?NULL:strdup (key);
 	cond->u.filter.flags = flags;
@@ -443,6 +456,7 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
 	cond->type = S4_COND_FILTER;
+	cond->u.filter.type = S4_FILTER_CUSTOM;
 	cond->ref_count = 1;
 	cond->u.filter.key = key==NULL?NULL:strdup (key);
 	cond->u.filter.flags = flags;
@@ -482,6 +496,16 @@ int s4_cond_is_filter (s4_condition_t *cond)
 int s4_cond_is_combiner (s4_condition_t *cond)
 {
 	return cond->type == S4_COND_COMBINER;
+}
+
+s4_filter_type_t s4_cond_get_filter_type (s4_condition_t *cond)
+{
+	return cond->u.filter.type;
+}
+
+s4_combine_type_t s4_cond_get_combiner_type (s4_condition_t *cond)
+{
+	return cond->u.combine.type;
 }
 
 /**

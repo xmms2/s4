@@ -96,13 +96,15 @@ typedef enum {
 	S4_FILTER_SMALLEREQ,
 	S4_FILTER_MATCH,
 	S4_FILTER_EXISTS,
-	S4_FILTER_TOKEN
+	S4_FILTER_TOKEN,
+	S4_FILTER_CUSTOM
 } s4_filter_type_t;
 
 typedef enum {
 	S4_COMBINE_AND,
 	S4_COMBINE_OR,
-	S4_COMBINE_NOT
+	S4_COMBINE_NOT,
+	S4_COMBINE_CUSTOM
 } s4_combine_type_t;
 
 #define S4_COND_PARENT 1
@@ -126,6 +128,9 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 
 int s4_cond_is_filter (s4_condition_t *cond);
 int s4_cond_is_combiner (s4_condition_t *cond);
+
+s4_filter_type_t s4_cond_get_filter_type (s4_condition_t *cond);
+s4_combine_type_t s4_cond_get_combiner_type (s4_condition_t *cond);
 
 int s4_cond_get_flags (s4_condition_t *cond);
 const char *s4_cond_get_key (s4_condition_t *cond);
