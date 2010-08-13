@@ -22,9 +22,9 @@ static void ref_list (list_t *list);
 static void unref_list (list_t *list);
 static list_t *create_list (GList *data);
 static GList *result_to_list (GList *prev, const s4_result_t *res);
-static GList *rows_to_list (const s4_resultset_t *set, int col);
-static GList *cols_to_list (const s4_resultset_t *set, int row);
-static GList *set_to_list (const s4_resultset_t *set);
+static GList *set_to_list (const s4_resultset_t *set,
+	int row_start, int row_end,
+	int col_start, int col_end);
 static void add_or_del (int (*func)(s4_t *s4, const char *,
 									const s4_val_t*, const char *,
 									const s4_val_t*, const char *),
@@ -53,6 +53,10 @@ struct list_St {
 	GList *list;
 	int refs;
 };
+typedef struct {
+	int start;
+	int end;
+} range_t;
 }
 
 %code provides {
@@ -74,6 +78,7 @@ int yylex (void);
 	struct list_St *list;
 	list_data_t *list_data;
 	GList *list_datas, *sourcepref_list;
+	range_t range;
 }
 
 %token <string> STRING QUOTED_STRING COND_VAR LIST_VAR RESULT_VAR FETCH_VAR PREF_VAR
@@ -91,6 +96,7 @@ int yylex (void);
 %type <list_data> list_data
 %type <sourcepref_list> pref_data
 %type <sourcepref> pref pref_or_not
+%type <range> range
 
 %destructor { free ($$); } <string>
 %destructor { s4_val_free ($$); } <value>
@@ -143,6 +149,13 @@ add: ADD list ',' list { add_or_del (s4_add, $2, $4); unref_list ($2); unref_lis
 
 del: DEL list ',' list { add_or_del (s4_del, $2, $4); unref_list ($2); unref_list ($4); }
    ;
+
+range: INT '-' INT { $$.start = $1; $$.end = $3; }
+	 | INT '-'     { $$.start = $1; $$.end = INT_MAX; }
+	 |     '-' INT { $$.start =  0; $$.end = $2; }
+	 |     '-'     { $$.start =  0; $$.end = INT_MAX; }
+	 | INT         { $$.start = $1; $$.end = $1; }
+	 ;
 
 pref_data: string { $$ = g_list_prepend (NULL, $1); }
 		 | pref_data ':' string { $$ = g_list_prepend ($1, $3); }
@@ -208,24 +221,9 @@ list: LIST_VAR
 	}
 	| '[' list_datas ']' { $$ = create_list ($2); }
 	| list_data { $$ = create_list (g_list_prepend (NULL, $1)); }
-	| result '[' INT ',' INT ']'
+	| result '{' range ',' range '}'
 	{
-		$$ = create_list (result_to_list (NULL, s4_resultset_get_result ($1, $3, $5)));
-		s4_resultset_unref ($1);
-	}
-	| result '[' '_' ',' INT ']'
-	{
-		$$ = create_list (rows_to_list ($1, $5));
-		s4_resultset_unref ($1);
-	}
-	| result '[' INT ',' '_' ']'
-	{
-		$$ = create_list (cols_to_list ($1, $3));
-		s4_resultset_unref ($1);
-	}
-	| result '[' '_' ',' '_' ']'
-	{
-		$$ = create_list (set_to_list ($1));
+		$$ = create_list (set_to_list ($1, $3.start, $3.end, $5.start, $5.end));
 		s4_resultset_unref ($1);
 	}
 	;
@@ -252,13 +250,13 @@ fetch: fetch_item
 	 }
 	 ;
 
-fetch_list: '[' fetch ']' { $$ = $2; }
+fetch_list: '(' fetch ')' { $$ = $2; }
 		  | FETCH_VAR
 		  {
 			  $$ = s4_fetchspec_ref (g_hash_table_lookup (fetch_table, $1));
 			  free ($1);
 			  if ($$ == NULL) {
-				  yyerror ("Undefined list variable");
+				  yyerror ("Undefined fetch variable");
 				  YYERROR;
 			  }
 		  }
@@ -394,7 +392,7 @@ void print_list (list_t *l)
 	GList *list = l->list;
 	int first = 1;
 
-	printf ("list [");
+	printf ("[");
 	for (; list != NULL; list = g_list_next (list)) {
 		if (first) {
 			first = 0;
@@ -450,14 +448,14 @@ void print_value (const s4_val_t *val, int newline)
 void print_fetch (s4_fetchspec_t *fetch)
 {
 	int i;
-	printf ("fetchspec [");
+	printf ("(");
 	for (i = 0; i < s4_fetchspec_size (fetch); i++) {
 		if (i != 0) {
 			printf (", ");
 		}
 		printf ("%s", s4_fetchspec_get_key (fetch, i));
 	}
-	printf ("]\n");
+	printf (")\n");
 }
 
 void print_vars ()
@@ -540,8 +538,8 @@ void print_help (void)
 			"against the highest priority source in the source preference\n\n"
 			"Fetch specification (<fetch>):\n"
 			"%%var                  - Returns the fetch spec bound to var\n"
-			"[key1, ..., keyn]      - Fetches keys 1 through n from matching entries\n"
-			"[key1 <pref>,...]     - Fetches key1 using the source preference given\n"
+			"(key1, ..., keyn)     - Fetches keys 1 through n from matching entries\n"
+			"(key1 <pref>,...)     - Fetches key1 using the source preference given\n"
 			"key                   - Fetches key from matching entries\n"
 			"key <pref>            - Fetches key using the source preference given\n"
 			"_                     - Fetches everything from matching entries\n\n"
@@ -550,10 +548,14 @@ void print_help (void)
 			"@var                  - Returns the result bound to var\n\n"
 			"Lists (<list>):\n"
 			"$var                  - Returns the list bound to the variable var\n"
-			"<result>[row, col]    - Returns the list at (row,col). If either row\n"
-			"                        or col is _, it will take all rows or cols\n"
+			"<result>{<rng>,<rng>} - Creates a list of the columns given by {row,col}.\n"
 			"[key val src, ...]    - Creates a list\n"
 			"[key val, ...]        - Creates a list where source is set to default_source\n\n"
+			"Ranges (<rng>):\n"
+			"start - stop          - Creates a range from start to stop (inclusive)\n"
+			"      - stop          - Creates a range from 0 to stop\n"
+			"start -               - Creates a range from start with no stop\n"
+			"      -               - Creates a range from 0 with no stop\n\n"
 			"Source preferences (<pref>):\n"
 			"#var                  - Returns the source preference bound to var\n"
 			":src1:src2:...:srcn   - Creates a new source preference where src1 has the highest priority,\n"
@@ -621,42 +623,20 @@ GList *result_to_list (GList *prev, const s4_result_t *res)
 	return ret;
 }
 
-GList *rows_to_list (const s4_resultset_t *set, int col)
-{
-	int row;
-	GList *ret = NULL;
-
-	for (row = 0; row < s4_resultset_get_rowcount (set); row++) {
-		ret = result_to_list (ret, s4_resultset_get_result (set, row, col));
-	}
-
-	return ret;
-}
-
-GList *cols_to_list (const s4_resultset_t *set, int row)
-{
-	int col;
-	GList *ret = NULL;
-
-	for (col = 0; col < s4_resultset_get_colcount (set); col++) {
-		ret = result_to_list (ret, s4_resultset_get_result (set, row, col));
-	}
-
-	return ret;
-}
-
-GList *set_to_list (const s4_resultset_t *set)
+GList *set_to_list (const s4_resultset_t *set,
+	int row_start, int row_end,
+	int col_start, int col_end)
 {
 	int row, col;
 	GList *ret = NULL;
 
-	for (row = 0; row < s4_resultset_get_rowcount (set); row++) {
-		for (col = 0; col < s4_resultset_get_colcount (set); col++) {
+	for (row = row_start; row <= row_end && row < s4_resultset_get_rowcount (set); row++) {
+		for (col = col_start; col <= col_end &&  col < s4_resultset_get_colcount (set); col++) {
 			ret = result_to_list (ret, s4_resultset_get_result (set, row, col));
 		}
 	}
 
-	return ret;
+	return g_list_reverse (ret);
 }
 
 static void add_or_del (int (*func)(s4_t *s4, const char *,
