@@ -546,6 +546,7 @@ int main(int argc, const char *argv[])
 		free, (GDestroyNotify)s4_sourcepref_unref);
 
 	g_thread_init (NULL);
+	config_init ();
 
 	s4 = s4_open (argv[1], NULL, S4_EXISTS);
 
@@ -585,6 +586,7 @@ int main(int argc, const char *argv[])
 		yyparse ();
 	}
 
+	config_cleanup ();
 	cleanup ();
 
 	return 0;

@@ -46,7 +46,9 @@ void print_fetch (s4_fetchspec_t *fetch);
 void print_vars (void);
 void print_help (void);
 
-void set_var (const char *key, const char *val);
+void config_init (void);
+void config_cleanup (void);
+void set_var (const char *key, char *val);
 const char *get_var (const char *key);
 void print_set_var (const char *key);
 
