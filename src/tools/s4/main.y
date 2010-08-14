@@ -13,6 +13,7 @@
  */
 
 %{
+#include "cli.h"
 #include <stdio.h>
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -22,16 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-typedef struct list_St list_t;
-
 static void yyerror (const char *);
-static void print_value (const s4_val_t *value, int newline);
-static void print_list (list_t *list);
-static void print_result (const s4_resultset_t *res);
-static void print_cond (s4_condition_t *cond);
-static void print_fetch (s4_fetchspec_t *fetch);
-static void print_vars (void);
-static void print_help (void);
 static void ref_list (list_t *list);
 static void unref_list (list_t *list);
 static list_t *create_list (GList *data);
@@ -43,42 +35,13 @@ static void add_or_del (int (*func)(s4_t *s4, const char *,
 									const s4_val_t*, const char *,
 									const s4_val_t*, const char *),
 						list_t *list_a, list_t *list_b);
-static void set_var (const char *key, const char *val);
-static const char *get_var (const char *key);
-static void print_set_var (const char *key);
 static void cleanup (void);
 
 GHashTable *cond_table, *res_table, *list_table, *fetch_table, *pref_table;
 char **lines;
 s4_t *s4;
 
-const char *user_vars[][2] = {{"default_source", "s4"}, {NULL, NULL}};
-
 %}
-
-%code requires {
-#include <glib.h>
-typedef struct {
-	char *key;
-	s4_val_t *val;
-	char *src;
-} list_data_t;
-struct list_St {
-	GList *list;
-	int refs;
-};
-typedef struct {
-	int start;
-	int end;
-} range_t;
-}
-
-%code provides {
-#define MAX_LINE_COUNT 128
-
-void init_lexer (char *lines[], int line_count);
-int yylex (void);
-}
 
 %union {
 	char *string;
@@ -89,7 +52,7 @@ int yylex (void);
 	s4_resultset_t *result;
 	s4_fetchspec_t *fetch;
 	s4_sourcepref_t *sourcepref;
-	struct list_St *list;
+	list_t *list;
 	list_data_t *list_data;
 	GList *list_datas, *sourcepref_list;
 	range_t range;
@@ -290,7 +253,11 @@ result: RESULT_VAR
 	  {
 		  const int order[2] = {1, 0};
 		  $$ = s4_query (s4, $2,  $3);
-		  s4_resultset_sort ($$, order);
+		  if ($$ != NULL) {
+			  s4_resultset_sort ($$, order);
+		  } else {
+			  $$ = s4_resultset_create (0);
+		  }
 		  s4_cond_unref ($3);
 		  s4_fetchspec_unref ($2);
 	  }
@@ -400,242 +367,6 @@ void yyerror (const char *str)
 	}
 }
 
-void print_list (list_t *l)
-{
-	list_data_t *data;
-	GList *list = l->list;
-	int first = 1;
-
-	printf ("[");
-	for (; list != NULL; list = g_list_next (list)) {
-		if (first) {
-			first = 0;
-		} else {
-			printf (", ");
-		}
-		data = list->data;
-		printf ("%s ", data->key);
-		print_value (data->val, 0);
-		printf(" %s", data->src);
-	}
-	printf ("]\n");
-}
-
-void print_result (const s4_resultset_t *set)
-{
-	int col, row;
-	const s4_result_t *res;
-
-	for (row = 0; row < s4_resultset_get_rowcount (set); row++) {
-		printf ("Row: %i\n", row);
-		for (col = 0; col < s4_resultset_get_colcount (set); col++) {
-			printf (" Col: %i\n", col);
-
-			for (res = s4_resultset_get_result (set, row, col);
-					res != NULL;
-					res = s4_result_next (res)) {
-				printf ("    %s ", s4_result_get_key (res));
-				print_value (s4_result_get_val (res), 0);
-				printf (" %s\n", s4_result_get_src (res));
-			}
-		}
-	}
-}
-
-void print_cond (s4_condition_t *cond)
-{
-	int i;
-	const char *operation;
-	s4_condition_t *operand;
-
-	if (s4_cond_is_filter (cond)) {
-		switch (s4_cond_get_filter_type (cond)) {
-		case S4_FILTER_EQUAL: operation = "="; break;
-		case S4_FILTER_NOTEQUAL: operation = "!="; break;
-		case S4_FILTER_SMALLER: operation = "<"; break;
-		case S4_FILTER_GREATER: operation = ">"; break;
-		case S4_FILTER_SMALLEREQ: operation = "<="; break;
-		case S4_FILTER_GREATEREQ: operation = ">="; break;
-		case S4_FILTER_MATCH: operation = "~"; break;
-		case S4_FILTER_EXISTS: operation = "+"; break;
-		case S4_FILTER_TOKEN: operation = "^"; break;
-		default: operation = "unknown filter"; break;
-		}
-		if (s4_cond_get_key (cond) != NULL) {
-			printf ("%s %s", s4_cond_get_key (cond), operation);
-		} else {
-			printf ("%s", operation);
-		}
-		if (s4_cond_get_filter_type (cond) == S4_FILTER_MATCH) {
-			printf (" pattern");
-		} else if (s4_cond_get_filter_type (cond) == S4_FILTER_TOKEN) {
-			printf (" %s", (const char *)s4_cond_get_funcdata (cond));
-		} else if (s4_cond_get_filter_type (cond) != S4_FILTER_EXISTS) {
-			printf (" ");
-			print_value (s4_cond_get_funcdata (cond), 0);
-		}
-	} else {
-		switch (s4_cond_get_combiner_type (cond)) {
-		case S4_COMBINE_AND: operation = "&"; break;
-		case S4_COMBINE_NOT: operation = "!"; break;
-		case S4_COMBINE_OR: operation = "|"; break;
-		default: operation = "unknown combiner"; break;
-		}
-
-		if (s4_cond_get_combiner_type (cond) == S4_COMBINE_NOT) {
-			printf ("!(");
-		} else {
-			printf ("(");
-		}
-		for (i = 0; (operand = s4_cond_get_operand (cond, i)) != NULL; i++) {
-			if (i != 0)
-				printf (") %s (", operation);
-			print_cond (operand);
-		}
-		printf (")");
-	}
-}
-
-void print_value (const s4_val_t *val, int newline)
-{
-	const char *s;
-	int32_t i;
-
-	if (s4_val_get_int (val, &i)) {
-		printf (newline?"%i\n":"%i", i);
-	} else if (s4_val_get_str (val, &s)) {
-		printf (newline?"\"%s\"\n":"\"%s\"", s);
-	}
-}
-
-void print_fetch (s4_fetchspec_t *fetch)
-{
-	int i;
-	printf ("(");
-	for (i = 0; i < s4_fetchspec_size (fetch); i++) {
-		if (i != 0) {
-			printf (", ");
-		}
-		printf ("%s", s4_fetchspec_get_key (fetch, i));
-	}
-	printf (")\n");
-}
-
-void print_vars ()
-{
-	GHashTableIter iter;
-	char *str;
-	void *val;
-
-	g_hash_table_iter_init (&iter, cond_table);
-	printf ("Cond table\n");
-	while (g_hash_table_iter_next (&iter, (void**)&str, &val)) {
-		printf ("%s: ", str);
-		print_cond (val);
-		printf ("\n");
-	}
-
-	g_hash_table_iter_init (&iter, fetch_table);
-	printf ("Fetch table\n");
-	while (g_hash_table_iter_next (&iter, (void**)&str, &val)) {
-		printf ("%s: ", str);
-		print_fetch (val);
-	}
-	g_hash_table_iter_init (&iter, res_table);
-	printf ("Result table\n");
-	while (g_hash_table_iter_next (&iter, (void**)&str, &val)) {
-		printf ("%s: ", str);
-		print_result (val);
-	}
-	g_hash_table_iter_init (&iter, list_table);
-	printf ("List table\n");
-	while (g_hash_table_iter_next (&iter, (void**)&str, &val)) {
-		printf ("%s: ", str);
-		print_list (val);
-	}
-}
-
-void print_help (void)
-{
-	printf("All statements must end with a semicolon\n\n"
-			"Statements with no value:\n"
-			".add <list>, <list>   - For every (key, val) from the first list it adds\n"
-			"                        the attributes (key, val, src) from the second list\n"
-			".del <list>, <list>   - For every (key, val) from the first list it deletes\n"
-			"                        the attributes (key, val, src) from the second list\n"
-			".exit                 - Exit the program\n"
-			".help                 - Prints this help\n"
-			".set key value        - Sets the option key to val\n"
-			".set key              - Shows the value of the key\n"
-			".set                  - Shows the value of all keys\n"
-			".vars                 - Prints all bound variables\n\n"
-			"?var = <cond>         - Assigns cond to the condition variable var\n"
-			"%%var = <fetch>        - Assigns fetch to the fetch variable var\n"
-			"@var = <result>       - Assigns var to something returning result\n"
-			"$var = <list>         - Assigns the list to the list variable var\n"
-			"#var = <pref>         - Assigns the pref to the souce preference variable var\n\n"
-			"Conditions (<cond>):\n"
-			"?var                  - Returns the condition bound to var\n"
-			"!cond                 - Matches everything cond does not match\n"
-			"cond1 & cond2         - Matches if both cond1 and cond2 matches\n"
-			"cond1 | cond2         - Matches if cond1 or cond2 matches\n\n"
-			"Filter conditions\n"
-			"key = value           - Matches all entries where key equals value\n"
-			"key ~ value           - Matches all entries where key matches value\n"
-			"key < value           - Matches all entries where key is smaller than value\n"
-			"key > value           - Matches all entries where key is greater than value\n"
-			"key ^ token           - Matches all entries where key has a token equal to token\n"
-			"key != value          - Matches all entries where key does not equal value\n"
-			"key <= value          - Matches all entries where key is smaller or equal to value\n"
-			"key >= value          - Matches all entries where key is greater or equal to value\n"
-			"= value               - Matches all entries where one or more keys equals value\n"
-			"~ value               - Matches all entries where one or more keys matches value\n"
-			"< value               - Matches all entries where one or more keys is smaller than value\n"
-			"> value               - Matches all entries where one or more keys is greater than value\n"
-			"^ token               - Matches all entries where one or more keys has token\n"
-			"!= value              - Matches all entries where one or more keys does not equal value\n"
-			"<= value              - Matches all entries where one or more keys is smaller or equal to value\n"
-			">= value              - Matches all entries where one or more keys is greater or equal to value\n"
-			"+key                  - Matches all entries that has key\n"
-			"+                     - Matches everything\n"
-			"<pref> may be added after all filter conditions to use a source preference to only match\n"
-			"against the highest priority source in the source preference\n\n"
-			"Fetch specification (<fetch>):\n"
-			"%%var                  - Returns the fetch spec bound to var\n"
-			"(key1, ..., keyn)     - Fetches keys 1 through n from matching entries\n"
-			"(key1 <pref>,...)     - Fetches key1 using the source preference given\n"
-			"key                   - Fetches key from matching entries\n"
-			"key <pref>            - Fetches key using the source preference given\n"
-			"_                     - Fetches everything from matching entries\n\n"
-			"Results (<result>):\n"
-			".query <fetch> <cond> - Queries the database, returns a result\n\n"
-			"@var                  - Returns the result bound to var\n\n"
-			"Lists (<list>):\n"
-			"$var                  - Returns the list bound to the variable var\n"
-			"<result>{<rng>,<rng>} - Creates a list of the columns given by {row,col}.\n"
-			"[key val src, ...]    - Creates a list\n"
-			"[key val, ...]        - Creates a list where source is set to default_source\n\n"
-			"Ranges (<rng>):\n"
-			"start - stop          - Creates a range from start to stop (inclusive)\n"
-			"      - stop          - Creates a range from 0 to stop\n"
-			"start -               - Creates a range from start with no stop\n"
-			"      -               - Creates a range from 0 with no stop\n\n"
-			"Source preferences (<pref>):\n"
-			"#var                  - Returns the source preference bound to var\n"
-			":src1:src2:...:srcn   - Creates a new source preference where src1 has the highest priority,\n"
-			"                        src2 seconds highest and so on\n\n"
-			"Shorthand:\n"
-			".q = .query\n"
-			".a = .add\n"
-			".d = .del\n"
-			".v = .vars\n"
-			".h = .help\n"
-			".? = .help\n"
-			".s = .set\n"
-			".e = .exit\n"
-			);
-}
-
 void ref_list (list_t *list)
 {
 	list->refs++;
@@ -716,47 +447,11 @@ static void add_or_del (int (*func)(s4_t *s4, const char *,
 		for (b = list_b->list; b != NULL; b = g_list_next (b)) {
 			db = b->data;
 			if (!func (s4, da->key, da->val, db->key, db->val, db->src)) {
-				printf ("failed on %s ", da->key);
-				print_value (da->val, 0);
-				printf (" %s ", db->key);
-				print_value (db->val, 0);
-				printf (" %s\n", db->src);
+				printf ("failed on %s %s, %s %s %s",
+					da->key, value_to_string (da->val),
+					db->key, value_to_string (db->val),
+					db->src);
 			}
-		}
-	}
-}
-
-void set_var (const char *key, const char *val)
-{
-	int i = 0;
-
-	for (i = 0; user_vars[i][0] != NULL; i++) {
-		if (strcmp (key, user_vars[i][0]) == 0) {
-			user_vars[i][1] = val;
-		}
-	}
-}
-
-static const char *get_var (const char *key)
-{
-	int i = 0;
-
-	for (i = 0; user_vars[i][0] != NULL; i++) {
-		if (strcmp (key, user_vars[i][0]) == 0) {
-			return user_vars[i][1];
-		}
-	}
-
-	return NULL;
-}
-
-void print_set_var (const char *key)
-{
-	int i = 0;
-
-	for (i = 0; user_vars[i][0] != NULL; i++) {
-		if (key == NULL || strcmp (key, user_vars[i][0]) == 0) {
-			printf ("%s = %s\n", user_vars[i][0], user_vars[i][1]);
 		}
 	}
 }

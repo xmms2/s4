@@ -7,10 +7,11 @@ import Options
 
 def build(bld):
 	s4 = bld.new_task_gen('cc', 'program')
-	s4.source = ["main.y", "lexer.l"]
+	s4.source = ["main.y", "lexer.l", "config.c", "print.c"]
 	s4.target = "s4"
 	s4.uselib_local = "s4"
 	s4.uselib = 'glib2 gthread2 readline'
+	s4.includes = '.'
 
 def configure (conf):
 	conf.check_tool("flex")

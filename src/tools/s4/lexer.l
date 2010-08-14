@@ -16,6 +16,7 @@
 #include <s4.h>
 #include <stdio.h>
 #include <readline/readline.h>
+#include "cli.h"
 #include "main.tab.h"
 
 static char *process_string (const char *);
