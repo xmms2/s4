@@ -220,10 +220,14 @@ fetch_item: fetch_key pref_or_not
 		  ;
 
 fetch: fetch_item
-	 | fetch ',' fetch_key
+	 | fetch ',' fetch_key pref_or_not
 	 {
 		 $$ = $1;
-		 s4_fetchspec_add ($$, $3, NULL, S4_FETCH_PARENT | S4_FETCH_DATA);
+		 s4_fetchspec_add ($$, $3, $4, S4_FETCH_PARENT | S4_FETCH_DATA);
+		 if ($4 != NULL)
+			 s4_sourcepref_unref ($4);
+		 if ($3 != NULL)
+			 free ($3);
 	 }
 	 ;
 
@@ -521,6 +525,7 @@ void cleanup ()
 	g_hash_table_destroy (fetch_table);
 	g_hash_table_destroy (list_table);
 	g_hash_table_destroy (res_table);
+	g_hash_table_destroy (pref_table);
 }
 
 int main(int argc, const char *argv[])
