@@ -332,10 +332,10 @@ static void *_sync_thread (s4_t *s4)
 {
 	char *tmpfile = g_strconcat (s4->filename, ".chkpnt", NULL);
 	g_mutex_lock (s4->log_lock);
-	while (s4->sync_thread_run || s4->last_checkpoint < s4->last_logpoint) {
+	while (s4->sync_thread_run || s4->last_checkpoint < s4->next_logpoint) {
 		if (s4->sync_thread_run)
 			g_cond_wait (s4->sync_cond, s4->log_lock);
-		s4->last_synced = s4->last_logpoint;
+		s4->last_synced = s4->next_logpoint;
 		g_mutex_unlock (s4->log_lock);
 
 		if (_write_file (s4, tmpfile)) {
@@ -467,7 +467,7 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 	s4->filename = strdup (filename);
 	s4->last_checkpoint = 0;
 	s4->last_synced = 0;
-	s4->last_logpoint = 0;
+	s4->next_logpoint = 0;
 
 	if (_read_file (s4, s4->filename, open_flags)) {
 		_free (s4);

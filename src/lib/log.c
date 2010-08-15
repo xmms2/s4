@@ -109,7 +109,7 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 	g_mutex_lock (s4->log_lock);
 	size = _get_size (&header);
 	pos = ftell (s4->logfile);
-	round = s4->last_logpoint / LOG_SIZE;
+	round = s4->next_logpoint / LOG_SIZE;
 
 	/* Wrap around if we're at the end */
 	if ((pos + size) > (LOG_SIZE - sizeof (struct log_header))) {
@@ -149,7 +149,7 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 		_start_sync (s4);
 	}
 
-	s4->last_logpoint = header.num;
+	s4->next_logpoint = ftell (s4->logfile) + round * LOG_SIZE;
 
 	g_mutex_unlock (s4->log_lock);
 	fflush (s4->logfile);
@@ -201,7 +201,7 @@ static s4_val_t *_read_val (FILE *file, int len)
 static int _log_redo (s4_t *s4, FILE *logfile)
 {
 	struct log_header hdr;
-	log_number_t pos, round, expected;
+	log_number_t pos, round;
 
 	pos = s4->last_checkpoint % LOG_SIZE;
 	round = s4->last_checkpoint / LOG_SIZE;
@@ -216,7 +216,7 @@ static int _log_redo (s4_t *s4, FILE *logfile)
 			&& (hdr.type == LOG_ENTRY_ADD
 				|| hdr.type == LOG_ENTRY_DEL
 				|| hdr.type == LOG_ENTRY_WRAP)
-			&& hdr.num == (expected = pos + round * LOG_SIZE)) {
+			&& hdr.num == (pos + round * LOG_SIZE)) {
 
 		if (hdr.type == LOG_ENTRY_WRAP) {
 			round++;
@@ -249,7 +249,7 @@ static int _log_redo (s4_t *s4, FILE *logfile)
 	}
 
 	fseek (logfile, -sizeof (struct log_header), SEEK_CUR);
-	s4->last_logpoint = expected;
+	s4->next_logpoint = (pos + round * LOG_SIZE);
 
 	return 0;
 }

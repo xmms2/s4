@@ -42,7 +42,7 @@ struct s4_St {
 	GCond *sync_cond, *sync_finished_cond;
 	log_number_t last_checkpoint;
 	log_number_t last_synced;
-	log_number_t last_logpoint;
+	log_number_t next_logpoint;
 	int sync_thread_run;
 	GThread *sync_thread;
 
