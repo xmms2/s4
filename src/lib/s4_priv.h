@@ -56,6 +56,9 @@ void s4_set_errno (s4_errno_t err);
 void _start_sync (s4_t *s4);
 void _sync (s4_t *s4);
 
+int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
+		const char *key_b, const s4_val_t *value_b, const char *src);
+
 s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
 
 const char *_string_lookup (s4_t *s4, const char *str);

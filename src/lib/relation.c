@@ -242,6 +242,69 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	return ret;
 }
 
+/* An internal function of the above functions. It expects all keys
+ * and values passed to be internal, so no copying have to be done.
+ * It also exploits that pairs with the same key_a and value_a are
+ * written next to each other on file, and it can therefore save
+ * many index searches.
+ */
+int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
+		const char *key_b, const s4_val_t *value_b, const char *src)
+{
+	int ret;
+	s4_index_t *index;
+	static entry_t *entry;
+	static const char *prev_key = NULL;
+	static const s4_val_t *prev_val = NULL;
+
+	/* If key_a and value_a are equal to the key and value of entry
+	 * it don't have to search the index to find entry
+	 */
+	if (prev_key != key_a || s4_val_cmp (prev_val, value_a, S4_CMP_BINARY)) {
+		GList *entries;
+
+		g_static_mutex_lock (&s4->rel_lock);
+		index = g_hash_table_lookup (s4->rel_table, key_a);
+
+		if (index == NULL) {
+			index = _index_create ();
+			g_hash_table_insert (s4->rel_table, (void*)key_a, index);
+		}
+		g_static_mutex_unlock (&s4->rel_lock);
+		entries = _index_search (index, NULL, (void*)value_a);
+
+		if (entries == NULL) {
+			entry = _entry_create (key_a, value_a);
+			g_static_mutex_lock (&entry->lock);
+			_index_insert (index, value_a, entry);
+		} else {
+			entry = entries->data;
+			g_static_mutex_lock (&entry->lock);
+			g_list_free (entries);
+		}
+
+		prev_key = key_a;
+		prev_val = value_a;
+	} else {
+		s4_val_free ((s4_val_t*)value_a);
+		value_a = prev_val;
+		g_static_mutex_lock (&entry->lock);
+	}
+
+	ret = _entry_insert (entry, key_b, value_b, src);
+	g_static_mutex_unlock (&entry->lock);
+
+	if (ret) {
+		index = _index_get (s4, key_b);
+
+		if (index != NULL) {
+			_index_insert (index, value_b, entry);
+		}
+	}
+
+	return ret;
+}
+
 /**
  * Deletes a relation from a database
  *

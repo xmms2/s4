@@ -98,27 +98,26 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
 
 	while (fread (&rec, sizeof (s4_intpair_t), 1, file) == 1) {
 		const char *key_a, *key_b, *src;
-		s4_val_t *val_a, *val_b;
+		const s4_val_t *val_a, *val_b;
 
 		key_a = g_hash_table_lookup (strings, GINT_TO_POINTER (ABS (rec.key_a)));
 		key_b = g_hash_table_lookup (strings, GINT_TO_POINTER (ABS (rec.key_b)));
 		src = g_hash_table_lookup (strings, GINT_TO_POINTER (ABS (rec.src)));
 
 		if (rec.key_a > 0) {
-			val_a = s4_val_new_string (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_a)));
+			val_a = _string_lookup_val (s4,
+					g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_a)));
 		} else {
 			val_a = s4_val_new_int (rec.val_a);
 		}
 		if (rec.key_b > 0) {
-			val_b = s4_val_new_string (g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_b)));
+			val_b = _string_lookup_val (s4,
+					g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_b)));
 		} else {
 			val_b = s4_val_new_int (rec.val_b);
 		}
 
-		s4_add (s4, key_a, val_a, key_b, val_b, src);
-
-		s4_val_free (val_a);
-		s4_val_free (val_b);
+		s4_add_internal (s4, key_a, val_a, key_b, val_b, src);
 	}
 
 	return 0;
