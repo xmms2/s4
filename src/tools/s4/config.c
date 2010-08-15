@@ -80,6 +80,7 @@ static void encode_string (const char *val, char *buf)
 			*buf++ = HEX_TO_CHAR (*val & 0xf);
 		}
 	}
+	*buf = '\0';
 }
 
 static void decode_string (char *buf)
