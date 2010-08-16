@@ -612,5 +612,7 @@ int main(int argc, const char *argv[])
 	config_cleanup ();
 	cleanup ();
 
+	printf (".exit;\n");
+
 	return 0;
 }
