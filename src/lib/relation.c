@@ -286,7 +286,11 @@ int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		prev_key = key_a;
 		prev_val = value_a;
 	} else {
-		s4_val_free ((s4_val_t*)value_a);
+		/* Int values are not constant, and we must free
+		 * the current one if we are using the previous one
+		 */
+		if (s4_val_is_int (value_a))
+			s4_val_free ((s4_val_t*)value_a);
 		value_a = prev_val;
 		g_static_mutex_lock (&entry->lock);
 	}
