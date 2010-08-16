@@ -41,6 +41,8 @@ GHashTable *cond_table, *res_table, *list_table, *fetch_table, *pref_table;
 char **lines;
 s4_t *s4;
 
+#define SET_YYLLOC(l) (yylloc = (l))
+
 %}
 
 %union {
@@ -87,7 +89,6 @@ s4_t *s4;
 %destructor { for (; $$ != NULL; $$ = g_list_delete_link ($$, $$)) free ($$->data); } <sourcepref_list>
 
 %error-verbose
-%locations
 %debug
 
 %left '|'
@@ -142,6 +143,7 @@ pref: PREF_VAR
 		$$ = g_hash_table_lookup (pref_table, $1);
 		free ($1);
 		if ($$ == NULL) {
+			SET_YYLLOC (@1);
 			yyerror ("Undefined source preference variable");
 			YYERROR;
 		}
@@ -191,6 +193,7 @@ list: LIST_VAR
 		$$ = g_hash_table_lookup (list_table, $1);
 		free ($1);
 		if ($$ == NULL) {
+			SET_YYLLOC (@1);
 			yyerror ("Undefined list variable");
 			YYERROR;
 		}
@@ -201,6 +204,18 @@ list: LIST_VAR
 	| result '{' range ',' range '}'
 	{
 		$$ = create_list (set_to_list ($1, $3.start, $3.end, $5.start, $5.end));
+		s4_resultset_unref ($1);
+	}
+	| result '{' range ',' string '}'
+	{
+		int col = find_column ($5, $1);
+		if (col != -1) {
+			$$ = create_list (set_to_list ($1, $3.start, $3.end, col, col));
+		} else {
+			SET_YYLLOC (@5);
+			yyerror ("No column with that key");
+			YYERROR;
+		}
 		s4_resultset_unref ($1);
 	}
 	;
@@ -237,6 +252,7 @@ fetch_list: '(' fetch ')' { $$ = $2; }
 			  $$ = s4_fetchspec_ref (g_hash_table_lookup (fetch_table, $1));
 			  free ($1);
 			  if ($$ == NULL) {
+				  SET_YYLLOC (@1);
 				  yyerror ("Undefined fetch variable");
 				  YYERROR;
 			  }
@@ -249,6 +265,7 @@ result: RESULT_VAR
 		  $$ = s4_resultset_ref (g_hash_table_lookup (res_table, $1));
 		  free ($1);
 		  if ($$ == NULL) {
+			  SET_YYLLOC (@1);
 			  yyerror ("Undefined result variable");
 			  YYERROR;
 		  }
@@ -293,6 +310,7 @@ cond: COND_VAR
 		$$ = s4_cond_ref (g_hash_table_lookup (cond_table, $1));
 		free ($1);
 		if ($$ == NULL) {
+			SET_YYLLOC (@1);
 			yyerror ("Undefined condition variable");
 			YYERROR;
 		}

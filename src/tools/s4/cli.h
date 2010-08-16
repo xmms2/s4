@@ -39,6 +39,8 @@ int yylex (void);
 
 const char *value_to_string (const s4_val_t *val);
 
+int find_column (const char *key, const s4_resultset_t *set);
+
 void print_list (list_t *list);
 void print_result (const s4_resultset_t *res);
 void print_cond (s4_condition_t *cond);

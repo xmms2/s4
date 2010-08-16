@@ -136,6 +136,21 @@ static const char *column_key (int col, const s4_resultset_t *set)
 	return ret;
 }
 
+/* Search for a column where all the fields have the given key. */
+int find_column (const char *key, const s4_resultset_t *set)
+{
+	int col;
+
+	for (col = 0; col < s4_resultset_get_colcount (set); col++) {
+		const char *col_key = column_key (col, set);
+		if (col_key != NULL && strcmp (col_key, key) == 0) {
+			return col;
+		}
+	}
+
+	return -1;
+}
+
 /* Uses the COLUMNS env. var to find the terminal width.
  * If it is not set it defaults to 80 chars
  */
@@ -387,6 +402,8 @@ void print_help (void)
 			"Lists (<list>):\n"
 			"$var                  - Returns the list bound to the variable var\n"
 			"<result>{<rng>,<rng>} - Creates a list of the columns given by {row,col}.\n"
+			"<result>{<rng>, key}  - Creates a list of the column where the column key\n"
+			"                        equals key and the rows are in the range\n"
 			"[key val src, ...]    - Creates a list\n"
 			"[key val, ...]        - Creates a list where source is set to default_source\n\n"
 			"Ranges (<rng>):\n"
