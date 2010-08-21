@@ -303,11 +303,22 @@ static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s
 				char *s;
 				int32_t i;
 
-				if (s4_val_get_str (val, &str)) {
-					s = g_strdup (str);
-				} else {
-					s4_val_get_int (val, &i);
+				if (s4_val_get_int (val, &i)) {
 					s = g_strdup_printf ("%i", i);
+				} else {
+					switch (cond->u.filter.cmp_mode) {
+					case S4_CMP_COLLATE:
+						/* Collated token matching makes no sense,
+						 * we use binary matching instead
+						 */
+					case S4_CMP_BINARY:
+						s4_val_get_str (val, &str);
+						break;
+					case S4_CMP_CASELESS:
+						s4_val_get_casefolded_str (val, &str);
+						break;
+					}
+					s = strdup (str);
 				}
 
 				cond->u.filter.func = token_filter;
