@@ -94,7 +94,7 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 {
 	struct log_header header;
 	int size;
-	log_number_t pos, end, round;
+	log_number_t pos, round;
 
 	if (s4->logfile == NULL)
 		return;
@@ -108,7 +108,15 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 
 	g_mutex_lock (s4->log_lock);
 	size = _get_size (&header);
-	pos = ftell (s4->logfile);
+
+	/* If writing this would overwrite log entries containing
+	 * data not commited yet we have to sync
+	 */
+	while ((s4->next_logpoint + size - s4->last_checkpoint) > LOG_SIZE) {
+		_sync (s4);
+	}
+
+	pos = s4->next_logpoint % LOG_SIZE;
 	round = s4->next_logpoint / LOG_SIZE;
 
 	/* Wrap around if we're at the end */
@@ -123,15 +131,6 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 	}
 
 	header.num = pos + round * LOG_SIZE;
-	end = header.num + size;
-
-	/* If writing this would overwrite log entries containing
-	 * data not commited yet we have to sync
-	 */
-	while ((end - s4->last_checkpoint) > LOG_SIZE) {
-		_sync (s4);
-	}
-
 	fwrite (&header, sizeof (struct log_header), 1, s4->logfile);
 
 	_write_str (key_a, header.ka_len, s4->logfile);
@@ -145,7 +144,7 @@ static void _log (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *
 	 * Hopefully the sync thread will sync everything before
 	 * we run out of space in the log file, and we have to stall.
 	 */
-	if ((end - s4->last_synced) > (LOG_SIZE / 2)) {
+	if ((s4->next_logpoint + size - s4->last_synced) > (LOG_SIZE / 2)) {
 		_start_sync (s4);
 	}
 
@@ -248,7 +247,7 @@ static int _log_redo (s4_t *s4, FILE *logfile)
 		}
 	}
 
-	fseek (logfile, -sizeof (struct log_header), SEEK_CUR);
+	fseek (logfile, pos, SEEK_SET);
 	s4->next_logpoint = (pos + round * LOG_SIZE);
 
 	return 0;
