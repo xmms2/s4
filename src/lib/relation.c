@@ -555,7 +555,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 	check_data_t data;
 	GList *entries;
 	s4_index_t *index;
-	s4_resultset_t *ret = NULL;
+	s4_resultset_t *ret = s4_resultset_create (s4_fetchspec_size (fs));
 
 	s4_cond_update_key (cond, s4);
 	s4_fetchspec_update_key (s4, fs);
@@ -594,10 +594,6 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
 			entries = g_list_concat (entries, _index_search (index, (index_function_t)_everything, NULL));
 		}
-	}
-
-	if (entries != NULL) {
-		ret = s4_resultset_create (s4_fetchspec_size (fs));
 	}
 
 	data.s4 = s4;
