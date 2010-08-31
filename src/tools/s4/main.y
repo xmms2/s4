@@ -274,11 +274,7 @@ result: RESULT_VAR
 	  {
 		  const int order[2] = {1, 0};
 		  $$ = s4_query (s4, $2,  $3);
-		  if ($$ != NULL) {
-			  s4_resultset_sort ($$, order);
-		  } else {
-			  $$ = s4_resultset_create (0);
-		  }
+		  s4_resultset_sort ($$, order);
 		  s4_cond_unref ($3);
 		  s4_fetchspec_unref ($2);
 	  }
