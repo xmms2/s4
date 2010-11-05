@@ -33,6 +33,16 @@ CLEANUP () {
 char *name;
 s4_t *s4;
 
+static void _mem_open ()
+{
+	s4 = s4_open (NULL, NULL, S4_MEMORY);
+}
+
+static void _mem_close ()
+{
+	s4_close (s4);
+}
+
 static void _open (int flags)
 {
 	name = strdup (tmpnam (NULL));
@@ -191,7 +201,7 @@ CASE (test_add_and_del) {
 		{NULL, {NULL}, NULL}};
 	struct db_struct empty[] = {
 		{NULL, {NULL}}};
-	_open (S4_NEW);
+	_mem_open ();
 
 	CU_ASSERT_PTR_NOT_NULL_FATAL (s4);
 
@@ -201,7 +211,7 @@ CASE (test_add_and_del) {
 	del_db (db);
 	check_db (empty);
 
-	_close ();
+	_mem_close ();
 }
 
 static void check_result (const s4_result_t *res, const char *key, const char *val, const char *src)
@@ -221,7 +231,7 @@ CASE (test_query) {
 		{"b", {"b", NULL}, "1"},
 		{NULL, {NULL}, NULL}};
 	const char *sources[] = {"1", "2", NULL};
-	_open (S4_NEW);
+	_mem_open ();
 
 	create_db (db);
 	check_db (db);
@@ -259,5 +269,5 @@ CASE (test_query) {
 	s4_sourcepref_unref (sp);
 	s4_fetchspec_free (fs);
 
-	_close ();
+	_mem_close ();
 }
