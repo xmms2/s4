@@ -444,7 +444,12 @@ static void _free (s4_t *s4)
  * 		If the file does not exists it will fail and return NULL.
  * 		s4_errno may be used to get more information about what
  * 		went wrong.
- * </P>
+ * </P><P>
+ * @b S4_MEMORY
+ * 		Creates a memory-only database. It will not read any files
+ * 		on startup or write files on shutdown. Use this if you want
+ * 		a temporary database.
+ * <BR>
  *
  * @param filename The name of the file containing the database
  * @param indices An array of keys to have indices on
@@ -462,12 +467,17 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 		_index_add (s4, indices[i], _index_create ());
 	}
 
+	s4->open_flags = open_flags;
 	s4->logfile = NULL;
-	s4->filename = strdup (filename);
 	s4->last_checkpoint = 0;
 	s4->last_synced = 0;
 	s4->next_logpoint = 0;
 
+	if (open_flags & S4_MEMORY) {
+		return s4;
+	}
+
+	s4->filename = strdup (filename);
 	if (_read_file (s4, s4->filename, open_flags)) {
 		_free (s4);
 		return NULL;
@@ -497,13 +507,16 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
  */
 int s4_close (s4_t* s4)
 {
-	g_mutex_lock (s4->log_lock);
-	s4->sync_thread_run = 0;
-	g_cond_signal (s4->sync_cond);
-	g_mutex_unlock (s4->log_lock);
-	g_thread_join (s4->sync_thread);
+	if (!(s4->open_flags & S4_MEMORY)) {
+		g_mutex_lock (s4->log_lock);
+		s4->sync_thread_run = 0;
+		g_cond_signal (s4->sync_cond);
+		g_mutex_unlock (s4->log_lock);
+		g_thread_join (s4->sync_thread);
 
-	_log_close (s4);
+		_log_close (s4);
+	}
+
 	_free (s4);
 
 	return 0;

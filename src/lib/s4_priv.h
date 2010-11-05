@@ -22,6 +22,8 @@
 typedef uint32_t log_number_t;
 
 struct s4_St {
+	int open_flags;
+
 	GHashTable *index_table;
 	GStaticMutex index_table_lock;
 

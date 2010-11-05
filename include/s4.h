@@ -20,6 +20,7 @@
 /* Flags */
 #define S4_NEW              1 << 0
 #define S4_EXISTS           1 << 1
+#define S4_MEMORY           1 << 2
 
 /**
  * Error codes
