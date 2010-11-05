@@ -370,7 +370,7 @@ void _sync (s4_t *s4)
 
 static s4_t *_alloc (void)
 {
-	s4_t* s4 = malloc (sizeof(s4_t));
+	s4_t* s4 = calloc (1, sizeof(s4_t));
 
 	s4->strings = g_string_chunk_new (8192);
 	s4->strings_table = g_hash_table_new_full (g_str_hash, g_str_equal,
@@ -468,10 +468,6 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 	}
 
 	s4->open_flags = open_flags;
-	s4->logfile = NULL;
-	s4->last_checkpoint = 0;
-	s4->last_synced = 0;
-	s4->next_logpoint = 0;
 
 	if (open_flags & S4_MEMORY) {
 		return s4;
