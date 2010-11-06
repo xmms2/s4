@@ -236,12 +236,14 @@ CASE (test_query) {
 	create_db (db);
 	check_db (db);
 
+	s4_val_t *sa = s4_val_new_string ("a");
+	s4_val_t *sb = s4_val_new_string ("b");
 	s4_sourcepref_t *sp = s4_sourcepref_create (sources);
 	s4_fetchspec_t *fs = s4_fetchspec_create ();
 	s4_fetchspec_add (fs, "property", sp, S4_FETCH_DATA);
 
 	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
-			s4_val_new_string ("a"), sp, S4_CMP_CASELESS, 0);
+			sa, sp, S4_CMP_CASELESS, 0);
 	s4_resultset_t *set = s4_query (s4, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
@@ -254,7 +256,7 @@ CASE (test_query) {
 	s4_cond_free (cond);
 
 	cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
-			s4_val_new_string ("b"), sp, S4_CMP_CASELESS, 0);
+			sb, sp, S4_CMP_CASELESS, 0);
 	set = s4_query (s4, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
@@ -263,6 +265,9 @@ CASE (test_query) {
 	res = s4_resultset_get_result (set, 0, 0);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (res);
 	check_result (res, "property", "b", "1");
+
+	s4_val_free (sa);
+	s4_val_free (sb);
 	s4_resultset_free (set);
 	s4_cond_free (cond);
 

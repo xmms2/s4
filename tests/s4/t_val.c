@@ -133,4 +133,10 @@ CASE (test_cmp) {
 	CU_ASSERT (s4_val_cmp (is, ib, S4_CMP_COLLATE) < 0);
 	CU_ASSERT (s4_val_cmp (ia, is, S4_CMP_COLLATE) < 0);
 	CU_ASSERT (s4_val_cmp (ib, is, S4_CMP_COLLATE) > 0);
+
+	s4_val_free (ia);
+	s4_val_free (ib);
+	s4_val_free (sa);
+	s4_val_free (sb);
+	s4_val_free (is);
 }
