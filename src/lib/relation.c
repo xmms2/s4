@@ -611,41 +611,5 @@ s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 }
 
 /**
- * Calls the given function for every relation in the database
- *
- * @param s4 The database to iterate over
- * @param func The function to call
- * @param data The data to be passed as the last argument to func
- */
-void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_t *val_a,
-			const char *key_b, const s4_val_t *val_b, const char *src, void *data), void *data)
-{
-	GHashTableIter iter;
-	s4_index_t *index;
-	GList *indices = NULL, *entries;
-
-	g_static_mutex_lock (&s4->rel_lock);
-	g_hash_table_iter_init (&iter, s4->rel_table);
-	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
-		indices = g_list_prepend (indices, index);
-	}
-	g_static_mutex_unlock (&s4->rel_lock);
-
-	for (; indices != NULL; indices = g_list_delete_link (indices, indices)) {
-		entries = _index_search (indices->data, (index_function_t)_everything, NULL);
-		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
-			entry_t *entry = entries->data;
-			int i;
-
-			g_static_mutex_lock (&entry->lock);
-			for (i = 0; i < entry->size; i++) {
-				func (s4, entry->key, entry->val, entry->data[i].key, entry->data[i].val, entry->data[i].src, data);
-			}
-			g_static_mutex_unlock (&entry->lock);
-		}
-	}
-}
-
-/**
  * @}
  */

@@ -71,8 +71,6 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
 int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
-void s4_foreach (s4_t *s4, void (*func)(s4_t *s4, const char *key, const s4_val_t *val_a,
-			const char *key_b, const s4_val_t *val_b, const char *src, void *data), void *data);
 
 /* uuid.c */
 void s4_create_uuid (unsigned char uuid[16]);

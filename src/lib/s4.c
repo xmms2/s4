@@ -240,47 +240,69 @@ typedef struct {
  * @param new_id A pointer to an int holding the next free id to use
  * @return The id associated with the string
  */
-static int _get_string_number (GHashTable *table, const char *str, int *new_id)
+static int _get_string_number (save_data_t *sd, const char *str)
 {
-	int i = GPOINTER_TO_INT (g_hash_table_lookup (table, str));
+	int i = GPOINTER_TO_INT (g_hash_table_lookup (sd->strings, str));
 
 	if (i == 0) {
-		i = (*new_id)++;
-		g_hash_table_insert (table, (void*)str, GINT_TO_POINTER (i));
+		i = sd->new_id++;
+		g_hash_table_insert (sd->strings, (void*)str, GINT_TO_POINTER (i));
 	}
 
 	return i;
 }
 
 /*
- * A helper function converting all relationships into intpairs
+ * A helper function converting a resultset into a list of int-pairs.
  */
-static void _entry_to_pair (s4_t *s4, const char *key_a, const s4_val_t *val_a,
-		const char *key_b, const s4_val_t *val_b, const char *src, void *data)
+static void _result_to_pairs (s4_resultset_t *res, save_data_t *sd)
 {
-	save_data_t *sd = data;
-	const char *str;
-	int32_t i;
-	s4_intpair_t *pair = malloc (sizeof (s4_intpair_t));
+	const s4_resultrow_t *row;
+	int row_no;
 
-	pair->key_a = _get_string_number (sd->strings, key_a, &sd->new_id);
-	pair->key_b = _get_string_number (sd->strings, key_b, &sd->new_id);
-	pair->src = _get_string_number (sd->strings, src, &sd->new_id);
+	for (row_no = 0; s4_resultset_get_row (res, row_no, &row); row_no++) {
+		int32_t va, ka, i;
+		const s4_val_t *val_a, *val_b;
+		const char *key_a, *key_b, *src, *str;
+		const s4_result_t *id_res, *val_res;
 
-	if (s4_val_get_int (val_a, &i)) {
-		pair->val_a = i;
-		pair->key_a = -pair->key_a;
-	} else if (s4_val_get_str (val_a, &str)) {
-		pair->val_a = _get_string_number (sd->strings, str, &sd->new_id);
+		s4_resultrow_get_col (row, 0, &id_res);
+		s4_resultrow_get_col (row, 1, &val_res);
+
+		val_a = s4_result_get_val (id_res);
+		key_a = s4_result_get_key (id_res);
+
+		ka = _get_string_number (sd, key_a);
+
+		if (s4_val_get_int (val_a, &i)) {
+			va = i;
+			ka = -ka;
+		} else if (s4_val_get_str (val_a, &str)) {
+			va = _get_string_number (sd, str);
+		}
+
+		for (; val_res != NULL; val_res = s4_result_next (val_res)) {
+			s4_intpair_t *pair = malloc (sizeof (s4_intpair_t));
+
+			val_b = s4_result_get_val (val_res);
+			key_b = s4_result_get_key (val_res);
+			src = s4_result_get_src (val_res);
+
+			pair->val_a = va;
+			pair->key_a = ka;
+			pair->key_b = _get_string_number (sd, key_b);
+			pair->src = _get_string_number (sd, src);
+
+			if (s4_val_get_int (val_b, &i)) {
+				pair->val_b = i;
+				pair->key_b = -pair->key_b;
+			} else if (s4_val_get_str (val_b, &str)) {
+				pair->val_b = _get_string_number (sd, str);
+			}
+
+			sd->pairs = g_list_prepend (sd->pairs, pair);
+		}
 	}
-	if (s4_val_get_int (val_b, &i)) {
-		pair->val_b = i;
-		pair->key_b = -pair->key_b;
-	} else if (s4_val_get_str (val_b, &str)) {
-		pair->val_b = _get_string_number (sd->strings, str, &sd->new_id);
-	}
-
-	sd->pairs = g_list_prepend (sd->pairs, pair);
 }
 
 /**
@@ -297,15 +319,26 @@ static int _write_file (s4_t *s4, const char *filename)
 	FILE *file = fopen (filename, "w");
 	s4_header_t hdr;
 	save_data_t sd;
+	s4_condition_t *cond;
+	s4_fetchspec_t *fs;
+	s4_resultset_t *res;
 
 	if (file == NULL)
 		return -1;
+
+	cond = s4_cond_new_filter (S4_FILTER_EXISTS, NULL, NULL, NULL, S4_CMP_BINARY, 0);
+
+	fs = s4_fetchspec_create ();
+	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_PARENT);
+	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_DATA);
+
+	res = s4_query (s4, fs, cond);
 
 	sd.strings = g_hash_table_new (NULL, NULL);
 	sd.pairs = NULL;
 	sd.new_id = 1;
 
-	s4_foreach (s4, _entry_to_pair, &sd);
+	_result_to_pairs (res, &sd);
 
 	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
 	hdr.version = S4_VERSION;
@@ -321,6 +354,9 @@ static int _write_file (s4_t *s4, const char *filename)
 
 	g_hash_table_destroy (sd.strings);
 	g_list_free (sd.pairs);
+	s4_cond_free (cond);
+	s4_fetchspec_free (fs);
+	s4_resultset_free (res);
 
 	fclose (file);
 
