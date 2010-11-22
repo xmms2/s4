@@ -17,9 +17,9 @@
 /**
  *
  * @internal
- * @defgroup String String
+ * @defgroup Constants Constants
  * @ingroup S4
- * @brief Handles string in S4
+ * @brief Handles constant values in S4
  *
  * @{
  */
@@ -148,6 +148,36 @@ const char *_string_lookup_collated (s4_t *s4, const char *str)
 	g_static_mutex_unlock (&s4->coll_lock);
 
 	return ret;
+}
+
+const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i)
+{
+	const s4_val_t *ret;
+
+	g_static_mutex_lock (&s4->int_lock);
+	ret = g_hash_table_lookup (s4->int_table, GINT_TO_POINTER (i));
+
+	if (ret == NULL) {
+		ret = s4_val_new_int (i);
+		g_hash_table_insert (s4->int_table, GINT_TO_POINTER (i), (void*)ret);
+	}
+
+	g_static_mutex_unlock (&s4->int_lock);
+
+	return ret;
+}
+
+const s4_val_t *_const_lookup (s4_t *s4, const s4_val_t *val)
+{
+	const char *str;
+	int32_t ival;
+
+	if (s4_val_get_int (val, &ival)) {
+		return _int_lookup_val (s4, ival);
+	} else if (s4_val_get_str (val, &str)) {
+		return _string_lookup_val (s4, str);
+	}
+	return NULL;
 }
 
 /**
