@@ -67,6 +67,8 @@ const char *_string_lookup (s4_t *s4, const char *str);
 const char *_string_lookup_casefolded (s4_t *s4, const char *str);
 const char *_string_lookup_collated (s4_t *s4, const char *str);
 const s4_val_t *_string_lookup_val (s4_t *s4, const char *str);
+const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i);
+const s4_val_t *_const_lookup (s4_t *s4, const s4_val_t *val);
 
 typedef struct {
 	int32_t key_a, val_a;
