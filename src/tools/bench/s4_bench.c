@@ -18,7 +18,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
-#define ENTRIES 100000
+#define ENTRIES 10000
 
 void log_init (GLogLevelFlags log_lev);
 
@@ -46,6 +46,7 @@ void take_time (const char *message, GTimeVal *prev, GTimeVal *cur)
 int main (int argc, char *argv[])
 {
 	s4_t *s4;
+	s4_transaction_t *t;
 	int i;
 	char *filename = tmpnam (NULL);
 	GTimeVal cur, prev;
@@ -66,7 +67,7 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, "a", val, "b", val, "src");
+		s4_add (s4, NULL, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 
@@ -75,34 +76,38 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, "a", val, "b", val, "src");
+		s4_del (s4, NULL, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 
 	take_time ("s4be_ip_del took", &prev, &cur);
 
+	t = s4_begin (s4, 0);
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, "a", val, "b", val, "src");
+		s4_add (s4, t, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
+	s4_commit (t);
 
 	take_time ("s4be_ip_add took", &prev, &cur);
 
+	t = s4_begin (s4, 0);
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, "a", val, "b", val, "src");
+		s4_del (s4, t, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
+	s4_commit (t);
 
 	take_time ("s4be_ip_del took", &prev, &cur);
 
 	for (i = ENTRIES; i > 0; i--) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, "a", val, "b", val, "src");
+		s4_add (s4, NULL, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 
@@ -111,7 +116,7 @@ int main (int argc, char *argv[])
 	for (i = ENTRIES; i > 0; i--) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, "a", val, "b", val, "src");
+		s4_del (s4, NULL, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 
