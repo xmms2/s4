@@ -34,21 +34,28 @@ struct s4_St {
 	GHashTable *strings_table;
 	GStaticMutex strings_lock;
 
+	GHashTable *int_table;
+	GStaticMutex int_lock;
+
 	GHashTable *coll_table;
 	GStaticMutex coll_lock;
 	GHashTable *case_table;
 	GStaticMutex case_lock;
 
 	FILE *logfile;
+	int log_users;
 	GMutex *log_lock;
 	GCond *sync_cond, *sync_finished_cond;
 	log_number_t last_checkpoint;
 	log_number_t last_synced;
+	log_number_t last_logpoint;
 	log_number_t next_logpoint;
 	int sync_thread_run;
 	GThread *sync_thread;
+	GMutex *sync_lock;
 
 	char *filename;
+	char *tmp_filename;
 	unsigned char uuid[16];
 };
 
@@ -57,6 +64,7 @@ typedef struct str_St str_t;
 void s4_set_errno (s4_errno_t err);
 void _start_sync (s4_t *s4);
 void _sync (s4_t *s4);
+int _reread_file (s4_t *s4);
 
 int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src);
@@ -87,12 +95,6 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *data);
 GList *_index_search (s4_index_t *index, index_function_t func, void *data);
 void _index_free (s4_index_t *index);
 
-void _log_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
-		const char *key_b, const s4_val_t *val_b, const char *src);
-void _log_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
-		const char *key_b, const s4_val_t *val_b, const char *src);
-int _log_open (s4_t *s4);
-int _log_close (s4_t *s4);
 
 int32_t s4_cond_get_ikey (s4_condition_t *cond);
 void s4_cond_set_ikey (s4_condition_t *cond, int32_t ikey);
@@ -139,4 +141,14 @@ int _oplist_next (oplist_t *list);
 void _oplist_reset (oplist_t *list);
 int _oplist_rollback (oplist_t *list);
 int _oplist_execute (oplist_t *list, int rollback_on_failure);
+
+void _log_lock_file (s4_t *s4);
+void _log_unlock_file (s4_t *s4);
+void _log_lock_db (s4_t *s4);
+void _log_unlock_db (s4_t *s4);
+int _log_write (oplist_t *list);
+void _log_checkpoint (s4_t *s4);
+int _log_open (s4_t *s4);
+int _log_close (s4_t *s4);
+
 #endif

@@ -117,7 +117,7 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
 			val_b = s4_val_new_int (rec.val_b);
 		}
 
-		s4_add_internal (s4, key_a, val_a, key_b, val_b, src);
+		_s4_add_internal (s4, key_a, val_a, key_b, val_b, src);
 	}
 
 	return 0;
@@ -172,7 +172,7 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 		return -1;
 	}
 
-	s4->last_checkpoint = hdr.last_checkpoint;
+	s4->last_logpoint = s4->last_checkpoint = hdr.last_checkpoint;
 	for (i = 0; i < 16; i++) {
 		s4->uuid[i] = hdr.uuid[i];
 	}
@@ -187,6 +187,11 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 
 	fclose (file);
 	return 0;
+}
+
+int _reread_file (s4_t *s4)
+{
+	return _read_file (s4, s4->filename, S4_EXISTS);
 }
 
 /**
@@ -312,19 +317,29 @@ static void _result_to_pairs (s4_resultset_t *res, save_data_t *sd)
  * @param filename The file to write to
  * @return 0 on success, non-zero on error
  */
-static int _write_file (s4_t *s4, const char *filename)
+static int _write_file (s4_t *s4)
 {
 	int32_t i = -1;
 	int j;
-	FILE *file = fopen (filename, "w");
+	FILE *file;
 	s4_header_t hdr;
 	save_data_t sd;
 	s4_condition_t *cond;
 	s4_fetchspec_t *fs;
 	s4_resultset_t *res;
+	s4_transaction_t *trans;
 
-	if (file == NULL)
-		return -1;
+	_log_lock_db (s4);
+
+	file = fopen (s4->tmp_filename, "w");
+	if (file == NULL) {
+		_log_unlock_db (s4);
+		return 0;
+	}
+
+	sd.strings = g_hash_table_new (NULL, NULL);
+	sd.pairs = NULL;
+	sd.new_id = 1;
 
 	cond = s4_cond_new_filter (S4_FILTER_EXISTS, NULL, NULL, NULL, S4_CMP_BINARY, 0);
 
@@ -332,13 +347,16 @@ static int _write_file (s4_t *s4, const char *filename)
 	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_PARENT);
 	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_DATA);
 
-	res = s4_query (s4, fs, cond);
-
-	sd.strings = g_hash_table_new (NULL, NULL);
-	sd.pairs = NULL;
-	sd.new_id = 1;
+	trans = s4_begin (s4, 0);
+	res = s4_query (s4, trans, fs, cond);
+	_transaction_writing (trans);
+	s4_commit (trans);
 
 	_result_to_pairs (res, &sd);
+
+	s4_cond_free (cond);
+	s4_fetchspec_free (fs);
+	s4_resultset_free (res);
 
 	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
 	hdr.version = S4_VERSION;
@@ -354,39 +372,30 @@ static int _write_file (s4_t *s4, const char *filename)
 
 	g_hash_table_destroy (sd.strings);
 	g_list_free (sd.pairs);
-	s4_cond_free (cond);
-	s4_fetchspec_free (fs);
-	s4_resultset_free (res);
 
 	fclose (file);
 
-	return 0;
+	g_rename (s4->tmp_filename, s4->filename);
+
+	_log_checkpoint (s4);
+	_log_unlock_db (s4);
+	return 1;
 }
 
 static void *_sync_thread (s4_t *s4)
 {
-	char *tmpfile = g_strconcat (s4->filename, ".chkpnt", NULL);
-	g_mutex_lock (s4->log_lock);
-	while (s4->sync_thread_run || s4->last_checkpoint < s4->next_logpoint) {
+	g_mutex_lock (s4->sync_lock);
+	while (s4->sync_thread_run) {
 		if (s4->sync_thread_run)
-			g_cond_wait (s4->sync_cond, s4->log_lock);
-		s4->last_synced = s4->next_logpoint;
-		g_mutex_unlock (s4->log_lock);
+			g_cond_wait (s4->sync_cond, s4->sync_lock);
+		g_mutex_unlock (s4->sync_lock);
 
-		if (_write_file (s4, tmpfile)) {
-			S4_ERROR ("sync thread could not write file");
-			g_remove (tmpfile);
-		} else {
-			g_rename (tmpfile, s4->filename);
-		}
+		s4_sync (s4);
 
-		g_mutex_lock (s4->log_lock);
-		s4->last_checkpoint = s4->last_synced;
+		g_mutex_lock (s4->sync_lock);
 		g_cond_broadcast (s4->sync_finished_cond);
 	}
-	g_mutex_unlock (s4->log_lock);
-
-	g_free (tmpfile);
+	g_mutex_unlock (s4->sync_lock);
 
 	return NULL;
 }
@@ -394,14 +403,18 @@ static void *_sync_thread (s4_t *s4)
 /* Start sync */
 void _start_sync (s4_t *s4)
 {
+	g_mutex_lock (s4->sync_lock);
 	g_cond_signal (s4->sync_cond);
+	g_mutex_unlock (s4->sync_lock);
 }
 
 /* Start and wait for sync to finish */
 void _sync (s4_t *s4)
 {
-	_start_sync (s4);
-	g_cond_wait (s4->sync_finished_cond, s4->log_lock);
+	g_mutex_lock (s4->sync_lock);
+	g_cond_signal (s4->sync_cond);
+	g_cond_wait (s4->sync_finished_cond, s4->sync_lock);
+	g_mutex_unlock (s4->sync_lock);
 }
 
 static s4_t *_alloc (void)
@@ -412,6 +425,10 @@ static s4_t *_alloc (void)
 	s4->strings_table = g_hash_table_new_full (g_str_hash, g_str_equal,
 			NULL, (GDestroyNotify)s4_val_free);
 	g_static_mutex_init (&s4->strings_lock);
+
+	s4->int_table = g_hash_table_new_full (NULL, NULL,
+			NULL, (GDestroyNotify)s4_val_free);
+	g_static_mutex_init (&s4->int_lock);
 
 	s4->index_table = g_hash_table_new_full (g_str_hash, g_str_equal, free, (GDestroyNotify)_index_free);
 	g_static_mutex_init (&s4->index_table_lock);
@@ -425,7 +442,9 @@ static s4_t *_alloc (void)
 	g_static_mutex_init (&s4->case_lock);
 
 	s4->log_lock = g_mutex_new ();
+	s4->log_users = 0;
 
+	s4->sync_lock = g_mutex_new ();
 	s4->sync_cond = g_cond_new ();
 	s4->sync_finished_cond = g_cond_new ();
 
@@ -445,9 +464,11 @@ static void _free (s4_t *s4)
 	g_hash_table_destroy (s4->coll_table);
 	g_hash_table_destroy (s4->case_table);
 	g_hash_table_destroy (s4->strings_table);
+	g_hash_table_destroy (s4->int_table);
 	g_string_chunk_free (s4->strings);
 
 	g_mutex_free (s4->log_lock);
+	g_mutex_free (s4->sync_lock);
 	g_cond_free (s4->sync_cond);
 	g_cond_free (s4->sync_finished_cond);
 
@@ -456,8 +477,10 @@ static void _free (s4_t *s4)
 	g_static_mutex_free (&s4->index_table_lock);
 	g_static_mutex_free (&s4->case_lock);
 	g_static_mutex_free (&s4->coll_lock);
+	g_static_mutex_free (&s4->int_lock);
 
 	free (s4->filename);
+	g_free (s4->tmp_filename);
 	free (s4);
 }
 
@@ -510,12 +533,13 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 	}
 
 	s4->filename = strdup (filename);
+	s4->tmp_filename = g_strconcat (filename, ".chkpnt", NULL);
 	if (_read_file (s4, s4->filename, open_flags)) {
 		_free (s4);
 		return NULL;
 	}
 
-	if (_log_open (s4)) {
+	if (!_log_open (s4)) {
 		_free (s4);
 		return NULL;
 	}
@@ -540,10 +564,10 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 int s4_close (s4_t* s4)
 {
 	if (!(s4->open_flags & S4_MEMORY)) {
-		g_mutex_lock (s4->log_lock);
+		g_mutex_lock (s4->sync_lock);
 		s4->sync_thread_run = 0;
 		g_cond_signal (s4->sync_cond);
-		g_mutex_unlock (s4->log_lock);
+		g_mutex_unlock (s4->sync_lock);
 		g_thread_join (s4->sync_thread);
 
 		_log_close (s4);
@@ -563,9 +587,9 @@ int s4_close (s4_t* s4)
  */
 void s4_sync (s4_t *s4)
 {
-	g_mutex_lock (s4->log_lock);
-	_sync (s4);
-	g_mutex_unlock (s4->log_lock);
+	if (!_write_file (s4)) {
+		S4_ERROR ("s4_sync: could not write file");
+	}
 }
 
 /**
