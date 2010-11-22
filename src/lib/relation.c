@@ -44,26 +44,6 @@ typedef struct {
  */
 
 /**
- * Creates an internal copy of val
- *
- * @param s4 The database to find constant strings in
- * @param val The value to copy
- * @return A new internal value that is equal to val
- */
-static const s4_val_t *_nocopy_val_copy (s4_t *s4, const s4_val_t *val)
-{
-	const char *str;
-	int32_t ival;
-
-	if (s4_val_get_int (val, &ival)) {
-		return s4_val_new_int (ival);
-	} else if (s4_val_get_str (val, &str)) {
-		return _string_lookup_val (s4, str);
-	}
-	return NULL;
-}
-
-/**
  * Searches an entry for key
  *
  * @param entry The entry to search
@@ -190,18 +170,13 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
  * @param src The source that made the relation
  * @return non-zero if everything went alrite, 0 otherwise
  */
-int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
-		const char *key_b, const s4_val_t *value_b, const char *src)
+int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src)
 {
 	s4_index_t *index;
 	entry_t *entry;
 	GList *entries;
 	int ret;
-	const s4_val_t *val_a, *val_b;
-
-	key_a = _string_lookup (s4, key_a);
-	key_b = _string_lookup (s4, key_b);
-	src = _string_lookup (s4, src);
 
 	g_static_mutex_lock (&s4->rel_lock);
 	index = g_hash_table_lookup (s4->rel_table, key_a);
@@ -212,10 +187,9 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	}
 	g_static_mutex_unlock (&s4->rel_lock);
 
-	entries = _index_search (index, NULL, (void*)value_a);
+	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
-		val_a = _nocopy_val_copy (s4, value_a);
 		entry = _entry_create (key_a, val_a);
 		g_static_mutex_lock (&entry->lock);
 		_index_insert (index, val_a, entry);
@@ -225,7 +199,6 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		g_list_free (entries);
 	}
 
-	val_b = _nocopy_val_copy (s4, value_b);
 	ret = _entry_insert (entry, key_b, val_b, src);
 	g_static_mutex_unlock (&entry->lock);
 
@@ -235,8 +208,6 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		if (index != NULL) {
 			_index_insert (index, val_b, entry);
 		}
-
-		_log_add (s4, key_a, value_a, key_b, value_b, src);
 	}
 
 	return ret;
@@ -248,7 +219,7 @@ int s4_add (s4_t *s4, const char *key_a, const s4_val_t *value_a,
  * written next to each other on file, and it can therefore save
  * many index searches.
  */
-int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
+int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src)
 {
 	int ret;
@@ -289,8 +260,6 @@ int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		/* Int values are not constant, and we must free
 		 * the current one if we are using the previous one
 		 */
-		if (s4_val_is_int (value_a))
-			s4_val_free ((s4_val_t*)value_a);
 		value_a = prev_val;
 		g_static_mutex_lock (&entry->lock);
 	}
@@ -320,7 +289,7 @@ int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
  * @param src The source that made the relation
  * @return non-zero if everything went alrite, 0 otherwise
  */
-int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src)
 {
 	s4_index_t *index;
@@ -359,7 +328,6 @@ int s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		if (index != NULL) {
 			_index_delete (index, val_b, entry);
 		}
-		_log_del (s4, key_a, val_a, key_b, val_b, src);
 	}
 
 	return ret;
@@ -399,15 +367,6 @@ void _free_relations (s4_t *s4)
 
 		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
 			entry_t *entry = entries->data;
-			int i;
-
-			for (i = 0; i < entry->size; i++) {
-				if (s4_val_is_int (entry->data[i].val))
-					s4_val_free ((s4_val_t*)entry->data[i].val);
-			}
-
-			if (s4_val_is_int (entry->val))
-				s4_val_free ((s4_val_t*)entry->val);
 
 			free (entry->data);
 			free (entry);
@@ -550,7 +509,7 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
  * @param cond The condition to check entries against
  * @return A resultset with a row for every entry that matched
  */
-s4_resultset_t *s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
+s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 {
 	check_data_t data;
 	GList *entries;

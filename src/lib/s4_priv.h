@@ -58,7 +58,7 @@ void s4_set_errno (s4_errno_t err);
 void _start_sync (s4_t *s4);
 void _sync (s4_t *s4);
 
-int s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
+int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src);
 
 s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
@@ -104,7 +104,14 @@ s4_resultrow_t *s4_resultrow_create (int colcount);
 s4_resultrow_t *s4_resultrow_ref (s4_resultrow_t *row);
 void s4_resultrow_unref (s4_resultrow_t *row);
 
+int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b, const char *src);
+s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);
 void _free_relations (s4_t *s4);
+
+void _transaction_writing (s4_transaction_t *trans);
 
 typedef struct oplist_St oplist_t;
 oplist_t *_oplist_new (s4_t *s4);
