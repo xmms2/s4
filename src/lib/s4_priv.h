@@ -106,4 +106,30 @@ void s4_resultrow_unref (s4_resultrow_t *row);
 
 void _free_relations (s4_t *s4);
 
+typedef struct oplist_St oplist_t;
+oplist_t *_oplist_new (s4_t *s4);
+void _oplist_free (oplist_t *list);
+s4_t *_oplist_get_db (oplist_t *list);
+void _oplist_insert_add (oplist_t *list,
+		const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b,
+		const char *src);
+void _oplist_insert_del (oplist_t *list,
+		const char *key_a, const s4_val_t *val_a,
+		const char *key_b, const s4_val_t *val_b,
+		const char *src);
+void _oplist_insert_writing (oplist_t *list);
+int _oplist_get_add (oplist_t *list,
+		const char **key_a, const s4_val_t **val_a,
+		const char **key_b, const s4_val_t **val_b,
+		const char **src);
+int _oplist_get_del (oplist_t *list,
+		const char **key_a, const s4_val_t **val_a,
+		const char **key_b, const s4_val_t **val_b,
+		const char **src);
+int _oplist_get_writing (oplist_t *list);
+int _oplist_next (oplist_t *list);
+void _oplist_reset (oplist_t *list);
+int _oplist_rollback (oplist_t *list);
+int _oplist_execute (oplist_t *list, int rollback_on_failure);
 #endif
