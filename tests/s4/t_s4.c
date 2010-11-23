@@ -77,7 +77,7 @@ static void create_db (struct db_struct *db)
 
 		for (j = 0; db[i].args[j] != NULL; j++) {
 			arg_val = s4_val_new_string (db[i].args[j]);
-			CU_ASSERT (s4_add (s4, "entry", name_val, "property", arg_val, db[i].src));
+			CU_ASSERT (s4_add (s4, NULL, "entry", name_val, "property", arg_val, db[i].src));
 			s4_val_free (arg_val);
 		}
 
@@ -95,7 +95,7 @@ static void check_db (struct db_struct *db)
 		s4_val_t *name_val = s4_val_new_string (db[i].name);
 		s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL,
 				"entry", name_val, NULL, S4_CMP_CASELESS, S4_COND_PARENT);
-		s4_resultset_t *set = s4_query (s4, fs, cond);
+		s4_resultset_t *set = s4_query (s4, NULL, fs, cond);
 		const s4_result_t *res = s4_resultset_get_result (set, 0, 0);
 		int found[ARG_SIZE] = {0};
 
@@ -185,7 +185,7 @@ static void del_db (struct db_struct db[])
 
 		for (j = 0; db[i].args[j] != NULL; j++) {
 			arg_val = s4_val_new_string (db[i].args[j]);
-			CU_ASSERT (s4_del (s4, "entry", name_val, "property", arg_val, db[i].src));
+			CU_ASSERT (s4_del (s4, NULL, "entry", name_val, "property", arg_val, db[i].src));
 			s4_val_free (arg_val);
 		}
 
@@ -244,7 +244,7 @@ CASE (test_query) {
 
 	s4_condition_t *cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
 			sa, sp, S4_CMP_CASELESS, 0);
-	s4_resultset_t *set = s4_query (s4, fs, cond);
+	s4_resultset_t *set = s4_query (s4, NULL, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
 	CU_ASSERT_EQUAL (s4_resultset_get_rowcount (set), 1);
@@ -257,7 +257,7 @@ CASE (test_query) {
 
 	cond = s4_cond_new_filter (S4_FILTER_EQUAL, "property",
 			sb, sp, S4_CMP_CASELESS, 0);
-	set = s4_query (s4, fs, cond);
+	set = s4_query (s4, NULL, fs, cond);
 	CU_ASSERT_PTR_NOT_NULL_FATAL (set);
 	CU_ASSERT_EQUAL (s4_resultset_get_colcount (set), 1);
 	CU_ASSERT_EQUAL (s4_resultset_get_rowcount (set), 1);
