@@ -245,7 +245,7 @@ int _log_write (oplist_t *list)
 	int writing = 0;
 	int size = _estimate_size (list, &writing);
 
-	if (size == 0)
+	if (s4->logfile == NULL || size == 0)
 		return 1;
 
 	_log_lock (s4);
@@ -452,7 +452,7 @@ int _log_open (s4_t *s4)
 	s4->logfile = fopen (log_name, "r+");
 
 	if (s4->logfile == NULL) {
-		s4->logfile = fopen (log_name, "w");
+		s4->logfile = fopen (log_name, "w+");
 		if (s4->logfile == NULL) {
 			s4_set_errno (S4E_LOGOPEN);
 			return 0;
