@@ -551,7 +551,7 @@ s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		g_static_mutex_unlock (&s4->rel_lock);
 
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
-			entries = g_list_concat (entries, _index_search (index, (index_function_t)_everything, NULL));
+			entries = g_list_concat (entries, _index_search (indices->data, (index_function_t)_everything, NULL));
 		}
 	}
 
