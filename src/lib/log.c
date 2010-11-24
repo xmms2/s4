@@ -352,6 +352,8 @@ static int _log_redo (s4_t *s4)
 	log_number_t last_valid_logpoint;
 	oplist_t *oplist = NULL;
 
+	fflush (s4->logfile);
+
 	/* Check if the log wrapped around since our last write */
 	pos = s4->last_logpoint % LOG_SIZE;
 	if (fseek (s4->logfile, pos, SEEK_SET) != 0 ||
