@@ -5,11 +5,15 @@
 struct s4_transaction_St {
 	int flags;
 	oplist_t *ops;
+	void *locks;
+	s4_transaction_t *waiting_for;
+	int restartable, deadlocked;
 };
 
 
 static void _transaction_free (s4_transaction_t *trans)
 {
+	_entry_unlock_all (trans);
 	_oplist_free (trans->ops);
 	free (trans);
 }
@@ -17,6 +21,62 @@ static void _transaction_free (s4_transaction_t *trans)
 void _transaction_writing (s4_transaction_t *trans)
 {
 	_oplist_insert_writing (trans->ops);
+}
+
+s4_transaction_t *_transaction_get_waiting_for (s4_transaction_t *trans)
+{
+	return trans->waiting_for;
+}
+
+void _transaction_set_waiting_for (s4_transaction_t *trans, s4_transaction_t *waiting_for)
+{
+	trans->waiting_for = waiting_for;
+}
+
+void *_transaction_get_locks (s4_transaction_t *trans)
+{
+	return trans->locks;
+}
+
+void _transaction_set_locks (s4_transaction_t *trans, void *locks)
+{
+	trans->locks = locks;
+}
+
+void _transaction_set_deadlocked (s4_transaction_t *trans)
+{
+	trans->deadlocked = 1;
+}
+
+/* Tries to acquire all the needed locks.
+ * Returns 0 on error (e.g. deadlock), non-zero on success.
+ */
+int _transaction_lock (s4_transaction_t *trans)
+{
+	int tries = 5, ret = 1;
+
+	if (trans->deadlocked) {
+		s4_set_errno (S4E_DEADLOCK);
+		return 0;
+	} else if (!trans->restartable) {
+		tries = 1;
+	}
+
+	do {
+		_oplist_reset (trans->ops);
+
+		while (ret && _oplist_next (trans->ops)) {
+			const char *key_a, *key_b, *src;
+			const s4_val_t *val_a, *val_b;
+
+			if (_oplist_get_add (trans->ops, &key_a, &val_a, &key_b, &val_b, &src)
+					|| _oplist_get_del (trans->ops, &key_a, &val_a, &key_b, &val_b, &src)) {
+				ret = _entry_lock (trans, key_a, val_a);
+			}
+		}
+	} while (--tries && !ret);
+
+	return ret;
 }
 
 /**
@@ -32,6 +92,7 @@ s4_transaction_t *s4_begin (s4_t *s4, int flags)
 	s4_transaction_t *trans = calloc (sizeof (s4_transaction_t), 1);
 	trans->flags = flags;
 	trans->ops = _oplist_new (s4);
+	trans->restartable = 1;
 
 	_log_lock_file (s4);
 
@@ -51,18 +112,22 @@ int s4_commit (s4_transaction_t *trans)
 {
 	int ret;
 
-	ret = _oplist_execute (trans->ops, 1);
+	if (!_transaction_lock (trans)) {
+		ret = 0;
+	} else {
+		ret = _oplist_execute (trans->ops, 1);
+	}
 
 	if (ret != 0) {
 		ret = _log_write (trans->ops);
 
 		if (ret == 0) {
 			_oplist_rollback (trans->ops);
-			_start_sync (_oplist_get_db (trans->ops));
+			_start_sync (_transaction_get_db (trans));
 		}
 	}
 
-	_log_unlock_file (_oplist_get_db (trans->ops));
+	_log_unlock_file (_transaction_get_db (trans));
 	_transaction_free (trans);
 
 	return ret;
@@ -82,6 +147,12 @@ int s4_abort (s4_transaction_t *trans)
 
 	return 1;
 }
+
+s4_t *_transaction_get_db (s4_transaction_t *trans)
+{
+	return _oplist_get_db (trans->ops);
+}
+
 
 int s4_add (s4_t *s4, s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
@@ -123,7 +194,8 @@ s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
 	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
 	s4_resultset_t *ret;
 
-	ret = _s4_query (_oplist_get_db (t->ops), spec, cond);
+	t->restartable = 0;
+	ret = _s4_query (t, spec, cond);
 
 	if (t != trans) {
 		s4_commit (t);

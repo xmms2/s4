@@ -33,7 +33,9 @@ typedef enum {
 	S4E_VERSION, /**< Version number was incorrect */
 	S4E_INCONS, /**< Database is inconsistent. */
 	S4E_LOGOPEN, /**< Could not open log file. See errno for more details */
-	S4E_LOGREDO /**< Could not redo changes in the log. Probably corrupted log */
+	S4E_LOGREDO, /**< Could not redo changes in the log. Probably corrupted log */
+	S4E_DEADLOCK, /**< The transaction deadlocked and was aborted */
+	S4E_EXECUTE, /**< One of the operations in the transaction failed */
 } s4_errno_t;
 
 typedef enum {

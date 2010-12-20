@@ -197,6 +197,7 @@ int _oplist_execute (oplist_t *list, int rollback_on_failure)
 
 		if (!ret && rollback_on_failure) {
 			_oplist_rollback (list);
+			s4_set_errno (S4E_EXECUTE);
 			return 0;
 		}
 	}

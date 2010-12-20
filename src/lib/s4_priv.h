@@ -42,6 +42,9 @@ struct s4_St {
 	GHashTable *case_table;
 	GStaticMutex case_lock;
 
+	GHashTable *lock_table;
+	GMutex *lock_lock;
+
 	FILE *logfile;
 	int log_users;
 	GMutex *log_lock;
@@ -110,10 +113,16 @@ int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
 int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
-s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond);
+s4_resultset_t *_s4_query (s4_transaction_t *trans, s4_fetchspec_t *fs, s4_condition_t *cond);
 void _free_relations (s4_t *s4);
 
-void _transaction_writing (s4_transaction_t *trans);
+s4_t *_transaction_get_db (s4_transaction_t *trans);
+void  _transaction_writing (s4_transaction_t *trans);
+s4_transaction_t *_transaction_get_waiting_for (s4_transaction_t *trans);
+void _transaction_set_waiting_for (s4_transaction_t *trans, s4_transaction_t *waiting_for);
+void *_transaction_get_locks (s4_transaction_t *trans);
+void  _transaction_set_locks (s4_transaction_t *trans, void *lock);
+void _transaction_set_deadlocked (s4_transaction_t *trans);
 
 typedef struct oplist_St oplist_t;
 oplist_t *_oplist_new (s4_t *s4);
@@ -150,5 +159,9 @@ int _log_write (oplist_t *list);
 void _log_checkpoint (s4_t *s4);
 int _log_open (s4_t *s4);
 int _log_close (s4_t *s4);
+
+GHashTable *_create_lock_table ();
+int _entry_lock (s4_transaction_t *trans, const char *key, const s4_val_t *val);
+int _entry_unlock_all (s4_transaction_t *trans);
 
 #endif

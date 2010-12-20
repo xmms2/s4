@@ -26,7 +26,6 @@ typedef struct {
 	const char *key;
 	const s4_val_t *val;
 	int size, alloc;
-	GStaticMutex lock;
 
 	entry_data_t *data;
 } entry_t;
@@ -148,7 +147,6 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
 	entry->val = val;
 	entry->size = 0;
 	entry->alloc = 1;
-	g_static_mutex_init (&entry->lock);
 
 	entry->data = malloc (sizeof (entry_data_t) * entry->alloc);
 
@@ -191,16 +189,13 @@ int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 
 	if (entries == NULL) {
 		entry = _entry_create (key_a, val_a);
-		g_static_mutex_lock (&entry->lock);
 		_index_insert (index, val_a, entry);
 	} else {
 		entry = entries->data;
-		g_static_mutex_lock (&entry->lock);
 		g_list_free (entries);
 	}
 
 	ret = _entry_insert (entry, key_b, val_b, src);
-	g_static_mutex_unlock (&entry->lock);
 
 	if (ret) {
 		index = _index_get (s4, key_b);
@@ -246,11 +241,9 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 
 		if (entries == NULL) {
 			entry = _entry_create (key_a, value_a);
-			g_static_mutex_lock (&entry->lock);
 			_index_insert (index, value_a, entry);
 		} else {
 			entry = entries->data;
-			g_static_mutex_lock (&entry->lock);
 			g_list_free (entries);
 		}
 
@@ -261,11 +254,9 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		 * the current one if we are using the previous one
 		 */
 		value_a = prev_val;
-		g_static_mutex_lock (&entry->lock);
 	}
 
 	ret = _entry_insert (entry, key_b, value_b, src);
-	g_static_mutex_unlock (&entry->lock);
 
 	if (ret) {
 		index = _index_get (s4, key_b);
@@ -318,9 +309,7 @@ int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		g_list_free (entries);
 	}
 
-	g_static_mutex_lock (&entry->lock);
 	ret = _entry_delete (entry, key_b, val_b, src);
-	g_static_mutex_unlock (&entry->lock);
 
 	if (ret) {
 		index = g_hash_table_lookup (s4->index_table, key_b);
@@ -509,12 +498,16 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
  * @param cond The condition to check entries against
  * @return A resultset with a row for every entry that matched
  */
-s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
+s4_resultset_t *_s4_query (
+		s4_transaction_t *trans,
+		s4_fetchspec_t *fs,
+		s4_condition_t *cond)
 {
 	check_data_t data;
 	GList *entries;
 	s4_index_t *index;
 	s4_resultset_t *ret = s4_resultset_create (s4_fetchspec_size (fs));
+	s4_t *s4 = _transaction_get_db (trans);
 
 	s4_cond_update_key (cond, s4);
 	s4_fetchspec_update_key (s4, fs);
@@ -560,10 +553,12 @@ s4_resultset_t *_s4_query (s4_t *s4, s4_fetchspec_t *fs, s4_condition_t *cond)
 		entry_t *entry = entries->data;
 		data.l = entry;
 
-		g_static_mutex_lock (&entry->lock);
+		if (!_entry_lock (trans, entry->key, entry->val)) {
+			_transaction_set_deadlocked (trans);
+			break;
+		}
 		if (entry->size != 0 && !_check_cond (cond, &data))
 			s4_resultset_add_row (ret, _fetch (s4, entry, fs));
-		g_static_mutex_unlock (&entry->lock);
 	}
 
 	return ret;
