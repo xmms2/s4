@@ -93,7 +93,7 @@ int _entry_lock (s4_transaction_t *trans, const char *key, const s4_val_t *val)
 		goto finished;
 	}
 
-	if (lock->trans != NULL) {
+	while (ret && lock->trans != NULL) {
 		if (_is_deadlocked (lock, trans)) {
 			s4_set_errno (S4E_DEADLOCK);
 			ret = 0;
@@ -129,7 +129,7 @@ int _entry_unlock_all (s4_transaction_t *trans)
 
 	g_mutex_lock (s4->lock_lock);
 
-	for (lock = _transaction_get_locks (trans);	lock != NULL; lock = lock->next) {
+	for (lock = _transaction_get_locks (trans); lock != NULL; lock = lock->next) {
 		lock->trans = NULL;
 		g_cond_signal (lock->cond);
 	}
