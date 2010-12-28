@@ -147,7 +147,8 @@ int _oplist_get_del (oplist_t *list,
 		const char **src);
 int _oplist_get_writing (oplist_t *list);
 int _oplist_next (oplist_t *list);
-void _oplist_reset (oplist_t *list);
+void _oplist_first (oplist_t *list);
+void _oplist_last (oplist_t *list);
 int _oplist_rollback (oplist_t *list);
 int _oplist_execute (oplist_t *list, int rollback_on_failure);
 

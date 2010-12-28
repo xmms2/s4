@@ -96,9 +96,14 @@ int _oplist_next (oplist_t *list)
 	return 1;
 }
 
-void _oplist_reset (oplist_t *list)
+void _oplist_first (oplist_t *list)
 {
 	list->cur = NULL;
+}
+
+void _oplist_last (oplist_t *list)
+{
+	list->cur = list->ops;
 }
 
 int _oplist_get_add (oplist_t *list,
@@ -182,7 +187,7 @@ int _oplist_rollback (oplist_t *list)
 
 int _oplist_execute (oplist_t *list, int rollback_on_failure)
 {
-	_oplist_reset (list);
+	_oplist_first (list);
 
 	while (_oplist_next (list)) {
 		const char *key_a, *key_b, *src;
