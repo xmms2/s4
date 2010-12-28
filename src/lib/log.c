@@ -103,7 +103,7 @@ static int _get_val_len (const s4_val_t *val)
 
 static int _estimate_size (oplist_t *list, int *writing) {
 	int ret = 0, largest = 0;
-	_oplist_reset (list);
+	_oplist_first (list);
 
 	while (_oplist_next (list)) {
 		const char *key_a, *key_b, *src;
@@ -260,7 +260,7 @@ int _log_write (oplist_t *list)
 
 	_log_simple (s4, LOG_ENTRY_BEGIN);
 
-	_oplist_reset (list);
+	_oplist_first (list);
 	while (_oplist_next (list)) {
 		const char *key_a, *key_b, *src;
 		const s4_val_t *val_a, *val_b;
