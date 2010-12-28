@@ -60,7 +60,7 @@ static gboolean _lock_equal (lock_t *a, lock_t *b)
 	return a->key == b->key && a->val == b->val;
 }
 
-GHashTable *_create_lock_table ()
+GHashTable *_create_lock_table (void)
 {
 	return g_hash_table_new_full ((GHashFunc)_lock_hash,
 			(GEqualFunc)_lock_equal, (GDestroyNotify)_free_lock, NULL);

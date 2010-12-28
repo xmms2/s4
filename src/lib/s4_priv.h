@@ -160,7 +160,7 @@ void _log_checkpoint (s4_t *s4);
 int _log_open (s4_t *s4);
 int _log_close (s4_t *s4);
 
-GHashTable *_create_lock_table ();
+GHashTable *_create_lock_table (void);
 int _entry_lock (s4_transaction_t *trans, const char *key, const s4_val_t *val);
 int _entry_unlock_all (s4_transaction_t *trans);
 
