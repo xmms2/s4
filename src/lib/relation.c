@@ -226,7 +226,7 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	/* If key_a and value_a are equal to the key and value of entry
 	 * it don't have to search the index to find entry
 	 */
-	if (prev_key != key_a || s4_val_cmp (prev_val, value_a, S4_CMP_BINARY)) {
+	if (prev_key != key_a || prev_val != value_a) {
 		GList *entries;
 
 		g_static_mutex_lock (&s4->rel_lock);
@@ -250,9 +250,6 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		prev_key = key_a;
 		prev_val = value_a;
 	} else {
-		/* Int values are not constant, and we must free
-		 * the current one if we are using the previous one
-		 */
 		value_a = prev_val;
 	}
 
