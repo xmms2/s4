@@ -48,11 +48,11 @@ void _oplist_insert_add (oplist_t *list,
 {
 	op_t *op = malloc (sizeof (op_t));
 	op->type = OP_ADD;
-	op->key_a = _string_lookup (list->s4, key_a);
-	op->key_b = _string_lookup (list->s4, key_b);
-	op->src = _string_lookup (list->s4, src);
-	op->val_a = _const_lookup (list->s4, val_a);
-	op->val_b = _const_lookup (list->s4, val_b);
+	op->key_a = key_a;
+	op->key_b = key_b;
+	op->src = src;
+	op->val_a = val_a;
+	op->val_b = val_b;
 
 	list->ops = g_list_prepend (list->ops, op);
 }
@@ -64,11 +64,11 @@ void _oplist_insert_del (oplist_t *list,
 {
 	op_t *op = malloc (sizeof (op_t));
 	op->type = OP_DEL;
-	op->key_a = _string_lookup (list->s4, key_a);
-	op->key_b = _string_lookup (list->s4, key_b);
-	op->src = _string_lookup (list->s4, src);
-	op->val_a = _const_lookup (list->s4, val_a);
-	op->val_b = _const_lookup (list->s4, val_b);
+	op->key_a = key_a;
+	op->key_b = key_b;
+	op->src = src;
+	op->val_a = val_a;
+	op->val_b = val_b;
 
 	list->ops = g_list_prepend (list->ops, op);
 }
