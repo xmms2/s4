@@ -108,13 +108,13 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
 			val_a = _string_lookup_val (s4,
 					g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_a)));
 		} else {
-			val_a = s4_val_new_int (rec.val_a);
+			val_a = _int_lookup_val (s4, rec.val_a);
 		}
 		if (rec.key_b > 0) {
 			val_b = _string_lookup_val (s4,
 					g_hash_table_lookup (strings, GINT_TO_POINTER (rec.val_b)));
 		} else {
-			val_b = s4_val_new_int (rec.val_b);
+			val_b = _int_lookup_val (s4, rec.val_b);
 		}
 
 		_s4_add_internal (s4, key_a, val_a, key_b, val_b, src);
