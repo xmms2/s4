@@ -7,7 +7,7 @@ struct s4_transaction_St {
 	oplist_t *ops;
 	void *locks;
 	s4_transaction_t *waiting_for;
-	int restartable, deadlocked;
+	int restartable, deadlocked, failed;
 };
 
 
@@ -48,37 +48,6 @@ void _transaction_set_deadlocked (s4_transaction_t *trans)
 	trans->deadlocked = 1;
 }
 
-/* Tries to acquire all the needed locks.
- * Returns 0 on error (e.g. deadlock), non-zero on success.
- */
-int _transaction_lock (s4_transaction_t *trans)
-{
-	int tries = 5, ret = 1;
-
-	if (trans->deadlocked) {
-		s4_set_errno (S4E_DEADLOCK);
-		return 0;
-	} else if (!trans->restartable) {
-		tries = 1;
-	}
-
-	do {
-		_oplist_reset (trans->ops);
-
-		while (ret && _oplist_next (trans->ops)) {
-			const char *key_a, *key_b, *src;
-			const s4_val_t *val_a, *val_b;
-
-			if (_oplist_get_add (trans->ops, &key_a, &val_a, &key_b, &val_b, &src)
-					|| _oplist_get_del (trans->ops, &key_a, &val_a, &key_b, &val_b, &src)) {
-				ret = _entry_lock (trans, key_a, val_a);
-			}
-		}
-	} while (--tries && !ret);
-
-	return ret;
-}
-
 /**
  * Starts a new transaction.
  *
@@ -110,21 +79,24 @@ s4_transaction_t *s4_begin (s4_t *s4, int flags)
  */
 int s4_commit (s4_transaction_t *trans)
 {
-	int ret;
+	int ret = 0;
 
-	if (!_transaction_lock (trans)) {
-		ret = 0;
+	if (trans->failed) {
+		s4_set_errno (S4E_EXECUTE);
+	} else if (trans->deadlocked) {
+		s4_set_errno (S4E_DEADLOCK);
 	} else {
-		ret = _oplist_execute (trans->ops, 1);
-	}
-
-	if (ret != 0) {
 		ret = _log_write (trans->ops);
 
 		if (ret == 0) {
-			_oplist_rollback (trans->ops);
 			_start_sync (_transaction_get_db (trans));
+			s4_set_errno (S4E_LOGFULL);
 		}
+	}
+
+	if (ret == 0) {
+		_oplist_last (trans->ops);
+		_oplist_rollback (trans->ops);
 	}
 
 	_log_unlock_file (_transaction_get_db (trans));
@@ -143,6 +115,8 @@ int s4_commit (s4_transaction_t *trans)
  */
 int s4_abort (s4_transaction_t *trans)
 {
+	_oplist_last (trans->ops);
+	_oplist_rollback (trans->ops);
 	_transaction_free (trans);
 
 	return 1;
@@ -159,10 +133,30 @@ int s4_add (s4_t *s4, s4_transaction_t *trans,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src)
 {
+	int ret;
 	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
-	int ret = 1;
+	s4_t *db = _transaction_get_db (t);
 
-	_oplist_insert_add (t->ops, key_a, val_a, key_b, val_b, src);
+	key_a = _string_lookup (db, key_a);
+	key_b = _string_lookup (db, key_b);
+	src = _string_lookup (db, src);
+	val_a = _const_lookup (db, val_a);
+	val_b = _const_lookup (db, val_b);
+
+	if (t->failed || t->deadlocked) {
+		ret = 0;
+	} else if (!_entry_lock (t, key_a, val_a)) {
+		t->deadlocked = 1;
+		ret = 0;
+	} else {
+		_oplist_insert_add (t->ops, key_a, val_a, key_b, val_b, src);
+		ret = _s4_add (db, key_a, val_a, key_b, val_b, src);
+
+		if (!ret) {
+			t->failed = 1;
+		}
+	}
+
 
 	if (t != trans) {
 		ret = s4_commit (t);
@@ -176,10 +170,29 @@ int s4_del (s4_t *s4, s4_transaction_t *trans,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src)
 {
+	int ret;
 	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
-	int ret = 1;
+	s4_t *db = _transaction_get_db (t);
 
-	_oplist_insert_del (t->ops, key_a, val_a, key_b, val_b, src);
+	key_a = _string_lookup (db, key_a);
+	key_b = _string_lookup (db, key_b);
+	src = _string_lookup (db, src);
+	val_a = _const_lookup (db, val_a);
+	val_b = _const_lookup (db, val_b);
+
+	if (t->failed || t->deadlocked) {
+		ret = 0;
+	} else if (!_entry_lock (t, key_a, val_a)) {
+		t->deadlocked = 1;
+		ret = 0;
+	} else {
+		_oplist_insert_del (t->ops, key_a, val_a, key_b, val_b, src);
+		ret = _s4_del (db, key_a, val_a, key_b, val_b, src);
+
+		if (!ret) {
+			t->failed = 1;
+		}
+	}
 
 	if (t != trans) {
 		ret = s4_commit (t);
@@ -195,7 +208,12 @@ s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
 	s4_resultset_t *ret;
 
 	t->restartable = 0;
-	ret = _s4_query (t, spec, cond);
+
+	if (t->failed || t->deadlocked) {
+		ret = s4_resultset_create (0);
+	} else {
+		ret = _s4_query (t, spec, cond);
+	}
 
 	if (t != trans) {
 		s4_commit (t);

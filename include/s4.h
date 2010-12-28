@@ -36,6 +36,7 @@ typedef enum {
 	S4E_LOGREDO, /**< Could not redo changes in the log. Probably corrupted log */
 	S4E_DEADLOCK, /**< The transaction deadlocked and was aborted */
 	S4E_EXECUTE, /**< One of the operations in the transaction failed */
+	S4E_LOGFULL, /**< Not enough room in the log for the transaction. */
 } s4_errno_t;
 
 typedef enum {
