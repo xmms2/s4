@@ -90,6 +90,7 @@ static GHashTable *_read_string (s4_t *s4, FILE *file)
  *
  * @param s4 The database to insert them into
  * @param file The file to read
+ * @param strings A hashtable with string->int relationships
  * @return -1 on error, 0 otherwise
  */
 static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
@@ -128,6 +129,7 @@ static int _read_relations (s4_t *s4, FILE *file, GHashTable *strings)
  *
  * @param s4 The s4 database to read the data into
  * @param filename The name of the file to read from
+ * @param flags Flags passed to s4_open
  * @return 0 on success, non-zero on error
  */
 static int _read_file (s4_t *s4, const char *filename, int flags)
@@ -241,9 +243,8 @@ typedef struct {
 /**
  * Gets the id of a string, or gives it an unique id if it doesn't have one
  *
- * @param table A hashtable with id->string pairs
+ * @param sd A structure holding the strings found so far and the next free id.
  * @param str The string to lookup
- * @param new_id A pointer to an int holding the next free id to use
  * @return The id associated with the string
  */
 static int _get_string_number (save_data_t *sd, const char *str)
@@ -315,7 +316,6 @@ static void _result_to_pairs (s4_resultset_t *res, save_data_t *sd)
  * Writes the database to disk
  *
  * @param s4 The database to write
- * @param filename The file to write to
  * @return 0 on success, non-zero on error
  */
 static int _write_file (s4_t *s4)
