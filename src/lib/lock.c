@@ -15,6 +15,14 @@
 #include "s4_priv.h"
 #include <stdlib.h>
 
+/**
+ * @defgroup Lock Lock
+ * @ingroup S4
+ * @brief Locks entries so only one transaction can use tham at a time.
+ *
+ * @{
+ */
+
 typedef struct lock_St {
 	const char *key;
 	const s4_val_t *val;
@@ -137,3 +145,7 @@ int _entry_unlock_all (s4_transaction_t *trans)
 	g_mutex_unlock (s4->lock_lock);
 	return ret;
 }
+
+/**
+ * @}
+ */
