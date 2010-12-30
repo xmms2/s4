@@ -1,6 +1,28 @@
+/*  S4 - An XMMS2 medialib backend
+ *  Copyright (C) 2009, 2010 Sivert Berg
+ *
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation; either
+ *  version 2.1 of the License, or (at your option) any later version.
+ *
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
+ */
+
 #include "s4_priv.h"
 #include <stdlib.h>
 
+/**
+ *
+ * @defgroup Transactions Transactions
+ * @ingroup S4
+ * @brief Functions dealing with transactions.
+ *
+ * @{
+ */
 
 struct s4_transaction_St {
 	int flags;
@@ -73,7 +95,6 @@ s4_transaction_t *s4_begin (s4_t *s4, int flags)
  * will be applied in one atomic step, on error none of the operations
  * in the transaction will be applied.
  *
- * @param s4 The database the transaction belongs to.
  * @param trans The transaction to commit.
  * @return 0 on error (and sets s4_errno), non-zero on success.
  */
@@ -109,7 +130,6 @@ int s4_commit (s4_transaction_t *trans)
  * Aborts a transaction.
  * The database will behave like the transaction never happened.
  *
- * @param s4 The database the transaction belongs to
  * @param trans The transaction
  * @return 0 on error, non-zero on success.
  */
@@ -127,7 +147,22 @@ s4_t *_transaction_get_db (s4_transaction_t *trans)
 	return _oplist_get_db (trans->ops);
 }
 
-
+/**
+ * Adds a relationship to the database.
+ * It takes both a database handle and a transaction handle,
+ * but only one if used. If the transaction handle is NULL it
+ * will create a local transaction, otherwise it will use the
+ * transaction passed, and thus s4 is not needed.
+ *
+ * @param s4 The database to add to.
+ * @param trans The transaction to use.
+ * @param key_a Key A.
+ * @param val_a Value A.
+ * @param key_b Key B.
+ * @param val_b Value B.
+ * @param src Source.
+ * @return 0 on error, non-zero on success.
+ */
 int s4_add (s4_t *s4, s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
@@ -165,6 +200,22 @@ int s4_add (s4_t *s4, s4_transaction_t *trans,
 	return ret;
 }
 
+/**
+ * Deletes a relationship from the database.
+ * It takes both a database handle and a transaction handle,
+ * but only one if used. If the transaction handle is NULL it
+ * will create a local transaction, otherwise it will use the
+ * transaction passed, and thus s4 is not needed.
+ *
+ * @param s4 The database to delete from.
+ * @param trans The transaction to use.
+ * @param key_a Key A.
+ * @param val_a Value A.
+ * @param key_b Key B.
+ * @param val_b Value B.
+ * @param src Source.
+ * @return 0 on error, non-zero on success.
+ */
 int s4_del (s4_t *s4, s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
@@ -201,6 +252,15 @@ int s4_del (s4_t *s4, s4_transaction_t *trans,
 	return ret;
 }
 
+/**
+ * Queries an S4 database.
+ *
+ * @param s4 The database to query. If s4 is NULL trans must be non-null.
+ * @param trans The transaction to use. If trans is NULL s4 must be non-null.
+ * @param spec The fetchspecification to use when querying.
+ * @param cond The condition to use when querying.
+ * @return A resultset containing the fetched data.
+ */
 s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
 		s4_fetchspec_t *spec, s4_condition_t *cond)
 {
@@ -221,3 +281,7 @@ s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
 
 	return ret;
 }
+
+/**
+ * @}
+ */
