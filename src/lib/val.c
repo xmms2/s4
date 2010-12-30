@@ -251,7 +251,8 @@ int s4_val_get_int (const s4_val_t *val, int32_t *i)
  *
  * @param i The int
  * @param s The string
- * @param casesens If non-zero compare case-sensitively
+ * @param coll_str A collated version of the string. If this is NULL
+ * strings will always be placed before integers.
  * @return <0 if i<s, 0 if i==s and >0 if i>s
  */
 static int _int_str_cmp (int32_t i, const char *s, const char *coll_str)
