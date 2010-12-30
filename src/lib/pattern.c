@@ -159,7 +159,7 @@ static int32_t
 _find_num (pattern_t *p, int32_t num)
 {
 	int32_t ret = 0;
-	for (; num && (ret = _match_num (p, num)) == -1; num /= 10);
+	for (; (ret = _match_num (p, num)) == -1 && num; num /= 10);
 
 	return ret;
 }
