@@ -18,9 +18,10 @@
 #include <stdlib.h>
 
 #ifdef _WIN32
-#include <io.h>     /* For _chsize */
+#include <io.h>      /* For _chsize */
+#include <Windows.h> /* For (Un)LockFile */
 #else
-#include <unistd.h> /* For ftruncate */
+#include <unistd.h>  /* For ftruncate */
 #include <fcntl.h>
 #endif
 
@@ -440,6 +441,36 @@ void _log_truncate (s4_t *s4)
 #endif
 }
 
+void _log_lockf (s4_t *s4, int offset)
+{
+#ifdef _WIN32
+	while (!LockFile (fileno (s4->logfile), offset, 0, 1, 0));
+#else
+	struct flock lock;
+	lock.l_type = F_UNLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = offset;
+	lock.l_len = 1;
+
+	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+#endif
+}
+
+void _log_unlockf (s4_t *s4, int offset)
+{
+#ifdef _WIN32
+	while (!UnlockFile (fileno (s4->logfile), offset, 0, 1, 0));
+#else
+	struct flock lock;
+	lock.l_type = F_UNLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = offset;
+	lock.l_len = 1;
+
+	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+#endif
+}
+
 /**
  * Opens a log file. It will redo every change written to the log
  * after the last checkpoint.
@@ -480,14 +511,7 @@ void _log_lock_file (s4_t *s4)
 
 	_log_lock (s4);
 	if (s4->log_users == 0) {
-		struct flock lock;
-		lock.l_type = F_WRLCK;
-		lock.l_whence = SEEK_SET;
-		lock.l_start = 0;
-		lock.l_len = 1;
-
-		while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
-
+		_log_lockf (s4, 0);
 		_log_redo (s4);
 	}
 
@@ -508,35 +532,17 @@ void _log_unlock_file (s4_t *s4)
 		s4->log_users = 0;
 	}
 	if (s4->log_users == 0) {
-		struct flock lock;
-		lock.l_type = F_UNLCK;
-		lock.l_whence = SEEK_SET;
-		lock.l_start = 0;
-		lock.l_len = 1;
-
-		while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+		_log_unlockf (s4, 0);
 	}
 	_log_unlock (s4);
 }
 
 void _log_lock_db (s4_t *s4)
 {
-	struct flock lock;
-	lock.l_type = F_WRLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 1;
-	lock.l_len = 1;
-
-	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+	_log_lockf (s4, 1);
 }
 
 void _log_unlock_db (s4_t *s4)
 {
-	struct flock lock;
-	lock.l_type = F_UNLCK;
-	lock.l_whence = SEEK_SET;
-	lock.l_start = 1;
-	lock.l_len = 1;
-
-	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+	_log_unlockf (s4, 1);
 }
