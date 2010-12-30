@@ -25,6 +25,14 @@
 #include <fcntl.h>
 #endif
 
+/**
+ * @defgroup Log Log
+ * @ingroup S4
+ * @brief Logs every action so we can redo changes if something crashes.
+ *
+ * @{
+ */
+
 typedef enum {
 	LOG_ENTRY_ADD = 0xaddadd,
 	LOG_ENTRY_DEL = 0xde1e7e,
@@ -52,7 +60,9 @@ struct mod_header {
 };
 
 /**
- * Calculate the size of a log entry from the header
+ * Calculates the size of a log entry from the header
+ * @param hdr The header to calculate the size of.
+ * @return The calculated size.
  */
 static int _get_size (struct mod_header *hdr)
 {
@@ -73,11 +83,23 @@ static int _get_size (struct mod_header *hdr)
 	return ret;
 }
 
+/**
+ * Writes a string to a file.
+ * @param str The string to write.
+ * @param len The length of the string.
+ * @param file The file to write to.
+ */
 static void _write_str (const char *str, int len, FILE *file)
 {
 	fwrite (str, 1, len, file);
 }
 
+/**
+ * Writes a value to a file.
+ * @param val The value to write.
+ * @param len The lenght of the value.
+ * @param file The file to write to.
+ */
 static void _write_val (const s4_val_t *val, int len, FILE *file)
 {
 	const char *s;
@@ -92,6 +114,13 @@ static void _write_val (const s4_val_t *val, int len, FILE *file)
 	}
 }
 
+/**
+ * Returns the length of a value.
+ *
+ * @param val The value to get the lenght of.
+ * @return If it is a string value it will return the string length.
+ * If it is an integer value it will return -1.
+ */
 static int _get_val_len (const s4_val_t *val)
 {
 	const char *s;
@@ -102,6 +131,14 @@ static int _get_val_len (const s4_val_t *val)
 	return -1;
 }
 
+/**
+ * Estimates the size needed to write the entire oplist to the log.
+ *
+ * @param list The oplist to estimate the size of
+ * @param writing A pointer to an int that will be set to 1
+ * if the oplist contains a write.
+ * @return The estimated size.
+ */
 static int _estimate_size (oplist_t *list, int *writing) {
 	int ret = 0, largest = 0;
 	_oplist_first (list);
@@ -132,23 +169,40 @@ static int _estimate_size (oplist_t *list, int *writing) {
 		return 0;
 	}
 
-	/* Add the size of begin, end and a warp-around header */
+	/* Add the size of begin, end and a warp-around header.
+	 * We also add the size of the largest entry as this is the
+	 * most extra space that could be needed on a wrap-around.
+	 */
 	ret += 3 * sizeof (struct log_header) + largest;
 	return ret;
 }
 
-
+/**
+ * Locks the log.
+ * @param s4 The database to lock the log of.
+ */
 static void _log_lock (s4_t *s4)
 {
 	g_mutex_lock (s4->log_lock);
 }
 
+/**
+ * Unlocks the log.
+ * @param s4 The database to unlock the log of.
+ */
 static void _log_unlock (s4_t *s4)
 {
 	g_mutex_unlock (s4->log_lock);
 }
 
 
+/**
+ * Writes a log header to the log.
+ *
+ * @param s4 The database handle.
+ * @param hdr The header to write.
+ * @param size The size of the data following the header.
+ */
 static void _log_write_header (s4_t *s4, struct log_header hdr, int size)
 {
 	log_number_t pos, round;
@@ -179,7 +233,14 @@ static void _log_write_header (s4_t *s4, struct log_header hdr, int size)
 }
 
 /**
- * Appends a log entry to the log
+ * Writes a log entry for a modification operation (add or del).
+ * @param s4 The database we are writing the log entry to.
+ * @param type The log entry type.
+ * @param key_a The key_a string.
+ * @param val_a The val_a value.
+ * @param key_b The key_b string.
+ * @param val_b The val_b value.
+ * @param src The source string.
  */
 static void _log_mod (s4_t *s4, log_type_t type, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src)
@@ -211,6 +272,11 @@ static void _log_mod (s4_t *s4, log_type_t type, const char *key_a, const s4_val
 	_write_str (src, mhdr.s_len, s4->logfile);
 }
 
+/**
+ * Writes a single header with no data.
+ * @param s4 The database handle.
+ * @param type The type of the log header.
+ */
 static void _log_simple (s4_t *s4, log_type_t type)
 {
 	struct log_header hdr;
@@ -220,6 +286,11 @@ static void _log_simple (s4_t *s4, log_type_t type)
 	_log_write_header (s4, hdr, 0);
 }
 
+/**
+ * Writes a checkpoint entry to the log, marking that the
+ * database has finished being written to disk.
+ * @param s4 The database to write the log entry to.
+ */
 void _log_checkpoint (s4_t *s4)
 {
 	struct log_header hdr;
@@ -234,12 +305,22 @@ void _log_checkpoint (s4_t *s4)
 	_log_unlock (s4);
 }
 
+/**
+ * Flushes file buffers and syncs the log to disk.
+ * @param s4 The database to flush the log of.
+ */
 static void _log_flush (s4_t *s4)
 {
 	fflush (s4->logfile);
 	fsync (fileno (s4->logfile));
 }
 
+/**
+ * Writes all the operations in an oplist to disk.
+ *
+ * @param list The oplist to write.
+ * @return 0 on error, non-zero on success.
+ */
 int _log_write (oplist_t *list)
 {
 	s4_t *s4 = _oplist_get_db (list);
@@ -285,6 +366,12 @@ int _log_write (oplist_t *list)
 	return 1;
 }
 
+/**
+ * Reads a string from the log file.
+ * @param s4 The database
+ * @param len The string length.
+ * @return A pointer to a constant string.
+ */
 static const char *_read_str (s4_t *s4, int len)
 {
 	const char *ret;
@@ -298,6 +385,12 @@ static const char *_read_str (s4_t *s4, int len)
 	return ret;
 }
 
+/**
+ * Reads an S4 value from the log file.
+ * @param s4 the database.
+ * @param len The value length.
+ * @return A pointer to a constant value.
+ */
 static const s4_val_t *_read_val (s4_t *s4, int len)
 {
 	const s4_val_t *ret;
@@ -313,6 +406,14 @@ static const s4_val_t *_read_val (s4_t *s4, int len)
 	return ret;
 }
 
+/**
+ * Reads a modification entry (add or del).
+ *
+ * @param s4 The database.
+ * @param list The oplist to insert the operation in.
+ * @param type The type of the log entry.
+ * @return 0 on error, non-zero on success.
+ */
 static int _read_mod (s4_t *s4, oplist_t *list, log_type_t type)
 {
 	const char *key_a, *key_b, *src;
@@ -343,7 +444,6 @@ static int _read_mod (s4_t *s4, oplist_t *list, log_type_t type)
  * Redoes everything that happened since the last checkpoint
  *
  * @param s4 The database to add changes to
- * @param logfile The logfile to redo changes from
  * @return 0 on error, non-zero otherwise
  */
 static int _log_redo (s4_t *s4)
@@ -376,6 +476,9 @@ static int _log_redo (s4_t *s4)
 		return 0;
 	}
 
+	/* Read log entries until fread fails, or the header num is different
+	 * from the expected number.
+	 */
 	while (fread (&hdr, sizeof (struct log_header), 1, s4->logfile) == 1
 			&& hdr.num == (pos + round * LOG_SIZE)) {
 
@@ -432,7 +535,11 @@ static int _log_redo (s4_t *s4)
 	return 1;
 }
 
-void _log_truncate (s4_t *s4)
+/**
+ * Truncates the logfile to LOG_SIZE length.
+ * @param s4 The database to truncate the logfile of.
+ */
+static void _log_truncate (s4_t *s4)
 {
 #ifdef _WIN32
 	_chsize (fileno (s4->logfile, LOG_SIZE));
@@ -441,7 +548,12 @@ void _log_truncate (s4_t *s4)
 #endif
 }
 
-void _log_lockf (s4_t *s4, int offset)
+/**
+ * Locks a byte in the logfile.
+ * @param s4 The databae to lock the log of.
+ * @param offset The offset of the byte to lock.
+ */
+static void _log_lockf (s4_t *s4, int offset)
 {
 #ifdef _WIN32
 	while (!LockFile (fileno (s4->logfile), offset, 0, 1, 0));
@@ -456,7 +568,12 @@ void _log_lockf (s4_t *s4, int offset)
 #endif
 }
 
-void _log_unlockf (s4_t *s4, int offset)
+/**
+ * Unlocks a byte in the logfile.
+ * @param s4 The database to unlock the log of.
+ * @param offset The offset of the byte to unlock.
+ */
+static void _log_unlockf (s4_t *s4, int offset)
 {
 #ifdef _WIN32
 	while (!UnlockFile (fileno (s4->logfile), offset, 0, 1, 0));
@@ -472,8 +589,7 @@ void _log_unlockf (s4_t *s4, int offset)
 }
 
 /**
- * Opens a log file. It will redo every change written to the log
- * after the last checkpoint.
+ * Opens a log file.
  *
  * @param s4 The database to open the logfile for
  * @return 0 on error, non-zero otherwise
@@ -498,12 +614,24 @@ int _log_open (s4_t *s4)
 	return 1;
 }
 
+/**
+ * Closes the log file.
+ * @param s4 The database to close the logfile of.
+ * @return 0 on error, non-zero on success.
+ */
 int _log_close (s4_t *s4)
 {
-	fclose (s4->logfile);
-	return 0;
+	if (fclose (s4->logfile) != 0) {
+		return 0;
+	}
+	return 1;
 }
 
+/**
+ * Locks the log file.
+ * It will redo everything new in the log.
+ * @param s4 The database to lock the log of.
+ */
 void _log_lock_file (s4_t *s4)
 {
 	if (s4->logfile == NULL)
@@ -519,6 +647,10 @@ void _log_lock_file (s4_t *s4)
 	_log_unlock (s4);
 }
 
+/**
+ * Unlocks the log file.
+ * @param s4 The database to unlock the log of.
+ */
 void _log_unlock_file (s4_t *s4)
 {
 	if (s4->logfile == NULL)
@@ -537,12 +669,27 @@ void _log_unlock_file (s4_t *s4)
 	_log_unlock (s4);
 }
 
+/**
+ * Locks the database file.
+ * This is actually a lock set on the log file.
+ *
+ * @param s4 The database to log.
+ */
 void _log_lock_db (s4_t *s4)
 {
 	_log_lockf (s4, 1);
 }
 
+/**
+ * Unlocks the database file.
+ *
+ * @param s4 The database to unlock.
+ */
 void _log_unlock_db (s4_t *s4)
 {
 	_log_unlockf (s4, 1);
 }
+
+/**
+ * @}
+ */
