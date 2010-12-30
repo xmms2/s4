@@ -33,7 +33,10 @@ typedef struct {
 #define LINEAR_SEARCH_SIZE 0
 
 /**
- * @addtogroup S4
+ * @defgroup Entry Entry
+ * @ingroup S4
+ * @brief The in-memory database.
+ *
  * @{
  */
 
@@ -162,9 +165,9 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
  *
  * @param s4 The database to add to
  * @param key_a The key of the first entry
- * @param value_a The value of the first entry
+ * @param val_a The value of the first entry
  * @param key_b The key of the second entry
- * @param value_b The value of the second entry
+ * @param val_b The value of the second entry
  * @param src The source that made the relation
  * @return non-zero if everything went alrite, 0 otherwise
  */
@@ -425,7 +428,7 @@ static int _check_cond (s4_condition_t *cond, void *d)
  * Fetches values from an entry
  *
  * @param s4 The database the entry lives in
- * @param entry The entry to fetch from
+ * @param l The entry to fetch from
  * @param fs The fetchspec that tells us what to fetch
  * @return An array of results
  */
@@ -490,7 +493,7 @@ static s4_resultrow_t *_fetch (s4_t *s4, entry_t *l, s4_fetchspec_t *fs)
  * Queries a database for all entries matching a condition,
  * then fetches data from them.
  *
- * @param s4 The database to search
+ * @param trans The transaction this query belongs to.
  * @param fs The fetchspec to use when fetching data
  * @param cond The condition to check entries against
  * @return A resultset with a row for every entry that matched
