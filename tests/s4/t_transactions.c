@@ -22,7 +22,7 @@
 s4_t *s4;
 s4_val_t *val;
 
-SETUP (S4) {
+SETUP (Transactions) {
 	if (!g_thread_get_initialized ())
 		g_thread_init (NULL);
 
