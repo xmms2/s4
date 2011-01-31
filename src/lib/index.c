@@ -44,18 +44,88 @@ struct s4_index_St {
  */
 
 /**
- * Gets the index associated with key
+ * Gets the a-index associated with key.
+ * A a-index is used to lookup entries by the a-value.
+ * If an index has not yet been created for this key and
+ * create is non-zero, one will be created and returned.
+ *
+ * @param s4 The database to look for the index in
+ * @param key The key the index should be indexing
+ * @param create Creates the index if it does not exist
+ * @return The index, or NULL if it does not exist and create is 0.
+ */
+s4_index_t *_index_get_a (s4_t *s4, const char *key, int create)
+{
+	s4_index_t *ret;
+
+	g_static_mutex_lock (&s4->rel_lock);
+	ret = g_hash_table_lookup (s4->rel_table, key);
+	if (ret == NULL && create) {
+		ret = _index_create ();
+		g_hash_table_insert (s4->rel_table, (void*)key, ret);
+	}
+	g_static_mutex_unlock (&s4->rel_lock);
+
+	return ret;
+}
+
+/**
+ * Gets the b-index associated with key.
+ * A b-index is used to lookup entries by the b-value.
  *
  * @param s4 The database to look for the index in
  * @param key The key the index should be indexing
  * @return The index, or NULL if it is not found
  */
-s4_index_t *_index_get (s4_t *s4, const char *key)
+s4_index_t *_index_get_b (s4_t *s4, const char *key)
 {
 	s4_index_t *ret;
 
 	g_static_mutex_lock (&s4->index_table_lock);
 	ret = g_hash_table_lookup (s4->index_table, key);
+	g_static_mutex_unlock (&s4->index_table_lock);
+
+	return ret;
+}
+
+/* A helper function for the _index_get_all_... functions.
+ * It will prepend all values in an hash-table to a list
+ */
+static void _prepend_value_to_list (void *key, void *value, void *list)
+{
+	GList **l = list;
+	*l = g_list_prepend (*l, value);
+}
+
+/**
+ * Gets all a-indexes.
+ *
+ * @param s4 The database to get the index of.
+ * @return A list of indexes.
+ */
+GList *_index_get_all_a (s4_t *s4)
+{
+	GList *ret = NULL;
+
+	g_static_mutex_lock (&s4->rel_lock);
+	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
+	g_static_mutex_unlock (&s4->rel_lock);
+
+	return ret;
+}
+
+/**
+ * Gets all b-indexes.
+ *
+ * @param s4 The database to get the index of.
+ * @return A list of indexes.
+ */
+GList *_index_get_all_b (s4_t *s4)
+{
+	GList *ret = NULL;
+
+	g_static_mutex_lock (&s4->index_table_lock);
+	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
 	g_static_mutex_unlock (&s4->index_table_lock);
 
 	return ret;

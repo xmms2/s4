@@ -90,7 +90,10 @@ typedef struct {
 typedef struct s4_index_St s4_index_t;
 typedef int (*index_function_t)(const s4_val_t *val, void *data);
 
-s4_index_t *_index_get (s4_t *s4, const char *key);
+s4_index_t *_index_get_a (s4_t *s4, const char *key, int create);
+s4_index_t *_index_get_b (s4_t *s4, const char *key);
+GList *_index_get_all_a (s4_t *s4);
+GList *_index_get_all_b (s4_t *s4);
 s4_index_t *_index_create (void);
 int _index_add (s4_t *s4, const char *key, s4_index_t *index);
 int _index_insert (s4_index_t *index, const s4_val_t *val, void *data);

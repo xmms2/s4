@@ -179,15 +179,7 @@ int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	GList *entries;
 	int ret;
 
-	g_static_mutex_lock (&s4->rel_lock);
-	index = g_hash_table_lookup (s4->rel_table, key_a);
-
-	if (index == NULL) {
-		index = _index_create ();
-		g_hash_table_insert (s4->rel_table, (void*)key_a, index);
-	}
-	g_static_mutex_unlock (&s4->rel_lock);
-
+	index = _index_get_a (s4, key_a, 1);
 	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
@@ -201,7 +193,7 @@ int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	ret = _entry_insert (entry, key_b, val_b, src);
 
 	if (ret) {
-		index = _index_get (s4, key_b);
+		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
 			_index_insert (index, val_b, entry);
@@ -232,14 +224,7 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	if (prev_key != key_a || prev_val != value_a) {
 		GList *entries;
 
-		g_static_mutex_lock (&s4->rel_lock);
-		index = g_hash_table_lookup (s4->rel_table, key_a);
-
-		if (index == NULL) {
-			index = _index_create ();
-			g_hash_table_insert (s4->rel_table, (void*)key_a, index);
-		}
-		g_static_mutex_unlock (&s4->rel_lock);
+		index = _index_get_a (s4, key_a, 1);
 		entries = _index_search (index, NULL, (void*)value_a);
 
 		if (entries == NULL) {
@@ -259,7 +244,7 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 	ret = _entry_insert (entry, key_b, value_b, src);
 
 	if (ret) {
-		index = _index_get (s4, key_b);
+		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
 			_index_insert (index, value_b, entry);
@@ -292,10 +277,7 @@ int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 	key_b = _string_lookup (s4, key_b);
 	src = _string_lookup (s4, src);
 
-	g_static_mutex_lock (&s4->rel_lock);
-	index = g_hash_table_lookup (s4->rel_table, key_a);
-	g_static_mutex_unlock (&s4->rel_lock);
-
+	index = _index_get_a (s4, key_a, 0);
 	if (index == NULL) {
 		return 0;
 	}
@@ -515,10 +497,7 @@ s4_resultset_t *_s4_query (
 	if (s4_cond_is_filter (cond)
 			&& (s4_cond_get_flags (cond) & S4_COND_PARENT)
 			&& s4_cond_get_key (cond) != NULL) {
-		const char *key = s4_cond_get_key (cond);
-		g_static_mutex_lock (&s4->rel_lock);
-		index = g_hash_table_lookup (s4->rel_table, key);
-		g_static_mutex_unlock (&s4->rel_lock);
+		index = _index_get_a (s4, s4_cond_get_key (cond), 0);
 
 		if (index == NULL)
 			entries = NULL;
@@ -530,18 +509,11 @@ s4_resultset_t *_s4_query (
 	} else if (s4_cond_is_filter (cond)
 			&& s4_cond_is_monotonic (cond)
 			&& s4_cond_get_key (cond) != NULL
-			&& (index = _index_get (s4, s4_cond_get_key (cond))) != NULL) {
+			&& (index = _index_get_b (s4, s4_cond_get_key (cond))) != NULL) {
 		entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 	} else {
-		GList *indices = NULL;
-		GHashTableIter iter;
-
-		g_static_mutex_lock (&s4->rel_lock);
-		g_hash_table_iter_init (&iter, s4->rel_table);
-		while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
-			indices = g_list_prepend (indices, index);
-		}
-		g_static_mutex_unlock (&s4->rel_lock);
+		GList *indices;
+		indices = _index_get_all_a (s4);
 
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
 			entries = g_list_concat (entries, _index_search (indices->data, (index_function_t)_everything, NULL));
