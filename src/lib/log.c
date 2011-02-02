@@ -495,7 +495,7 @@ static int _log_redo (s4_t *s4)
 		} else if (hdr.type == LOG_ENTRY_WRITING) {
 			new_synced = s4->last_logpoint;
 		} else if (hdr.type == LOG_ENTRY_BEGIN) {
-			oplist = _oplist_new (s4);
+			oplist = _oplist_new (_transaction_dummy_alloc (s4));
 			new_checkpoint = -1;
 			new_synced = -1;
 		} else if (hdr.type == LOG_ENTRY_END) {
@@ -504,6 +504,7 @@ static int _log_redo (s4_t *s4)
 			}
 
 			_oplist_execute (oplist, 0);
+			_transaction_dummy_free (_oplist_get_trans (oplist));
 			_oplist_free (oplist);
 			oplist = NULL;
 
@@ -524,8 +525,10 @@ static int _log_redo (s4_t *s4)
 		s4->next_logpoint = pos + round * LOG_SIZE;
 	}
 
-	if (oplist != NULL)
+	if (oplist != NULL) {
+		_transaction_dummy_free (_oplist_get_trans (oplist));
 		_oplist_free (oplist);
+	}
 
 	s4->last_logpoint = last_valid_logpoint;
 	s4->next_logpoint = last_valid_logpoint + sizeof (struct log_header);
