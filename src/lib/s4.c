@@ -449,9 +449,6 @@ static s4_t *_alloc (void)
 	s4->sync_cond = g_cond_new ();
 	s4->sync_finished_cond = g_cond_new ();
 
-	s4->lock_table = _create_lock_table ();
-	s4->lock_lock = g_mutex_new ();
-
 	return s4;
 }
 
@@ -469,12 +466,10 @@ static void _free (s4_t *s4)
 	g_hash_table_destroy (s4->case_table);
 	g_hash_table_destroy (s4->strings_table);
 	g_hash_table_destroy (s4->int_table);
-	g_hash_table_destroy (s4->lock_table);
 	g_string_chunk_free (s4->strings);
 
 	g_mutex_free (s4->log_lock);
 	g_mutex_free (s4->sync_lock);
-	g_mutex_free (s4->lock_lock);
 	g_cond_free (s4->sync_cond);
 	g_cond_free (s4->sync_finished_cond);
 

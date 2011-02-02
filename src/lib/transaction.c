@@ -27,15 +27,16 @@
 struct s4_transaction_St {
 	int flags;
 	oplist_t *ops;
-	void *locks;
-	s4_transaction_t *waiting_for;
+	GList *locks;
+	s4_lock_t *waiting_for;
 	int restartable, deadlocked, failed;
 };
 
 
 static void _transaction_free (s4_transaction_t *trans)
 {
-	_entry_unlock_all (trans);
+	_lock_unlock_all (trans);
+	g_list_free (trans->locks);
 	_oplist_free (trans->ops);
 	free (trans);
 }
@@ -45,24 +46,24 @@ void _transaction_writing (s4_transaction_t *trans)
 	_oplist_insert_writing (trans->ops);
 }
 
-s4_transaction_t *_transaction_get_waiting_for (s4_transaction_t *trans)
+s4_lock_t *_transaction_get_waiting_for (s4_transaction_t *trans)
 {
 	return trans->waiting_for;
 }
 
-void _transaction_set_waiting_for (s4_transaction_t *trans, s4_transaction_t *waiting_for)
+void _transaction_set_waiting_for (s4_transaction_t *trans, s4_lock_t *waiting_for)
 {
 	trans->waiting_for = waiting_for;
 }
 
-void *_transaction_get_locks (s4_transaction_t *trans)
+GList *_transaction_get_locks (s4_transaction_t *trans)
 {
 	return trans->locks;
 }
 
-void _transaction_set_locks (s4_transaction_t *trans, void *locks)
+void _transaction_add_lock (s4_transaction_t *trans, s4_lock_t *lock)
 {
-	trans->locks = locks;
+	trans->locks = g_list_prepend (trans->locks, lock);
 }
 
 void _transaction_set_deadlocked (s4_transaction_t *trans)

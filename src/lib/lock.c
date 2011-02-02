@@ -23,127 +23,168 @@
  * @{
  */
 
-typedef struct lock_St {
-	const char *key;
-	const s4_val_t *val;
-	s4_transaction_t *trans;
-	GCond *cond;
-	struct lock_St *next;
-} lock_t;
+struct s4_lock_St {
+	GMutex *lock;
+	GCond *upgrade_signal, *signal;
+	GHashTable *transactions;
+	int writers_waiting;
+	int readers;
+	int exclusive;
+	int upgrade, want_upgrade;
+};
 
-static void _free_lock (lock_t *lock)
+
+s4_lock_t *_lock_alloc ()
 {
-	g_cond_free (lock->cond);
-	free (lock);
-}
-
-/* Create a new lock object */
-static lock_t *_create_lock (const char *key, const s4_val_t *val)
-{
-	lock_t *lock = malloc (sizeof (lock_t));
-
-	lock->key = key;
-	lock->val = val;
-	lock->cond = g_cond_new ();
-	lock->trans = NULL;
+	s4_lock_t *lock = calloc (sizeof (s4_lock_t), 1);
+	lock->lock = g_mutex_new ();
+	lock->signal = g_cond_new ();
+	lock->upgrade_signal = g_cond_new ();
+	lock->transactions = g_hash_table_new (NULL, NULL);
 
 	return lock;
 }
 
+void _lock_free (s4_lock_t *lock)
+{
+	g_mutex_free (lock->lock);
+	g_cond_free (lock->signal);
+	g_cond_free (lock->upgrade_signal);
+	g_hash_table_destroy (lock->transactions);
+	free (lock);
+}
+
+static int _lock_has_trans (s4_lock_t *lock, s4_transaction_t *trans)
+{
+	return g_hash_table_lookup (lock->transactions, trans) != NULL;
+}
+
+static void _lock_add_trans (s4_lock_t *lock, s4_transaction_t *trans)
+{
+	g_hash_table_insert (lock->transactions, trans, GINT_TO_POINTER (1));
+}
+
+static void _lock_del_trans (s4_lock_t *lock, s4_transaction_t *trans)
+{
+	g_hash_table_remove (lock->transactions, trans);
+}
+
 /* Checks if making trans wait for lock would deadlock. */
-static int _is_deadlocked (lock_t *lock, s4_transaction_t *trans)
+static int _lock_will_deadlock (s4_lock_t *lock, s4_transaction_t *trans)
 {
+	GHashTableIter iter;
 	s4_transaction_t *t;
-	for (t = lock->trans; t != trans && t != NULL; t = _transaction_get_waiting_for (t));
-	return t == trans;
-}
+	int ret = 0;
 
-static guint _lock_hash (lock_t *lock)
-{
-	return GPOINTER_TO_INT (lock->key) ^ GPOINTER_TO_INT (lock->val);
-}
+	if (lock == NULL)
+		return 0;
 
-static gboolean _lock_equal (lock_t *a, lock_t *b)
-{
-	return a->key == b->key && a->val == b->val;
-}
+	g_hash_table_iter_init (&iter, lock->transactions);
 
-GHashTable *_create_lock_table (void)
-{
-	return g_hash_table_new_full ((GHashFunc)_lock_hash,
-			(GEqualFunc)_lock_equal, (GDestroyNotify)_free_lock, NULL);
-}
-
-/**
- * Locks an entry.
- *
- * @param trans The transaction doing the locking
- * @param key
- * @param val
- * @return 0 on error, non-zero otherwise.
- */
-int _entry_lock (s4_transaction_t *trans, const char *key, const s4_val_t *val)
-{
-	int ret = 1;
-	lock_t lookup_lock = {.key = key, .val = val};
-	lock_t *lock;
-	s4_t *s4 = _transaction_get_db (trans);
-
-	g_mutex_lock (s4->lock_lock);
-	lock = g_hash_table_lookup (s4->lock_table, &lookup_lock);
-
-	if (lock == NULL) {
-		lock = _create_lock (key, val);
-		g_hash_table_insert (s4->lock_table, lock, lock);
+	while (!ret || g_hash_table_iter_next (&iter, (void**)&t, NULL)) {
+		ret = t == trans || _lock_will_deadlock (_transaction_get_waiting_for (t), trans);
 	}
 
-	if (lock->trans == trans) {
-		goto finished;
+	return ret;
+}
+
+int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
+{
+	g_mutex_lock (lock->lock);
+
+	if (_lock_will_deadlock (lock, trans)) {
+		s4_set_errno (S4E_DEADLOCK);
+		return 0;
 	}
 
-	while (ret && lock->trans != NULL) {
-		if (_is_deadlocked (lock, trans)) {
-			s4_set_errno (S4E_DEADLOCK);
-			ret = 0;
-		} else {
-			_transaction_set_waiting_for (trans, lock->trans);
-			g_cond_wait (lock->cond, s4->lock_lock);
-			_transaction_set_waiting_for (trans, NULL);
+	if (_lock_has_trans (lock, trans)) {
+		if (!lock->exclusive) {
+			lock->want_upgrade = 1;
+			while (lock->readers) {
+				g_cond_wait (lock->upgrade_signal, lock->lock);
+			}
+			lock->want_upgrade = 0;
 		}
+	} else {
+		while (lock->readers || lock->exclusive || lock->upgrade) {
+			lock->writers_waiting++;
+			g_cond_wait (lock->signal, lock->lock);
+			lock->writers_waiting--;
+		}
+
+		_lock_add_trans (lock, trans);
 	}
 
-	if (ret) {
-		lock->trans = trans;
-		lock->next = _transaction_get_locks (trans);
-		_transaction_set_locks (trans, lock);
-	}
+	lock->exclusive = 1;
 
-finished:
-	g_mutex_unlock (s4->lock_lock);
-	return ret;
+	g_mutex_unlock (lock->lock);
+	return 1;
 }
 
-/**
- * Unlocks all locks held by a transaction.
- *
- * @param trans The transaction to release the locks of
- * @return 0 on error, non-zero otherwise.
- */
-int _entry_unlock_all (s4_transaction_t *trans)
+int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 {
-	int ret = 1;
-	lock_t *lock;
-	s4_t *s4 = _transaction_get_db (trans);
+	int upgrade = 1;
 
-	g_mutex_lock (s4->lock_lock);
+	g_mutex_lock (lock->lock);
 
-	for (lock = _transaction_get_locks (trans); lock != NULL; lock = lock->next) {
-		lock->trans = NULL;
-		g_cond_signal (lock->cond);
+	if (_lock_will_deadlock (lock, trans)) {
+		s4_set_errno (S4E_DEADLOCK);
+		return 0;
 	}
 
-	g_mutex_unlock (s4->lock_lock);
-	return ret;
+	if (!_lock_has_trans (lock, trans)) {
+		while (lock->exclusive || lock->writers_waiting || (lock->upgrade && upgrade)) {
+			g_cond_wait (lock->signal, lock->lock);
+		}
+
+		lock->readers++;
+		if (upgrade) {
+			lock->upgrade = 1;
+		}
+		_lock_add_trans (lock, trans);
+	}
+
+	g_mutex_unlock (lock->lock);
+	return 1;
+}
+
+static void _lock_unlock (s4_lock_t *lock, s4_transaction_t *trans)
+{
+	int upgrade = 1;
+
+	g_mutex_lock (lock->lock);
+	if (lock->exclusive) {
+		lock->exclusive = 0;
+		g_cond_signal (lock->signal);
+	} else if (lock->readers) {
+		lock->readers--;
+
+		if (lock->readers == 0) {
+			if (lock->want_upgrade) {
+				g_cond_signal (lock->upgrade_signal);
+			} else {
+				g_cond_signal (lock->signal);
+			}
+		}
+
+	}
+
+	_lock_del_trans (lock, trans);
+	if (upgrade) {
+		lock->upgrade = 0;
+	}
+
+	g_mutex_unlock (lock->lock);
+}
+
+void _lock_unlock_all (s4_transaction_t *trans)
+{
+	GList *locks = _transaction_get_locks (trans);
+
+	for (; locks != NULL; locks = g_list_next (locks)) {
+		s4_lock_t *lock = locks->data;
+		_lock_unlock (lock, trans);
+	}
 }
 
 /**
