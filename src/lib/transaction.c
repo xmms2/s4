@@ -26,6 +26,7 @@
 
 struct s4_transaction_St {
 	int flags;
+	s4_t *s4;
 	oplist_t *ops;
 	GList *locks;
 	s4_lock_t *waiting_for;
@@ -71,6 +72,20 @@ void _transaction_set_deadlocked (s4_transaction_t *trans)
 	trans->deadlocked = 1;
 }
 
+s4_transaction_t *_transaction_dummy_alloc (s4_t *s4)
+{
+	s4_transaction_t *trans = calloc (sizeof (s4_transaction_t), 1);
+	trans->s4 = s4;
+
+	return trans;
+}
+
+void _transaction_dummy_free (s4_transaction_t *trans)
+{
+	_lock_unlock_all (trans);
+	free (trans);
+}
+
 /**
  * Starts a new transaction.
  *
@@ -82,8 +97,9 @@ void _transaction_set_deadlocked (s4_transaction_t *trans)
 s4_transaction_t *s4_begin (s4_t *s4, int flags)
 {
 	s4_transaction_t *trans = calloc (sizeof (s4_transaction_t), 1);
+	trans->s4 = s4;
 	trans->flags = flags;
-	trans->ops = _oplist_new (s4);
+	trans->ops = _oplist_new (trans);
 	trans->restartable = 1;
 
 	_log_lock_file (s4);
@@ -145,7 +161,7 @@ int s4_abort (s4_transaction_t *trans)
 
 s4_t *_transaction_get_db (s4_transaction_t *trans)
 {
-	return _oplist_get_db (trans->ops);
+	return trans->s4;
 }
 
 /**
@@ -181,12 +197,9 @@ int s4_add (s4_t *s4, s4_transaction_t *trans,
 
 	if (t->failed || t->deadlocked) {
 		ret = 0;
-	} else if (!_entry_lock (t, key_a, val_a)) {
-		t->deadlocked = 1;
-		ret = 0;
 	} else {
 		_oplist_insert_add (t->ops, key_a, val_a, key_b, val_b, src);
-		ret = _s4_add (db, key_a, val_a, key_b, val_b, src);
+		ret = _s4_add (t, key_a, val_a, key_b, val_b, src);
 
 		if (!ret) {
 			t->failed = 1;
@@ -234,12 +247,9 @@ int s4_del (s4_t *s4, s4_transaction_t *trans,
 
 	if (t->failed || t->deadlocked) {
 		ret = 0;
-	} else if (!_entry_lock (t, key_a, val_a)) {
-		t->deadlocked = 1;
-		ret = 0;
 	} else {
 		_oplist_insert_del (t->ops, key_a, val_a, key_b, val_b, src);
-		ret = _s4_del (db, key_a, val_a, key_b, val_b, src);
+		ret = _s4_del (t, key_a, val_a, key_b, val_b, src);
 
 		if (!ret) {
 			t->failed = 1;
