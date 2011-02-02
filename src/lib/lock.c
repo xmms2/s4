@@ -70,7 +70,7 @@ static void _lock_del_trans (s4_lock_t *lock, s4_transaction_t *trans)
 }
 
 /* Checks if making trans wait for lock would deadlock. */
-static int _lock_will_deadlock (s4_lock_t *lock, s4_transaction_t *trans)
+static int _lock_will_deadlock (s4_lock_t *lock, s4_transaction_t *trans, int first)
 {
 	GHashTableIter iter;
 	s4_transaction_t *t;
@@ -81,8 +81,8 @@ static int _lock_will_deadlock (s4_lock_t *lock, s4_transaction_t *trans)
 
 	g_hash_table_iter_init (&iter, lock->transactions);
 
-	while (!ret || g_hash_table_iter_next (&iter, (void**)&t, NULL)) {
-		ret = t == trans || _lock_will_deadlock (_transaction_get_waiting_for (t), trans);
+	while (!ret && g_hash_table_iter_next (&iter, (void**)&t, NULL)) {
+		ret = (!first && t == trans) ||_lock_will_deadlock (_transaction_get_waiting_for (t), trans, 0);
 	}
 
 	return ret;
@@ -92,27 +92,34 @@ int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
 {
 	g_mutex_lock (lock->lock);
 
-	if (_lock_will_deadlock (lock, trans)) {
+	if (_lock_will_deadlock (lock, trans, 1)) {
 		s4_set_errno (S4E_DEADLOCK);
+		g_mutex_unlock (lock->lock);
 		return 0;
 	}
 
 	if (_lock_has_trans (lock, trans)) {
 		if (!lock->exclusive) {
 			lock->want_upgrade = 1;
+			lock->readers--;
 			while (lock->readers) {
+				_transaction_set_waiting_for (trans, lock);
 				g_cond_wait (lock->upgrade_signal, lock->lock);
+				_transaction_set_waiting_for (trans, NULL);
 			}
 			lock->want_upgrade = 0;
 		}
 	} else {
 		while (lock->readers || lock->exclusive || lock->upgrade) {
 			lock->writers_waiting++;
+			_transaction_set_waiting_for (trans, lock);
 			g_cond_wait (lock->signal, lock->lock);
+			_transaction_set_waiting_for (trans, NULL);
 			lock->writers_waiting--;
 		}
 
 		_lock_add_trans (lock, trans);
+		_transaction_add_lock (trans, lock);
 	}
 
 	lock->exclusive = 1;
@@ -127,14 +134,17 @@ int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 
 	g_mutex_lock (lock->lock);
 
-	if (_lock_will_deadlock (lock, trans)) {
+	if (_lock_will_deadlock (lock, trans, 1)) {
 		s4_set_errno (S4E_DEADLOCK);
+		g_mutex_unlock (lock->lock);
 		return 0;
 	}
 
 	if (!_lock_has_trans (lock, trans)) {
 		while (lock->exclusive || lock->writers_waiting || (lock->upgrade && upgrade)) {
+			_transaction_set_waiting_for (trans, lock);
 			g_cond_wait (lock->signal, lock->lock);
+			_transaction_set_waiting_for (trans, NULL);
 		}
 
 		lock->readers++;
@@ -142,6 +152,7 @@ int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 			lock->upgrade = 1;
 		}
 		_lock_add_trans (lock, trans);
+		_transaction_add_lock (trans, lock);
 	}
 
 	g_mutex_unlock (lock->lock);
