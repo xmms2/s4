@@ -111,9 +111,9 @@ s4_resultrow_t *s4_resultrow_create (int colcount);
 s4_resultrow_t *s4_resultrow_ref (s4_resultrow_t *row);
 void s4_resultrow_unref (s4_resultrow_t *row);
 
-int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+int _s4_add (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
-int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+int _s4_del (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src);
 s4_resultset_t *_s4_query (s4_transaction_t *trans, s4_fetchspec_t *fs, s4_condition_t *cond);
 void _free_relations (s4_t *s4);

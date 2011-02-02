@@ -23,6 +23,7 @@ typedef struct {
 } entry_data_t;
 
 typedef struct {
+	s4_lock_t *lock;
 	const char *key;
 	const s4_val_t *val;
 	int size, alloc;
@@ -146,6 +147,7 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
 {
 	entry_t *entry = malloc (sizeof (entry_t));
 
+	entry->lock = _lock_alloc ();
 	entry->key = key;
 	entry->val = val;
 	entry->size = 0;
@@ -154,6 +156,16 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
 	entry->data = malloc (sizeof (entry_data_t) * entry->alloc);
 
 	return entry;
+}
+
+static int _entry_lock_shared (entry_t *entry, s4_transaction_t *trans)
+{
+	return _lock_shared (entry->lock, trans);
+}
+
+static int _entry_lock_exclusive (entry_t *entry, s4_transaction_t *trans)
+{
+	return _lock_exclusive (entry->lock, trans);
 }
 
 /**
@@ -171,31 +183,39 @@ static entry_t *_entry_create (const char *key, const s4_val_t *val)
  * @param src The source that made the relation
  * @return non-zero if everything went alrite, 0 otherwise
  */
-int _s4_add (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+int _s4_add (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src)
 {
 	s4_index_t *index;
 	entry_t *entry;
 	GList *entries;
 	int ret;
+	s4_t *s4 = _transaction_get_db (trans);
 
 	index = _index_get_a (s4, key_a, 1);
+	_index_lock_shared (index, trans);
 	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
 		entry = _entry_create (key_a, val_a);
+		_index_lock_exclusive (index, trans);
 		_index_insert (index, val_a, entry);
 	} else {
 		entry = entries->data;
 		g_list_free (entries);
 	}
 
+	if (!_entry_lock_exclusive (entry, trans)) {
+		_transaction_set_deadlocked (trans);
+		return 0;
+	}
 	ret = _entry_insert (entry, key_b, val_b, src);
 
 	if (ret) {
 		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
+			_index_lock_exclusive (index, trans);
 			_index_insert (index, val_b, entry);
 		}
 	}
@@ -265,23 +285,21 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
  * @param src The source that made the relation
  * @return non-zero if everything went alrite, 0 otherwise
  */
-int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
+int _s4_del (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b, const char *src)
 {
 	s4_index_t *index;
 	entry_t *entry;
 	GList *entries;
 	int ret;
-
-	key_a = _string_lookup (s4, key_a);
-	key_b = _string_lookup (s4, key_b);
-	src = _string_lookup (s4, src);
+	s4_t *s4 = _transaction_get_db (trans);
 
 	index = _index_get_a (s4, key_a, 0);
 	if (index == NULL) {
 		return 0;
 	}
 
+	_index_lock_shared (index, trans);
 	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
@@ -291,12 +309,17 @@ int _s4_del (s4_t *s4, const char *key_a, const s4_val_t *val_a,
 		g_list_free (entries);
 	}
 
+	if (!_entry_lock_exclusive (entry, trans)) {
+		_transaction_set_deadlocked (trans);
+		return 0;
+	}
 	ret = _entry_delete (entry, key_b, val_b, src);
 
 	if (ret) {
 		index = g_hash_table_lookup (s4->index_table, key_b);
 
 		if (index != NULL) {
+			_index_lock_exclusive (index, trans);
 			_index_delete (index, val_b, entry);
 		}
 	}
@@ -339,6 +362,7 @@ void _free_relations (s4_t *s4)
 		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
 			entry_t *entry = entries->data;
 
+			_lock_free (entry->lock);
 			free (entry->data);
 			free (entry);
 		}
@@ -525,7 +549,7 @@ s4_resultset_t *_s4_query (
 		entry_t *entry = entries->data;
 		data.l = entry;
 
-		if (!_entry_lock (trans, entry->key, entry->val)) {
+		if (!_entry_lock_shared (entry, trans)) {
 			_transaction_set_deadlocked (trans);
 			break;
 		}
