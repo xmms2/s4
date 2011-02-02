@@ -15,23 +15,28 @@ typedef struct {
 } op_t;
 
 struct oplist_St {
-	s4_t *s4;
+	s4_transaction_t *trans;
 	GList *ops, *cur;
 };
 
-oplist_t *_oplist_new (s4_t *s4)
+oplist_t *_oplist_new (s4_transaction_t *trans)
 {
 	oplist_t *ret = malloc (sizeof (oplist_t));
 	ret->ops = NULL;
 	ret->cur = NULL;
-	ret->s4 = s4;
+	ret->trans = trans;
 
 	return ret;
 }
 
 s4_t *_oplist_get_db (oplist_t *list)
 {
-	return list->s4;
+	return _transaction_get_db (list->trans);
+}
+
+s4_transaction_t *_oplist_get_trans (oplist_t *list)
+{
+	return list->trans;
 }
 
 void _oplist_free (oplist_t *list)
@@ -176,9 +181,9 @@ int _oplist_rollback (oplist_t *list)
 		const s4_val_t *val_a, *val_b;
 
 		if (_oplist_get_add (list, &key_a, &val_a, &key_b, &val_b, &src)) {
-			_s4_del (list->s4, key_a, val_a, key_b, val_b, src);
+			_s4_del (list->trans, key_a, val_a, key_b, val_b, src);
 		} else if (_oplist_get_del (list, &key_a, &val_a, &key_b, &val_b, &src)) {
-			_s4_add (list->s4, key_a, val_a, key_b, val_b, src);
+			_s4_add (list->trans, key_a, val_a, key_b, val_b, src);
 		}
 	}
 
@@ -195,9 +200,9 @@ int _oplist_execute (oplist_t *list, int rollback_on_failure)
 		int ret = 1;
 
 		if (_oplist_get_add (list, &key_a, &val_a, &key_b, &val_b, &src)) {
-			ret = _s4_add (list->s4, key_a, val_a, key_b, val_b, src);
+			ret = _s4_add (list->trans, key_a, val_a, key_b, val_b, src);
 		} else if (_oplist_get_del (list, &key_a, &val_a, &key_b, &val_b, &src)) {
-			ret = _s4_del (list->s4, key_a, val_a, key_b, val_b, src);
+			ret = _s4_del (list->trans, key_a, val_a, key_b, val_b, src);
 		}
 
 		if (!ret && rollback_on_failure) {

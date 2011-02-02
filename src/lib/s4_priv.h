@@ -134,9 +134,10 @@ void  _transaction_add_lock (s4_transaction_t *trans, s4_lock_t *lock);
 void _transaction_set_deadlocked (s4_transaction_t *trans);
 
 typedef struct oplist_St oplist_t;
-oplist_t *_oplist_new (s4_t *s4);
+oplist_t *_oplist_new (s4_transaction_t *trans);
 void _oplist_free (oplist_t *list);
 s4_t *_oplist_get_db (oplist_t *list);
+s4_transaction_t *_oplist_get_trans (oplist_t *list);
 void _oplist_insert_add (oplist_t *list,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
