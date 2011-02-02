@@ -97,6 +97,8 @@ int _index_insert (s4_index_t *index, const s4_val_t *val, void *data);
 int _index_delete (s4_index_t *index, const s4_val_t *val, void *data);
 GList *_index_search (s4_index_t *index, index_function_t func, void *data);
 void _index_free (s4_index_t *index);
+int _index_lock_shared (s4_index_t *index, s4_transaction_t *trans);
+int _index_lock_exclusive (s4_index_t *index, s4_transaction_t *trans);
 
 
 int32_t s4_cond_get_ikey (s4_condition_t *cond);

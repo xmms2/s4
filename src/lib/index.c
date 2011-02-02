@@ -28,8 +28,8 @@ typedef struct {
 } index_t;
 
 struct s4_index_St {
-	GStaticMutex lock;
 	int size, alloc;
+	s4_lock_t *lock;
 
 	index_t *data;
 };
@@ -58,13 +58,11 @@ s4_index_t *_index_get_a (s4_t *s4, const char *key, int create)
 {
 	s4_index_t *ret;
 
-	g_static_mutex_lock (&s4->rel_lock);
 	ret = g_hash_table_lookup (s4->rel_table, key);
 	if (ret == NULL && create) {
 		ret = _index_create ();
 		g_hash_table_insert (s4->rel_table, (void*)key, ret);
 	}
-	g_static_mutex_unlock (&s4->rel_lock);
 
 	return ret;
 }
@@ -81,9 +79,7 @@ s4_index_t *_index_get_b (s4_t *s4, const char *key)
 {
 	s4_index_t *ret;
 
-	g_static_mutex_lock (&s4->index_table_lock);
 	ret = g_hash_table_lookup (s4->index_table, key);
-	g_static_mutex_unlock (&s4->index_table_lock);
 
 	return ret;
 }
@@ -107,9 +103,7 @@ GList *_index_get_all_a (s4_t *s4)
 {
 	GList *ret = NULL;
 
-	g_static_mutex_lock (&s4->rel_lock);
 	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
-	g_static_mutex_unlock (&s4->rel_lock);
 
 	return ret;
 }
@@ -124,9 +118,7 @@ GList *_index_get_all_b (s4_t *s4)
 {
 	GList *ret = NULL;
 
-	g_static_mutex_lock (&s4->index_table_lock);
 	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
-	g_static_mutex_unlock (&s4->index_table_lock);
 
 	return ret;
 }
@@ -142,8 +134,7 @@ s4_index_t *_index_create ()
 	ret->size = 0;
 	ret->alloc = 1;
 	ret->data = malloc (sizeof (index_t) * ret->alloc);
-
-	g_static_mutex_init (&ret->lock);
+	ret->lock = _lock_alloc ();
 
 	return ret;
 }
@@ -159,12 +150,10 @@ s4_index_t *_index_create ()
 int _index_add (s4_t *s4, const char *key, s4_index_t *index)
 {
 	int ret = 0;
-	g_static_mutex_lock (&s4->index_table_lock);
 	if (g_hash_table_lookup (s4->index_table, key) == NULL) {
 		g_hash_table_insert (s4->index_table, strdup (key), index);
 		ret = 1;
 	}
-	g_static_mutex_unlock (&s4->index_table_lock);
 
 	return ret;
 }
@@ -225,8 +214,6 @@ int _index_insert (s4_index_t *index, const s4_val_t *val, void *new_data)
 {
 	int i,j;
 
-	g_static_mutex_lock (&index->lock);
-
 	i = _bsearch (index, (index_function_t)_val_cmp, (void*)val);
 
 	if (i >= index->size || _val_cmp (val, index->data[i].val)) {
@@ -260,8 +247,6 @@ int _index_insert (s4_index_t *index, const s4_val_t *val, void *new_data)
 		index->data[i].data[j].count++;
 	}
 
-	g_static_mutex_unlock (&index->lock);
-
 	return 1;
 }
 
@@ -277,17 +262,13 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *data)
 {
 	int i,j;
 
-	g_static_mutex_lock (&index->lock);
-
 	i = _bsearch (index, (index_function_t)_val_cmp, (void*)val);
 	if (i >= index->size || _val_cmp (val, index->data[i].val)) {
-		g_static_mutex_unlock (&index->lock);
 		return 0;
 	}
 
 	j = _data_search (index->data + i, data);
 	if (j >= index->size || data != index->data[i].data) {
-		g_static_mutex_unlock (&index->lock);
 		return 0;
 	}
 
@@ -302,8 +283,6 @@ int _index_delete (s4_index_t *index, const s4_val_t *val, void *data)
 		memmove (index->data + i, index->data + i + i, (index->size - i - 1) * sizeof (index_t));
 		index->size--;
 	}
-
-	g_static_mutex_unlock (&index->lock);
 
 	return 1;
 }
@@ -326,15 +305,12 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 	void *key;
 	GList *ret = NULL;
 
-	g_static_mutex_lock (&index->lock);
-
 	if (func == NULL)
 		func = (index_function_t)_val_cmp;
 
 	i = _bsearch (index, func, func_data);
 
 	if (i >= index->size || func (index->data[i].val, func_data)) {
-		g_static_mutex_unlock (&index->lock);
 		return NULL;
 	}
 
@@ -354,8 +330,6 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 
 	g_hash_table_destroy (found);
 
-	g_static_mutex_unlock (&index->lock);
-
 	return ret;
 }
 
@@ -372,9 +346,19 @@ void _index_free (s4_index_t *index)
 		free (index->data[i].data);
 	}
 
-	g_static_mutex_free (&index->lock);
+	_lock_free (index->lock);
 	free (index->data);
 	free (index);
+}
+
+int _index_lock_shared (s4_index_t *index, s4_transaction_t *trans)
+{
+	return _lock_shared (index->lock, trans);
+}
+
+int _index_lock_exclusive (s4_index_t *index, s4_transaction_t *trans)
+{
+	return _lock_exclusive (index->lock, trans);
 }
 
 /**
