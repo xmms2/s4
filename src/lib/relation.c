@@ -258,8 +258,6 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 
 		prev_key = key_a;
 		prev_val = value_a;
-	} else {
-		value_a = prev_val;
 	}
 
 	ret = _entry_insert (entry, key_b, value_b, src);
@@ -528,8 +526,10 @@ s4_resultset_t *_s4_query (
 		if (index == NULL)
 			entries = NULL;
 		else if (s4_cond_is_monotonic (cond)) {
+			if (!_index_lock_shared (index, trans)) goto deadlocked;
 			entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 		} else {
+			if (!_index_lock_shared (index, trans)) goto deadlocked;
 			entries = _index_search (index, (index_function_t)_everything, NULL);
 		}
 	} else if (s4_cond_is_filter (cond)
@@ -542,6 +542,7 @@ s4_resultset_t *_s4_query (
 		indices = _index_get_all_a (s4);
 
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
+			if (!_index_lock_shared (indices->data, trans)) goto deadlocked;
 			entries = g_list_concat (entries, _index_search (indices->data, (index_function_t)_everything, NULL));
 		}
 	}
@@ -551,14 +552,15 @@ s4_resultset_t *_s4_query (
 		entry_t *entry = entries->data;
 		data.l = entry;
 
-		if (!_entry_lock_shared (entry, trans)) {
-			_transaction_set_deadlocked (trans);
-			break;
-		}
+		if (!_entry_lock_shared (entry, trans)) goto deadlocked;
 		if (entry->size != 0 && !_check_cond (cond, &data))
 			s4_resultset_add_row (ret, _fetch (s4, entry, fs));
 	}
 
+	return ret;
+
+deadlocked:
+	_transaction_set_deadlocked (trans);
 	return ret;
 }
 
