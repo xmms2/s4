@@ -122,7 +122,7 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
 		s4_val_t *value, s4_sourcepref_t *sourcepref, s4_cmp_mode_t mode, int flags);
 s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdata,
 		free_func_t free, const char *key, s4_sourcepref_t *sourcepref,
-		s4_cmp_mode_t cmp_mode, int flags);
+		s4_cmp_mode_t cmp_mode, int monotonic, int flags);
 
 int s4_cond_is_filter (s4_condition_t *cond);
 int s4_cond_is_combiner (s4_condition_t *cond);

@@ -462,7 +462,7 @@ s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
  */
 s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdata,
 		free_func_t free, const char *key, s4_sourcepref_t *sourcepref,
-		s4_cmp_mode_t cmp_mode, int flags)
+		s4_cmp_mode_t cmp_mode, int monotonic, int flags)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 
@@ -474,7 +474,7 @@ s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdat
 	cond->u.filter.func = func;
 	cond->u.filter.funcdata = userdata;
 	cond->u.filter.free_func = free;
-	cond->u.filter.monotonic = 0;
+	cond->u.filter.monotonic = monotonic;
 	cond->u.filter.cmp_mode = cmp_mode;
 	cond->u.filter.const_key = 0;
 

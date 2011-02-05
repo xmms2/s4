@@ -194,7 +194,7 @@ CASE (test_custom_filter) {
 	s4_val_t *val = (void*)0x1234;
 
 	cond = s4_cond_new_custom_filter ((filter_function_t)simple_filter,
-			val, NULL, "asdf", NULL, S4_CMP_CASELESS, 0);
+			val, NULL, "asdf", NULL, S4_CMP_CASELESS, 0, 0);
 	CU_ASSERT_FALSE (s4_cond_get_filter_function (cond)(val, cond));
 	CU_ASSERT (s4_cond_get_filter_function (cond)((s4_val_t*)0x4312, cond));
 	s4_cond_free (cond);
