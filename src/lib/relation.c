@@ -193,34 +193,35 @@ int _s4_add (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 	s4_t *s4 = _transaction_get_db (trans);
 
 	index = _index_get_a (s4, key_a, 1);
-	_index_lock_shared (index, trans);
+	if (!_index_lock_shared (index, trans)) goto deadlocked;
 	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
 		entry = _entry_create (key_a, val_a);
-		_index_lock_exclusive (index, trans);
+		if (!_index_lock_exclusive (index, trans)) goto deadlocked;
 		_index_insert (index, val_a, entry);
 	} else {
 		entry = entries->data;
 		g_list_free (entries);
 	}
 
-	if (!_entry_lock_exclusive (entry, trans)) {
-		_transaction_set_deadlocked (trans);
-		return 0;
-	}
+	if (!_entry_lock_exclusive (entry, trans)) goto deadlocked;
 	ret = _entry_insert (entry, key_b, val_b, src);
 
 	if (ret) {
 		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
-			_index_lock_exclusive (index, trans);
+			if (!_index_lock_exclusive (index, trans)) goto deadlocked;
 			_index_insert (index, val_b, entry);
 		}
 	}
 
 	return ret;
+
+deadlocked:
+	_transaction_set_deadlocked (trans);
+	return 0;
 }
 
 /* An internal function of the above functions. It expects all keys
@@ -299,7 +300,7 @@ int _s4_del (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		return 0;
 	}
 
-	_index_lock_shared (index, trans);
+	if (!_index_lock_shared (index, trans)) goto deadlocked;
 	entries = _index_search (index, NULL, (void*)val_a);
 
 	if (entries == NULL) {
@@ -309,22 +310,23 @@ int _s4_del (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 		g_list_free (entries);
 	}
 
-	if (!_entry_lock_exclusive (entry, trans)) {
-		_transaction_set_deadlocked (trans);
-		return 0;
-	}
+	if (!_entry_lock_exclusive (entry, trans)) goto deadlocked;
 	ret = _entry_delete (entry, key_b, val_b, src);
 
 	if (ret) {
 		index = g_hash_table_lookup (s4->index_table, key_b);
 
 		if (index != NULL) {
-			_index_lock_exclusive (index, trans);
+			if (!_index_lock_exclusive (index, trans)) goto deadlocked;
 			_index_delete (index, val_b, entry);
 		}
 	}
 
 	return ret;
+
+deadlocked:
+	_transaction_set_deadlocked (trans);
+	return 0;
 }
 
 /**
