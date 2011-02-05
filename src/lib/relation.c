@@ -523,27 +523,32 @@ s4_resultset_t *_s4_query (
 			&& s4_cond_get_key (cond) != NULL) {
 		index = _index_get_a (s4, s4_cond_get_key (cond), 0);
 
-		if (index == NULL)
+		if (index == NULL) {
 			entries = NULL;
-		else if (s4_cond_is_monotonic (cond)) {
-			if (!_index_lock_shared (index, trans)) goto deadlocked;
-			entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
 		} else {
 			if (!_index_lock_shared (index, trans)) goto deadlocked;
-			entries = _index_search (index, (index_function_t)_everything, NULL);
+			if (s4_cond_is_monotonic (cond)) {
+				entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+			} else {
+				entries = _index_lsearch (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+			}
 		}
 	} else if (s4_cond_is_filter (cond)
-			&& s4_cond_is_monotonic (cond)
 			&& s4_cond_get_key (cond) != NULL
 			&& (index = _index_get_b (s4, s4_cond_get_key (cond))) != NULL) {
-		entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+		if (!_index_lock_shared (index, trans)) goto deadlocked;
+		if (s4_cond_is_monotonic (cond)) {
+			entries = _index_search (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+		} else {
+			entries = _index_lsearch (index, (index_function_t)s4_cond_get_filter_function (cond), cond);
+		}
 	} else {
 		GList *indices;
 		indices = _index_get_all_a (s4);
 
 		for (entries = NULL; indices != NULL; indices = g_list_delete_link (indices, indices)) {
 			if (!_index_lock_shared (indices->data, trans)) goto deadlocked;
-			entries = g_list_concat (entries, _index_search (indices->data, (index_function_t)_everything, NULL));
+			entries = g_list_concat (entries, _index_lsearch (indices->data, (index_function_t)_everything, NULL));
 		}
 	}
 
