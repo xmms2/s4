@@ -398,7 +398,6 @@ static const s4_val_t *_read_val (s4_t *s4, int len)
 		int32_t i;
 		fread (&i, sizeof (int32_t), 1, s4->logfile);
 		ret = _int_lookup_val (s4, i);
-		ret = s4_val_new_int (i);
 	} else {
 		const char *str = _read_str (s4, len);
 		ret = _string_lookup_val (s4, str);
