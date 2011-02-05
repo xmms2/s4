@@ -301,8 +301,6 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 {
 	int i,j;
 	GHashTable *found;
-	GHashTableIter iter;
-	void *key;
 	GList *ret = NULL;
 
 	if (func == NULL)
@@ -319,16 +317,46 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 	for (; i >= 0 && !func (index->data[i].val, func_data); i--); i++;
 	for (; i < index->size && !func (index->data[i].val, func_data); i++) {
 		for (j = 0; j < index->data[i].size; j++) {
-			g_hash_table_insert (found, index->data[i].data[j].data, (void*)1);
+			if (g_hash_table_lookup (found, index->data[i].data[j].data) == NULL) {
+				g_hash_table_insert (found, index->data[i].data[j].data, (void*)1);
+				ret = g_list_prepend (ret, index->data[i].data[j].data);
+			}
 		}
 	}
 
-	g_hash_table_iter_init (&iter, found);
-	while (g_hash_table_iter_next (&iter, &key, NULL)) {
-		ret = g_list_prepend (ret, key);
-	}
-
 	g_hash_table_destroy (found);
+
+	return ret;
+}
+
+/**
+ * Searches an index using a linear search.
+ *
+ * @param index The index to search
+ * @param func The function to use when searching.
+ * It should return 0  if the value matches, -1 if the value is too small
+ * and 1 if the value is too big,
+ * @param func_data Data passed as the second argument to func
+ * @return A GList where list->data is the data found matching
+ */
+GList *_index_lsearch (s4_index_t *index, index_function_t func, void *func_data)
+{
+	int i, j;
+	GList *ret = NULL;
+	GHashTable *found;
+
+	found = g_hash_table_new (NULL, NULL);
+
+	for (i = 0; i < index->size; i++) {
+		if (!func (index->data[i].val, func_data)) {
+			for (j = 0; j < index->data[i].size; j++) {
+				if (g_hash_table_lookup (found, index->data[i].data[j].data) == NULL) {
+					g_hash_table_insert (found, index->data[i].data[j].data, (void*)1);
+					ret = g_list_prepend (ret, index->data[i].data[j].data);
+				}
+			}
+		}
+	}
 
 	return ret;
 }
