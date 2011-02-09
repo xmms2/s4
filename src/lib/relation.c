@@ -312,7 +312,7 @@ int _s4_del (s4_transaction_t *trans, const char *key_a, const s4_val_t *val_a,
 	ret = _entry_delete (entry, key_b, val_b, src);
 
 	if (ret) {
-		index = g_hash_table_lookup (s4->index_table, key_b);
+		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
 			if (!_index_lock_exclusive (index, trans)) goto deadlocked;
@@ -349,14 +349,13 @@ static int _everything (void)
  */
 void _free_relations (s4_t *s4)
 {
-	GHashTableIter iter;
 	s4_index_t *index;
-	GList *entries;
+	GList *indexes, *entries;
 
-	g_static_mutex_lock (&s4->rel_lock);
-	g_hash_table_iter_init (&iter, s4->rel_table);
+	indexes = _index_get_all_a (s4);
 
-	while (g_hash_table_iter_next (&iter, NULL, (void**)&index)) {
+	for (; indexes != NULL; indexes = g_list_delete_link (indexes, indexes)) {
+		index = indexes->data;
 		entries = _index_search (index, (index_function_t)_everything, NULL);
 
 		for (; entries != NULL; entries = g_list_delete_link (entries, entries)) {
@@ -367,8 +366,6 @@ void _free_relations (s4_t *s4)
 			free (entry);
 		}
 	}
-
-	g_static_mutex_unlock (&s4->rel_lock);
 }
 
 typedef struct {

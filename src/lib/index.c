@@ -34,6 +34,11 @@ struct s4_index_St {
 	index_t *data;
 };
 
+struct s4_index_data_St {
+	GHashTable *indexb_table, *indexa_table;
+	GStaticMutex indexb_table_lock, indexa_table_lock;
+};
+
 /**
  *
  * @internal
@@ -42,6 +47,28 @@ struct s4_index_St {
  * @brief Search indexes for S4
  *
  */
+
+s4_index_data_t *_index_create_data ()
+{
+	s4_index_data_t *ret = malloc (sizeof (s4_index_data_t));
+
+	ret->indexa_table = g_hash_table_new_full (g_str_hash, g_str_equal,
+	                                           free, (GDestroyNotify)_index_free);
+	ret->indexb_table = g_hash_table_new_full (g_str_hash, g_str_equal,
+	                                           free, (GDestroyNotify)_index_free);
+	g_static_mutex_init (&ret->indexa_table_lock);
+	g_static_mutex_init (&ret->indexb_table_lock);
+
+	return ret;
+}
+
+void _index_free_data (s4_index_data_t *data)
+{
+	g_hash_table_destroy (data->indexa_table);
+	g_hash_table_destroy (data->indexb_table);
+	g_static_mutex_free (&data->indexa_table_lock);
+	g_static_mutex_free (&data->indexb_table_lock);
+}
 
 /**
  * Gets the a-index associated with key.
@@ -58,11 +85,13 @@ s4_index_t *_index_get_a (s4_t *s4, const char *key, int create)
 {
 	s4_index_t *ret;
 
-	ret = g_hash_table_lookup (s4->rel_table, key);
+	g_static_mutex_lock (&s4->index_data->indexa_table_lock);
+	ret = g_hash_table_lookup (s4->index_data->indexa_table, key);
 	if (ret == NULL && create) {
 		ret = _index_create ();
-		g_hash_table_insert (s4->rel_table, (void*)key, ret);
+		g_hash_table_insert (s4->index_data->indexa_table, (void*)key, ret);
 	}
+	g_static_mutex_unlock (&s4->index_data->indexa_table_lock);
 
 	return ret;
 }
@@ -79,7 +108,9 @@ s4_index_t *_index_get_b (s4_t *s4, const char *key)
 {
 	s4_index_t *ret;
 
-	ret = g_hash_table_lookup (s4->index_table, key);
+	g_static_mutex_lock (&s4->index_data->indexb_table_lock);
+	ret = g_hash_table_lookup (s4->index_data->indexb_table, key);
+	g_static_mutex_unlock (&s4->index_data->indexb_table_lock);
 
 	return ret;
 }
@@ -103,7 +134,10 @@ GList *_index_get_all_a (s4_t *s4)
 {
 	GList *ret = NULL;
 
-	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
+	g_static_mutex_lock (&s4->index_data->indexa_table_lock);
+	g_hash_table_foreach (s4->index_data->indexa_table,
+	                      _prepend_value_to_list, &ret);
+	g_static_mutex_unlock (&s4->index_data->indexa_table_lock);
 
 	return ret;
 }
@@ -118,7 +152,10 @@ GList *_index_get_all_b (s4_t *s4)
 {
 	GList *ret = NULL;
 
-	g_hash_table_foreach (s4->rel_table, _prepend_value_to_list, &ret);
+	g_static_mutex_lock (&s4->index_data->indexb_table_lock);
+	g_hash_table_foreach (s4->index_data->indexb_table,
+	                      _prepend_value_to_list, &ret);
+	g_static_mutex_unlock (&s4->index_data->indexb_table_lock);
 
 	return ret;
 }
@@ -150,10 +187,13 @@ s4_index_t *_index_create ()
 int _index_add (s4_t *s4, const char *key, s4_index_t *index)
 {
 	int ret = 0;
-	if (g_hash_table_lookup (s4->index_table, key) == NULL) {
-		g_hash_table_insert (s4->index_table, strdup (key), index);
+
+	g_static_mutex_lock (&s4->index_data->indexb_table_lock);
+	if (g_hash_table_lookup (s4->index_data->indexb_table, key) == NULL) {
+		g_hash_table_insert (s4->index_data->indexb_table, strdup (key), index);
 		ret = 1;
 	}
+	g_static_mutex_unlock (&s4->index_data->indexb_table_lock);
 
 	return ret;
 }

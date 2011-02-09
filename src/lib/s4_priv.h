@@ -21,15 +21,15 @@
 
 typedef uint32_t log_number_t;
 
+typedef struct s4_index_data_St s4_index_data_t;
+typedef struct s4_const_data_St s4_const_data_t;
+
 struct s4_St {
 	int open_flags;
 
-	GHashTable *index_table;
-	GStaticMutex index_table_lock;
+	s4_index_data_t *index_data;
 
-	GHashTable *rel_table;
-	GStaticMutex rel_lock;
-
+	s4_const_data_t *const_data;
 	GStringChunk *strings;
 	GHashTable *strings_table;
 	GStaticMutex strings_lock;
@@ -87,6 +87,8 @@ typedef struct {
 typedef struct s4_index_St s4_index_t;
 typedef int (*index_function_t)(const s4_val_t *val, void *data);
 
+s4_index_data_t *_index_create_data (void);
+void _index_free_data (s4_index_data_t *data);
 s4_index_t *_index_get_a (s4_t *s4, const char *key, int create);
 s4_index_t *_index_get_b (s4_t *s4, const char *key);
 GList *_index_get_all_a (s4_t *s4);
