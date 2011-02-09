@@ -30,17 +30,6 @@ struct s4_St {
 	s4_index_data_t *index_data;
 
 	s4_const_data_t *const_data;
-	GStringChunk *strings;
-	GHashTable *strings_table;
-	GStaticMutex strings_lock;
-
-	GHashTable *int_table;
-	GStaticMutex int_lock;
-
-	GHashTable *coll_table;
-	GStaticMutex coll_lock;
-	GHashTable *case_table;
-	GStaticMutex case_lock;
 
 	FILE *logfile;
 	int log_users;
@@ -77,6 +66,8 @@ const char *_string_lookup_collated (s4_t *s4, const char *str);
 const s4_val_t *_string_lookup_val (s4_t *s4, const char *str);
 const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i);
 const s4_val_t *_const_lookup (s4_t *s4, const s4_val_t *val);
+s4_const_data_t *_const_create_data ();
+void _const_free_data (s4_const_data_t *data);
 
 typedef struct {
 	int32_t key_a, val_a;

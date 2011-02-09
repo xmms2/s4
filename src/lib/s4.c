@@ -422,19 +422,6 @@ static s4_t *_alloc (void)
 {
 	s4_t* s4 = calloc (1, sizeof(s4_t));
 
-	s4->strings = g_string_chunk_new (8192);
-	s4->strings_table = g_hash_table_new_full (g_str_hash, g_str_equal,
-			NULL, (GDestroyNotify)s4_val_free);
-	g_static_mutex_init (&s4->strings_lock);
-
-	s4->int_table = g_hash_table_new_full (NULL, NULL,
-			NULL, (GDestroyNotify)s4_val_free);
-	g_static_mutex_init (&s4->int_lock);
-
-	s4->coll_table = g_hash_table_new (NULL, NULL);
-	g_static_mutex_init (&s4->coll_lock);
-	s4->case_table = g_hash_table_new (NULL, NULL);
-	g_static_mutex_init (&s4->case_lock);
 
 	s4->log_lock = g_mutex_new ();
 	s4->log_users = 0;
@@ -443,6 +430,7 @@ static s4_t *_alloc (void)
 	s4->sync_cond = g_cond_new ();
 	s4->sync_finished_cond = g_cond_new ();
 
+	s4->const_data = _const_create_data ();
 	s4->index_data = _index_create_data ();
 
 	return s4;
@@ -456,23 +444,15 @@ static s4_t *_alloc (void)
 static void _free (s4_t *s4)
 {
 	_free_relations (s4);
-	g_hash_table_destroy (s4->coll_table);
-	g_hash_table_destroy (s4->case_table);
-	g_hash_table_destroy (s4->strings_table);
-	g_hash_table_destroy (s4->int_table);
-	g_string_chunk_free (s4->strings);
 
 	g_mutex_free (s4->log_lock);
 	g_mutex_free (s4->sync_lock);
 	g_cond_free (s4->sync_cond);
 	g_cond_free (s4->sync_finished_cond);
 
-	g_static_mutex_free (&s4->strings_lock);
-	g_static_mutex_free (&s4->case_lock);
-	g_static_mutex_free (&s4->coll_lock);
-	g_static_mutex_free (&s4->int_lock);
-
+	_const_free_data (s4->const_data);
 	_index_free_data (s4->index_data);
+
 	free (s4->filename);
 	g_free (s4->tmp_filename);
 	free (s4);

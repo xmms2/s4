@@ -52,8 +52,8 @@ s4_index_data_t *_index_create_data ()
 {
 	s4_index_data_t *ret = malloc (sizeof (s4_index_data_t));
 
-	ret->indexa_table = g_hash_table_new_full (g_str_hash, g_str_equal,
-	                                           free, (GDestroyNotify)_index_free);
+	ret->indexa_table = g_hash_table_new_full (NULL, NULL,
+	                                           NULL, (GDestroyNotify)_index_free);
 	ret->indexb_table = g_hash_table_new_full (g_str_hash, g_str_equal,
 	                                           free, (GDestroyNotify)_index_free);
 	g_static_mutex_init (&ret->indexa_table_lock);

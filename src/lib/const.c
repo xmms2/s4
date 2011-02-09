@@ -13,6 +13,7 @@
  */
 
 #include "s4_priv.h"
+#include <stdlib.h>
 
 /**
  *
@@ -23,6 +24,57 @@
  *
  * @{
  */
+
+struct s4_const_data_St {
+	GStringChunk *strings;
+	GHashTable *strings_table;
+	GStaticMutex strings_lock;
+
+	GHashTable *int_table;
+	GStaticMutex int_lock;
+
+	GHashTable *coll_table;
+	GStaticMutex coll_lock;
+	GHashTable *case_table;
+	GStaticMutex case_lock;
+};
+
+s4_const_data_t *_const_create_data ()
+{
+	s4_const_data_t *data = malloc (sizeof (s4_const_data_t));
+
+	data->strings = g_string_chunk_new (8192);
+
+	data->strings_table = g_hash_table_new_full (g_str_hash, g_str_equal,
+	                                             NULL, (GDestroyNotify)s4_val_free);
+	data->int_table = g_hash_table_new_full (NULL, NULL,
+	                                         NULL, (GDestroyNotify)s4_val_free);
+	data->coll_table = g_hash_table_new (NULL, NULL);
+	data->case_table = g_hash_table_new (NULL, NULL);
+
+	g_static_mutex_init (&data->strings_lock);
+	g_static_mutex_init (&data->int_lock);
+	g_static_mutex_init (&data->coll_lock);
+	g_static_mutex_init (&data->case_lock);
+
+	return data;
+}
+
+void _const_free_data (s4_const_data_t *data)
+{
+	g_hash_table_destroy (data->coll_table);
+	g_hash_table_destroy (data->case_table);
+	g_hash_table_destroy (data->strings_table);
+	g_hash_table_destroy (data->int_table);
+	g_string_chunk_free (data->strings);
+
+	g_static_mutex_free (&data->strings_lock);
+	g_static_mutex_free (&data->case_lock);
+	g_static_mutex_free (&data->coll_lock);
+	g_static_mutex_free (&data->int_lock);
+
+	free (data);
+}
 
 /**
  * Gets a pointer to a constant string that's equal to str.
@@ -58,16 +110,16 @@ const s4_val_t *_string_lookup_val (s4_t *s4, const char *str)
 {
 	s4_val_t *ret;
 
-	g_static_mutex_lock (&s4->strings_lock);
+	g_static_mutex_lock (&s4->const_data->strings_lock);
 
-	ret = g_hash_table_lookup (s4->strings_table, str);
+	ret = g_hash_table_lookup (s4->const_data->strings_table, str);
 	if (ret == NULL) {
-		str = g_string_chunk_insert (s4->strings, str);
+		str = g_string_chunk_insert (s4->const_data->strings, str);
 		ret = s4_val_new_internal_string (str, s4);
-		g_hash_table_insert (s4->strings_table, (void*)str, ret);
+		g_hash_table_insert (s4->const_data->strings_table, (void*)str, ret);
 	}
 
-	g_static_mutex_unlock (&s4->strings_lock);
+	g_static_mutex_unlock (&s4->const_data->strings_lock);
 
 	return ret;
 }
@@ -106,18 +158,18 @@ const char *_string_lookup_casefolded (s4_t *s4, const char *str)
 {
 	const char *ret;
 
-	g_static_mutex_lock (&s4->case_lock);
-	ret = g_hash_table_lookup (s4->case_table, str);
+	g_static_mutex_lock (&s4->const_data->case_lock);
+	ret = g_hash_table_lookup (s4->const_data->case_table, str);
 
 	if (ret == NULL) {
 		char *tmp = s4_string_casefold (str);
 		ret = _string_lookup (s4, tmp);
 		g_free (tmp);
 
-		g_hash_table_insert (s4->case_table, (void*)str, (void*)ret);
+		g_hash_table_insert (s4->const_data->case_table, (void*)str, (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->case_lock);
+	g_static_mutex_unlock (&s4->const_data->case_lock);
 
 	return ret;
 }
@@ -134,18 +186,18 @@ const char *_string_lookup_collated (s4_t *s4, const char *str)
 {
 	const char *ret;
 
-	g_static_mutex_lock (&s4->coll_lock);
-	ret = g_hash_table_lookup (s4->coll_table, str);
+	g_static_mutex_lock (&s4->const_data->coll_lock);
+	ret = g_hash_table_lookup (s4->const_data->coll_table, str);
 
 	if (ret == NULL) {
 		char *tmp = s4_string_collate (str);
 		ret = _string_lookup (s4, tmp);
 		g_free (tmp);
 
-		g_hash_table_insert (s4->coll_table, (void*)str, (void*)ret);
+		g_hash_table_insert (s4->const_data->coll_table, (void*)str, (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->coll_lock);
+	g_static_mutex_unlock (&s4->const_data->coll_lock);
 
 	return ret;
 }
@@ -154,15 +206,15 @@ const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i)
 {
 	const s4_val_t *ret;
 
-	g_static_mutex_lock (&s4->int_lock);
-	ret = g_hash_table_lookup (s4->int_table, GINT_TO_POINTER (i));
+	g_static_mutex_lock (&s4->const_data->int_lock);
+	ret = g_hash_table_lookup (s4->const_data->int_table, GINT_TO_POINTER (i));
 
 	if (ret == NULL) {
 		ret = s4_val_new_int (i);
-		g_hash_table_insert (s4->int_table, GINT_TO_POINTER (i), (void*)ret);
+		g_hash_table_insert (s4->const_data->int_table, GINT_TO_POINTER (i), (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->int_lock);
+	g_static_mutex_unlock (&s4->const_data->int_lock);
 
 	return ret;
 }
