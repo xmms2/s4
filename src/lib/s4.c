@@ -432,6 +432,7 @@ static s4_t *_alloc (void)
 
 	s4->const_data = _const_create_data ();
 	s4->index_data = _index_create_data ();
+	s4->entry_data = _entry_create_data ();
 
 	return s4;
 }
@@ -452,6 +453,7 @@ static void _free (s4_t *s4)
 
 	_const_free_data (s4->const_data);
 	_index_free_data (s4->index_data);
+	_entry_free_data (s4->entry_data);
 
 	free (s4->filename);
 	g_free (s4->tmp_filename);

@@ -23,13 +23,14 @@ typedef uint32_t log_number_t;
 
 typedef struct s4_index_data_St s4_index_data_t;
 typedef struct s4_const_data_St s4_const_data_t;
+typedef struct s4_entry_data_St s4_entry_data_t;
 
 struct s4_St {
 	int open_flags;
 
 	s4_index_data_t *index_data;
-
 	s4_const_data_t *const_data;
+	s4_entry_data_t *entry_data;
 
 	FILE *logfile;
 	int log_users;
@@ -57,6 +58,8 @@ int _reread_file (s4_t *s4);
 
 int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src);
+s4_entry_data_t *_entry_create_data ();
+void _entry_free_data (s4_entry_data_t *data);
 
 s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
 

@@ -31,6 +31,12 @@ typedef struct {
 	entry_data_t *data;
 } entry_t;
 
+struct s4_entry_data_St {
+	entry_t *entry;
+	const char *prev_key;
+	const s4_val_t *prev_val;
+};
+
 #define LINEAR_SEARCH_SIZE 0
 
 /**
@@ -45,6 +51,18 @@ typedef struct {
  * @{
  * @internal
  */
+
+s4_entry_data_t *_entry_create_data ()
+{
+	s4_entry_data_t *ret = calloc (1, sizeof (s4_entry_data_t));
+
+	return ret;
+}
+
+void _entry_free_data (s4_entry_data_t *data)
+{
+	free (data);
+}
 
 /**
  * Searches an entry for key
@@ -235,38 +253,36 @@ int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 {
 	int ret;
 	s4_index_t *index;
-	static entry_t *entry;
-	static const char *prev_key = NULL;
-	static const s4_val_t *prev_val = NULL;
 
 	/* If key_a and value_a are equal to the key and value of entry
 	 * it don't have to search the index to find entry
 	 */
-	if (prev_key != key_a || prev_val != value_a) {
+	if (s4->entry_data->prev_key != key_a
+	    || s4->entry_data->prev_val != value_a) {
 		GList *entries;
 
 		index = _index_get_a (s4, key_a, 1);
 		entries = _index_search (index, NULL, (void*)value_a);
 
 		if (entries == NULL) {
-			entry = _entry_create (key_a, value_a);
-			_index_insert (index, value_a, entry);
+			s4->entry_data->entry = _entry_create (key_a, value_a);
+			_index_insert (index, value_a, s4->entry_data->entry);
 		} else {
-			entry = entries->data;
+			s4->entry_data->entry = entries->data;
 			g_list_free (entries);
 		}
 
-		prev_key = key_a;
-		prev_val = value_a;
+		s4->entry_data->prev_key = key_a;
+		s4->entry_data->prev_val = value_a;
 	}
 
-	ret = _entry_insert (entry, key_b, value_b, src);
+	ret = _entry_insert (s4->entry_data->entry, key_b, value_b, src);
 
 	if (ret) {
 		index = _index_get_b (s4, key_b);
 
 		if (index != NULL) {
-			_index_insert (index, value_b, entry);
+			_index_insert (index, value_b, s4->entry_data->entry);
 		}
 	}
 
@@ -366,6 +382,10 @@ void _free_relations (s4_t *s4)
 			free (entry);
 		}
 	}
+
+	s4->entry_data->entry = NULL;
+	s4->entry_data->prev_key = NULL;
+	s4->entry_data->prev_val = NULL;
 }
 
 typedef struct {
