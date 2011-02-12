@@ -53,7 +53,7 @@ int _reread_file (s4_t *s4);
 
 int _s4_add_internal (s4_t *s4, const char *key_a, const s4_val_t *value_a,
 		const char *key_b, const s4_val_t *value_b, const char *src);
-s4_entry_data_t *_entry_create_data ();
+s4_entry_data_t *_entry_create_data (void);
 void _entry_free_data (s4_entry_data_t *data);
 
 s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4);
@@ -64,7 +64,7 @@ const char *_string_lookup_collated (s4_t *s4, const char *str);
 const s4_val_t *_string_lookup_val (s4_t *s4, const char *str);
 const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i);
 const s4_val_t *_const_lookup (s4_t *s4, const s4_val_t *val);
-s4_const_data_t *_const_create_data ();
+s4_const_data_t *_const_create_data (void);
 void _const_free_data (s4_const_data_t *data);
 
 typedef struct {
@@ -111,7 +111,7 @@ s4_resultset_t *_s4_query (s4_transaction_t *trans, s4_fetchspec_t *fs, s4_condi
 void _free_relations (s4_t *s4);
 
 typedef struct s4_lock_St s4_lock_t;
-s4_lock_t *_lock_alloc ();
+s4_lock_t *_lock_alloc (void);
 void _lock_free (s4_lock_t *lock);
 int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans);
 int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans);
@@ -156,7 +156,7 @@ void _oplist_last (oplist_t *list);
 int _oplist_rollback (oplist_t *list);
 int _oplist_execute (oplist_t *list, int rollback_on_failure);
 
-s4_log_data_t *_log_create_data ();
+s4_log_data_t *_log_create_data (void);
 void _log_free_data (s4_log_data_t *data);
 void _log_lock_file (s4_t *s4);
 void _log_unlock_file (s4_t *s4);
