@@ -174,7 +174,8 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 		return -1;
 	}
 
-	s4->last_logpoint = s4->last_checkpoint = hdr.last_checkpoint;
+	_log_init (s4, hdr.last_checkpoint);
+
 	for (i = 0; i < 16; i++) {
 		s4->uuid[i] = hdr.uuid[i];
 	}
@@ -316,7 +317,7 @@ static void _result_to_pairs (s4_resultset_t *res, save_data_t *sd)
  * Writes the database to disk
  *
  * @param s4 The database to write
- * @return 0 on success, non-zero on error
+ * @return non-zero on success, 0 on error
  */
 static int _write_file (s4_t *s4)
 {
@@ -348,10 +349,11 @@ static int _write_file (s4_t *s4)
 	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_PARENT);
 	s4_fetchspec_add (fs, NULL, NULL, S4_FETCH_DATA);
 
-	trans = s4_begin (s4, 0);
-	res = s4_query (s4, trans, fs, cond);
-	_transaction_writing (trans);
-	s4_commit (trans);
+	do {
+		trans = s4_begin (s4, 0);
+		res = s4_query (s4, trans, fs, cond);
+		_transaction_writing (trans);
+	} while (!s4_commit (trans));
 
 	_result_to_pairs (res, &sd);
 
@@ -364,7 +366,7 @@ static int _write_file (s4_t *s4)
 	for (j = 0; j < 16; j++) {
 		hdr.uuid[j] = s4->uuid[j];
 	}
-	hdr.last_checkpoint = s4->last_synced;
+	hdr.last_checkpoint = _log_last_synced (s4);
 
 	fwrite (&hdr, sizeof (s4_header_t), 1, file);
 	_write_strings (sd.strings, file);
@@ -422,10 +424,6 @@ static s4_t *_alloc (void)
 {
 	s4_t* s4 = calloc (1, sizeof(s4_t));
 
-
-	s4->log_lock = g_mutex_new ();
-	s4->log_users = 0;
-
 	s4->sync_lock = g_mutex_new ();
 	s4->sync_cond = g_cond_new ();
 	s4->sync_finished_cond = g_cond_new ();
@@ -433,6 +431,7 @@ static s4_t *_alloc (void)
 	s4->const_data = _const_create_data ();
 	s4->index_data = _index_create_data ();
 	s4->entry_data = _entry_create_data ();
+	s4->log_data = _log_create_data ();
 
 	return s4;
 }
@@ -446,7 +445,6 @@ static void _free (s4_t *s4)
 {
 	_free_relations (s4);
 
-	g_mutex_free (s4->log_lock);
 	g_mutex_free (s4->sync_lock);
 	g_cond_free (s4->sync_cond);
 	g_cond_free (s4->sync_finished_cond);
@@ -454,6 +452,7 @@ static void _free (s4_t *s4)
 	_const_free_data (s4->const_data);
 	_index_free_data (s4->index_data);
 	_entry_free_data (s4->entry_data);
+	_log_free_data (s4->log_data);
 
 	free (s4->filename);
 	g_free (s4->tmp_filename);

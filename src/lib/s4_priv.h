@@ -24,6 +24,7 @@ typedef uint32_t log_number_t;
 typedef struct s4_index_data_St s4_index_data_t;
 typedef struct s4_const_data_St s4_const_data_t;
 typedef struct s4_entry_data_St s4_entry_data_t;
+typedef struct s4_log_data_St s4_log_data_t;
 
 struct s4_St {
 	int open_flags;
@@ -31,15 +32,9 @@ struct s4_St {
 	s4_index_data_t *index_data;
 	s4_const_data_t *const_data;
 	s4_entry_data_t *entry_data;
+	s4_log_data_t *log_data;
 
-	FILE *logfile;
-	int log_users;
-	GMutex *log_lock;
 	GCond *sync_cond, *sync_finished_cond;
-	log_number_t last_checkpoint;
-	log_number_t last_synced;
-	log_number_t last_logpoint;
-	log_number_t next_logpoint;
 	int sync_thread_run;
 	GThread *sync_thread;
 	GMutex *sync_lock;
@@ -161,6 +156,8 @@ void _oplist_last (oplist_t *list);
 int _oplist_rollback (oplist_t *list);
 int _oplist_execute (oplist_t *list, int rollback_on_failure);
 
+s4_log_data_t *_log_create_data ();
+void _log_free_data (s4_log_data_t *data);
 void _log_lock_file (s4_t *s4);
 void _log_unlock_file (s4_t *s4);
 void _log_lock_db (s4_t *s4);
@@ -169,5 +166,7 @@ int _log_write (oplist_t *list);
 void _log_checkpoint (s4_t *s4);
 int _log_open (s4_t *s4);
 int _log_close (s4_t *s4);
+log_number_t _log_last_synced (s4_t *s4);
+void _log_init (s4_t *s4, log_number_t last_checkpoint);
 
 #endif

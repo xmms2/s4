@@ -59,6 +59,32 @@ struct mod_header {
 	int32_t s_len;
 };
 
+struct s4_log_data_St {
+	FILE *logfile;
+	int log_users;
+	GMutex *lock;
+
+	log_number_t last_checkpoint;
+	log_number_t last_synced;
+	log_number_t last_logpoint;
+	log_number_t next_logpoint;
+};
+
+s4_log_data_t *_log_create_data ()
+{
+	s4_log_data_t *ret = calloc (1, sizeof (s4_log_data_t));
+
+	ret->lock = g_mutex_new ();
+
+	return ret;
+}
+
+void _log_free_data (s4_log_data_t *data)
+{
+	g_mutex_free (data->lock);
+	free (data);
+}
+
 /**
  * Calculates the size of a log entry from the header
  * @param hdr The header to calculate the size of.
@@ -183,7 +209,7 @@ static int _estimate_size (oplist_t *list, int *writing) {
  */
 static void _log_lock (s4_t *s4)
 {
-	g_mutex_lock (s4->log_lock);
+	g_mutex_lock (s4->log_data->lock);
 }
 
 /**
@@ -192,7 +218,7 @@ static void _log_lock (s4_t *s4)
  */
 static void _log_unlock (s4_t *s4)
 {
-	g_mutex_unlock (s4->log_lock);
+	g_mutex_unlock (s4->log_data->lock);
 }
 
 
@@ -207,11 +233,11 @@ static void _log_write_header (s4_t *s4, struct log_header hdr, int size)
 {
 	log_number_t pos, round;
 
-	if (s4->logfile == NULL)
+	if (s4->log_data->logfile == NULL)
 		return;
 
-	pos = s4->next_logpoint % LOG_SIZE;
-	round = s4->next_logpoint / LOG_SIZE;
+	pos = s4->log_data->next_logpoint % LOG_SIZE;
+	round = s4->log_data->next_logpoint / LOG_SIZE;
 
 	/* Wrap around if we're at the end */
 	if ((pos + size) > (LOG_SIZE - sizeof (struct log_header) * 2)) {
@@ -219,17 +245,17 @@ static void _log_write_header (s4_t *s4, struct log_header hdr, int size)
 
 		hdr.num = pos + round * LOG_SIZE;
 		hdr.type = LOG_ENTRY_WRAP;
-		fwrite (&hdr, sizeof (struct log_header), 1, s4->logfile);
+		fwrite (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile);
 		pos = 0;
 		round++;
-		rewind (s4->logfile);
+		rewind (s4->log_data->logfile);
 	}
 
 	hdr.num = pos + round * LOG_SIZE;
-	fwrite (&hdr, sizeof (struct log_header), 1, s4->logfile);
+	fwrite (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile);
 
-	s4->last_logpoint = s4->next_logpoint;
-	s4->next_logpoint = ftell (s4->logfile) + round * LOG_SIZE + size;
+	s4->log_data->last_logpoint = s4->log_data->next_logpoint;
+	s4->log_data->next_logpoint = ftell (s4->log_data->logfile) + round * LOG_SIZE + size;
 }
 
 /**
@@ -249,7 +275,7 @@ static void _log_mod (s4_t *s4, log_type_t type, const char *key_a, const s4_val
 	struct mod_header mhdr;
 	int size;
 
-	if (s4->logfile == NULL)
+	if (s4->log_data->logfile == NULL)
 		return;
 
 	lhdr.type = type;
@@ -263,13 +289,13 @@ static void _log_mod (s4_t *s4, log_type_t type, const char *key_a, const s4_val
 
 	_log_write_header (s4, lhdr, size);
 
-	fwrite (&mhdr, sizeof (struct mod_header), 1, s4->logfile);
+	fwrite (&mhdr, sizeof (struct mod_header), 1, s4->log_data->logfile);
 
-	_write_str (key_a, mhdr.ka_len, s4->logfile);
-	_write_val (val_a, mhdr.va_len, s4->logfile);
-	_write_str (key_b, mhdr.kb_len, s4->logfile);
-	_write_val (val_b, mhdr.vb_len, s4->logfile);
-	_write_str (src, mhdr.s_len, s4->logfile);
+	_write_str (key_a, mhdr.ka_len, s4->log_data->logfile);
+	_write_val (val_a, mhdr.va_len, s4->log_data->logfile);
+	_write_str (key_b, mhdr.kb_len, s4->log_data->logfile);
+	_write_val (val_b, mhdr.vb_len, s4->log_data->logfile);
+	_write_str (src, mhdr.s_len, s4->log_data->logfile);
 }
 
 /**
@@ -299,8 +325,8 @@ void _log_checkpoint (s4_t *s4)
 	_log_lock (s4);
 	_log_simple (s4, LOG_ENTRY_BEGIN);
 	_log_write_header (s4, hdr, sizeof (int32_t));
-	fwrite (&s4->last_synced, sizeof (log_number_t), 1, s4->logfile);
-	s4->last_checkpoint = s4->last_synced;
+	fwrite (&s4->log_data->last_synced, sizeof (log_number_t), 1, s4->log_data->logfile);
+	s4->log_data->last_checkpoint = s4->log_data->last_synced;
 	_log_simple (s4, LOG_ENTRY_END);
 	_log_unlock (s4);
 }
@@ -311,8 +337,8 @@ void _log_checkpoint (s4_t *s4)
  */
 static void _log_flush (s4_t *s4)
 {
-	fflush (s4->logfile);
-	fsync (fileno (s4->logfile));
+	fflush (s4->log_data->logfile);
+	fsync (fileno (s4->log_data->logfile));
 }
 
 /**
@@ -327,17 +353,17 @@ int _log_write (oplist_t *list)
 	int writing = 0;
 	int size = _estimate_size (list, &writing);
 
-	if (s4->logfile == NULL || size == 0)
+	if (s4->log_data->logfile == NULL || size == 0)
 		return 1;
 
 	_log_lock (s4);
 	if (writing) {
-		s4->last_synced = s4->last_logpoint;
+		s4->log_data->last_synced = s4->log_data->last_logpoint;
 	}
 
-	if ((s4->next_logpoint + size) > (s4->last_checkpoint + LOG_SIZE)) {
+	if ((s4->log_data->next_logpoint + size) > (s4->log_data->last_checkpoint + LOG_SIZE)) {
 		_log_unlock (s4);
-		return 0;
+		return writing;
 	}
 
 	_log_simple (s4, LOG_ENTRY_BEGIN);
@@ -358,7 +384,7 @@ int _log_write (oplist_t *list)
 
 	_log_simple (s4, LOG_ENTRY_END);
 
-	if (s4->last_synced > (s4->last_checkpoint + LOG_SIZE / 2))
+	if (s4->log_data->last_synced > (s4->log_data->last_checkpoint + LOG_SIZE / 2))
 		_start_sync (s4);
 
 	_log_flush (s4);
@@ -376,7 +402,7 @@ static const char *_read_str (s4_t *s4, int len)
 {
 	const char *ret;
 	char *str = malloc (len + 1);
-	fread (str, 1, len, s4->logfile);
+	fread (str, 1, len, s4->log_data->logfile);
 	str[len] = '\0';
 
 	ret = _string_lookup (s4, str);
@@ -396,7 +422,7 @@ static const s4_val_t *_read_val (s4_t *s4, int len)
 	const s4_val_t *ret;
 	if (len == -1) {
 		int32_t i;
-		fread (&i, sizeof (int32_t), 1, s4->logfile);
+		fread (&i, sizeof (int32_t), 1, s4->log_data->logfile);
 		ret = _int_lookup_val (s4, i);
 	} else {
 		const char *str = _read_str (s4, len);
@@ -422,7 +448,7 @@ static int _read_mod (s4_t *s4, oplist_t *list, log_type_t type)
 	if (list == NULL)
 		return 0;
 
-	fread (&mhdr, sizeof (struct mod_header), 1, s4->logfile);
+	fread (&mhdr, sizeof (struct mod_header), 1, s4->log_data->logfile);
 
 	key_a = _read_str (s4, mhdr.ka_len);
 	val_a = _read_val (s4, mhdr.va_len);
@@ -452,47 +478,47 @@ static int _log_redo (s4_t *s4)
 	log_number_t last_valid_logpoint;
 	oplist_t *oplist = NULL;
 
-	fflush (s4->logfile);
+	fflush (s4->log_data->logfile);
 
 	/* Check if the log wrapped around since our last write */
-	pos = s4->last_logpoint % LOG_SIZE;
-	if (fseek (s4->logfile, pos, SEEK_SET) != 0 ||
-			fread (&hdr, sizeof (struct log_header), 1, s4->logfile) != 1) {
+	pos = s4->log_data->last_logpoint % LOG_SIZE;
+	if (fseek (s4->log_data->logfile, pos, SEEK_SET) != 0 ||
+			fread (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile) != 1) {
 		return 0;
 	}
 
 	/* If it did, we have to read in everything */
-	if (hdr.num != s4->last_logpoint) {
+	if (hdr.num != s4->log_data->last_logpoint) {
 		_reread_file (s4);
 	}
 
-	last_valid_logpoint = s4->last_logpoint;
-	s4->next_logpoint = s4->last_logpoint + sizeof (struct log_header);
+	last_valid_logpoint = s4->log_data->last_logpoint;
+	s4->log_data->next_logpoint = s4->log_data->last_logpoint + sizeof (struct log_header);
 
-	pos = s4->next_logpoint % LOG_SIZE;
-	round = s4->next_logpoint / LOG_SIZE;
-	if (fseek (s4->logfile, pos, SEEK_SET) != 0) {
+	pos = s4->log_data->next_logpoint % LOG_SIZE;
+	round = s4->log_data->next_logpoint / LOG_SIZE;
+	if (fseek (s4->log_data->logfile, pos, SEEK_SET) != 0) {
 		return 0;
 	}
 
 	/* Read log entries until fread fails, or the header num is different
 	 * from the expected number.
 	 */
-	while (fread (&hdr, sizeof (struct log_header), 1, s4->logfile) == 1
+	while (fread (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile) == 1
 			&& hdr.num == (pos + round * LOG_SIZE)) {
 
-		s4->last_logpoint = s4->next_logpoint;
+		s4->log_data->last_logpoint = s4->log_data->next_logpoint;
 
 		if (hdr.type == LOG_ENTRY_WRAP) {
 			round++;
-			rewind (s4->logfile);
+			rewind (s4->log_data->logfile);
 		} else if (hdr.type == LOG_ENTRY_DEL || hdr.type == LOG_ENTRY_ADD) {
 			if (!_read_mod (s4, oplist, hdr.type))
 				break;
 		} else if (hdr.type == LOG_ENTRY_CHECKPOINT) {
-			fread (&new_checkpoint, sizeof (log_number_t), 1, s4->logfile);
+			fread (&new_checkpoint, sizeof (log_number_t), 1, s4->log_data->logfile);
 		} else if (hdr.type == LOG_ENTRY_WRITING) {
-			new_synced = s4->last_logpoint;
+			new_synced = s4->log_data->last_logpoint;
 		} else if (hdr.type == LOG_ENTRY_BEGIN) {
 			oplist = _oplist_new (_transaction_dummy_alloc (s4));
 			new_checkpoint = -1;
@@ -508,11 +534,11 @@ static int _log_redo (s4_t *s4)
 			oplist = NULL;
 
 			if (new_checkpoint != -1) {
-				s4->last_synced = s4->last_checkpoint = new_checkpoint;
+				s4->log_data->last_synced = s4->log_data->last_checkpoint = new_checkpoint;
 			} else if (new_synced != -1) {
-				s4->last_synced = new_synced;
+				s4->log_data->last_synced = new_synced;
 			}
-			last_valid_logpoint = s4->last_logpoint;
+			last_valid_logpoint = s4->log_data->last_logpoint;
 		} else if (hdr.type == LOG_ENTRY_INIT) {
 			/* Ignore */
 		} else {
@@ -520,8 +546,8 @@ static int _log_redo (s4_t *s4)
 			break;
 		}
 
-		pos = ftell (s4->logfile);
-		s4->next_logpoint = pos + round * LOG_SIZE;
+		pos = ftell (s4->log_data->logfile);
+		s4->log_data->next_logpoint = pos + round * LOG_SIZE;
 	}
 
 	if (oplist != NULL) {
@@ -529,10 +555,10 @@ static int _log_redo (s4_t *s4)
 		_oplist_free (oplist);
 	}
 
-	s4->last_logpoint = last_valid_logpoint;
-	s4->next_logpoint = last_valid_logpoint + sizeof (struct log_header);
-	pos = s4->next_logpoint % LOG_SIZE;
-	fseek (s4->logfile, pos, SEEK_SET);
+	s4->log_data->last_logpoint = last_valid_logpoint;
+	s4->log_data->next_logpoint = last_valid_logpoint + sizeof (struct log_header);
+	pos = s4->log_data->next_logpoint % LOG_SIZE;
+	fseek (s4->log_data->logfile, pos, SEEK_SET);
 
 	return 1;
 }
@@ -544,9 +570,9 @@ static int _log_redo (s4_t *s4)
 static void _log_truncate (s4_t *s4)
 {
 #ifdef _WIN32
-	_chsize (fileno (s4->logfile, LOG_SIZE));
+	_chsize (fileno (s4->log_data->logfile, LOG_SIZE));
 #else
-	ftruncate (fileno (s4->logfile), LOG_SIZE);
+	ftruncate (fileno (s4->log_data->logfile), LOG_SIZE);
 #endif
 }
 
@@ -558,7 +584,7 @@ static void _log_truncate (s4_t *s4)
 static void _log_lockf (s4_t *s4, int offset)
 {
 #ifdef _WIN32
-	while (!LockFile (fileno (s4->logfile), offset, 0, 1, 0));
+	while (!LockFile (fileno (s4->log_data->logfile), offset, 0, 1, 0));
 #else
 	struct flock lock;
 	lock.l_type = F_UNLCK;
@@ -566,7 +592,7 @@ static void _log_lockf (s4_t *s4, int offset)
 	lock.l_start = offset;
 	lock.l_len = 1;
 
-	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+	while (fcntl (fileno (s4->log_data->logfile), F_SETLKW, &lock) == -1);
 #endif
 }
 
@@ -578,7 +604,7 @@ static void _log_lockf (s4_t *s4, int offset)
 static void _log_unlockf (s4_t *s4, int offset)
 {
 #ifdef _WIN32
-	while (!UnlockFile (fileno (s4->logfile), offset, 0, 1, 0));
+	while (!UnlockFile (fileno (s4->log_data->logfile), offset, 0, 1, 0));
 #else
 	struct flock lock;
 	lock.l_type = F_UNLCK;
@@ -586,7 +612,7 @@ static void _log_unlockf (s4_t *s4, int offset)
 	lock.l_start = offset;
 	lock.l_len = 1;
 
-	while (fcntl (fileno (s4->logfile), F_SETLKW, &lock) == -1);
+	while (fcntl (fileno (s4->log_data->logfile), F_SETLKW, &lock) == -1);
 #endif
 }
 
@@ -600,11 +626,11 @@ int _log_open (s4_t *s4)
 {
 	char *log_name = g_strconcat (s4->filename, ".log", NULL);
 
-	s4->logfile = fopen (log_name, "r+");
+	s4->log_data->logfile = fopen (log_name, "r+");
 
-	if (s4->logfile == NULL) {
-		s4->logfile = fopen (log_name, "w+");
-		if (s4->logfile == NULL) {
+	if (s4->log_data->logfile == NULL) {
+		s4->log_data->logfile = fopen (log_name, "w+");
+		if (s4->log_data->logfile == NULL) {
 			s4_set_errno (S4E_LOGOPEN);
 			return 0;
 		}
@@ -623,7 +649,7 @@ int _log_open (s4_t *s4)
  */
 int _log_close (s4_t *s4)
 {
-	if (fclose (s4->logfile) != 0) {
+	if (fclose (s4->log_data->logfile) != 0) {
 		return 0;
 	}
 	return 1;
@@ -636,16 +662,16 @@ int _log_close (s4_t *s4)
  */
 void _log_lock_file (s4_t *s4)
 {
-	if (s4->logfile == NULL)
+	if (s4->log_data->logfile == NULL)
 		return;
 
 	_log_lock (s4);
-	if (s4->log_users == 0) {
+	if (s4->log_data->log_users == 0) {
 		_log_lockf (s4, 0);
 		_log_redo (s4);
 	}
 
-	s4->log_users++;
+	s4->log_data->log_users++;
 	_log_unlock (s4);
 }
 
@@ -655,17 +681,17 @@ void _log_lock_file (s4_t *s4)
  */
 void _log_unlock_file (s4_t *s4)
 {
-	if (s4->logfile == NULL)
+	if (s4->log_data->logfile == NULL)
 		return;
 
 	_log_lock (s4);
-	s4->log_users--;
+	s4->log_data->log_users--;
 
-	if (s4->log_users < 0) {
+	if (s4->log_data->log_users < 0) {
 		S4_ERROR ("_log_unlock_file called more time than _log_lock_file!");
-		s4->log_users = 0;
+		s4->log_data->log_users = 0;
 	}
-	if (s4->log_users == 0) {
+	if (s4->log_data->log_users == 0) {
 		_log_unlockf (s4, 0);
 	}
 	_log_unlock (s4);
@@ -690,6 +716,17 @@ void _log_lock_db (s4_t *s4)
 void _log_unlock_db (s4_t *s4)
 {
 	_log_unlockf (s4, 1);
+}
+
+log_number_t _log_last_synced (s4_t *s4)
+{
+	return s4->log_data->last_synced;
+}
+
+void _log_init (s4_t *s4, log_number_t last_checkpoint)
+{
+	s4->log_data->last_synced = last_checkpoint;
+	s4->log_data->last_checkpoint = last_checkpoint;
 }
 
 /**
