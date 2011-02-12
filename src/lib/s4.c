@@ -195,6 +195,12 @@ static int _read_file (s4_t *s4, const char *filename, int flags)
 int _reread_file (s4_t *s4)
 {
 	_free_relations (s4);
+
+	_index_free_data (s4->index_data);
+	_entry_free_data (s4->entry_data);
+	s4->index_data = _index_create_data ();
+	s4->entry_data = _entry_create_data ();
+
 	return _read_file (s4, s4->filename, S4_EXISTS);
 }
 

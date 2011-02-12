@@ -382,10 +382,6 @@ void _free_relations (s4_t *s4)
 			free (entry);
 		}
 	}
-
-	s4->entry_data->entry = NULL;
-	s4->entry_data->prev_key = NULL;
-	s4->entry_data->prev_val = NULL;
 }
 
 typedef struct {
