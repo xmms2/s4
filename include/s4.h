@@ -192,7 +192,7 @@ void s4_resultset_shuffle (const s4_resultset_t *set);
 typedef struct s4_pattern_St s4_pattern_t;
 
 s4_pattern_t *s4_pattern_create (const char *pattern, int normalize);
-int s4_pattern_match (s4_pattern_t *p, const s4_val_t *val);
+int s4_pattern_match (const s4_pattern_t *p, const s4_val_t *val);
 void s4_pattern_free (s4_pattern_t *pattern);
 
 /* string.c */

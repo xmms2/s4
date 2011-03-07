@@ -427,7 +427,7 @@ s4_pattern_create (const char *pattern, int casefold)
  * @return non-zero if the pattern matches the value, 0 otherwise
  */
 int
-s4_pattern_match (s4_pattern_t *p, const s4_val_t *val)
+s4_pattern_match (const s4_pattern_t *p, const s4_val_t *val)
 {
 	int32_t i;
 	const char *str;
