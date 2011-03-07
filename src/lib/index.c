@@ -68,6 +68,7 @@ void _index_free_data (s4_index_data_t *data)
 	g_hash_table_destroy (data->indexb_table);
 	g_static_mutex_free (&data->indexa_table_lock);
 	g_static_mutex_free (&data->indexb_table_lock);
+	free (data);
 }
 
 /**
