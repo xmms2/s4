@@ -234,7 +234,7 @@ static int token_filter (const s4_val_t *value, s4_condition_t *cond)
 /*
  * Sets the correct function and function data based on filter type
  */
-static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, s4_val_t *val)
+static void _set_filter_function (s4_condition_t *cond, s4_filter_type_t type, const s4_val_t *val)
 {
 	switch (type) {
 		case S4_FILTER_EQUAL:
@@ -421,8 +421,10 @@ s4_condition_t *s4_cond_get_operand (s4_condition_t *cond, int operand)
  * @param flags Condition flags, or 0
  * @return A new filter condition
  */
-s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
-		s4_val_t *value, s4_sourcepref_t *sourcepref, s4_cmp_mode_t cmp_mode, int flags)
+s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
+		const char *key, const s4_val_t *value,
+		s4_sourcepref_t *sourcepref, s4_cmp_mode_t cmp_mode,
+		int flags)
 {
 	s4_condition_t *cond = malloc (sizeof (s4_condition_t));
 

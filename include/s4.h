@@ -118,8 +118,9 @@ s4_condition_t *s4_cond_new_custom_combiner (combine_function_t func);
 void s4_cond_add_operand (s4_condition_t *cond, s4_condition_t *op);
 s4_condition_t *s4_cond_get_operand (s4_condition_t *cond, int op);
 
-s4_condition_t *s4_cond_new_filter (s4_filter_type_t type, const char *key,
-		s4_val_t *value, s4_sourcepref_t *sourcepref, s4_cmp_mode_t mode, int flags);
+s4_condition_t *s4_cond_new_filter (s4_filter_type_t type,
+		const char *key, const s4_val_t *value,	s4_sourcepref_t *sourcepref,
+		s4_cmp_mode_t mode, int flags);
 s4_condition_t *s4_cond_new_custom_filter (filter_function_t func, void *userdata,
 		free_func_t free, const char *key, s4_sourcepref_t *sourcepref,
 		s4_cmp_mode_t cmp_mode, int monotonic, int flags);
