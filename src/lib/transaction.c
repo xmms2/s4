@@ -83,6 +83,7 @@ s4_transaction_t *_transaction_dummy_alloc (s4_t *s4)
 void _transaction_dummy_free (s4_transaction_t *trans)
 {
 	_lock_unlock_all (trans);
+	g_list_free (trans->locks);
 	free (trans);
 }
 
