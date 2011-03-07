@@ -185,8 +185,8 @@ int s4_resultset_get_rowcount (const s4_resultset_t *set);
 void s4_resultset_free (s4_resultset_t *set);
 s4_resultset_t *s4_resultset_ref (s4_resultset_t *set);
 void s4_resultset_unref (s4_resultset_t *set);
-void s4_resultset_sort (const s4_resultset_t *set, const int *order);
-void s4_resultset_shuffle (const s4_resultset_t *set);
+void s4_resultset_sort (s4_resultset_t *set, const int *order);
+void s4_resultset_shuffle (s4_resultset_t *set);
 
 /* pattern.c */
 typedef struct s4_pattern_St s4_pattern_t;

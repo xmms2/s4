@@ -165,7 +165,7 @@ static int _compare_rows (const s4_resultrow_t **row1, const s4_resultrow_t **ro
  * will result in the column (i - 1) being sorted descending, a negative
  * integer i will. result in the column (-i - 1) being sorted ascending.
  */
-void s4_resultset_sort (const s4_resultset_t *set, const int *order)
+void s4_resultset_sort (s4_resultset_t *set, const int *order)
 {
 	g_ptr_array_sort_with_data (set->results, (GCompareDataFunc)_compare_rows, (void*)order);
 }
@@ -174,7 +174,7 @@ void s4_resultset_sort (const s4_resultset_t *set, const int *order)
  * Shuffles the resultset into a pseudo-random order
  * @param set The resultset to shuffle
  */
-void s4_resultset_shuffle (const s4_resultset_t *set)
+void s4_resultset_shuffle (s4_resultset_t *set)
 {
 	g_ptr_array_sort (set->results, (GCompareFunc)g_random_int);
 }
