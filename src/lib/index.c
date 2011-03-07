@@ -398,6 +398,8 @@ GList *_index_lsearch (s4_index_t *index, index_function_t func, void *func_data
 		}
 	}
 
+	g_hash_table_unref (found);
+
 	return ret;
 }
 
