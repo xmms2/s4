@@ -93,12 +93,11 @@ static int _lock_will_deadlock (s4_lock_t *lock, s4_transaction_t *trans, int fi
 
 	g_mutex_unlock (lock->lock);
 
-	for (; !ret && transactions != NULL; transactions = g_list_next (transactions)) {
+	while (!ret && transactions != NULL) {
 		t = transactions->data;
 		ret = _lock_will_deadlock (_transaction_get_waiting_for (t), trans, 0);
+		transactions = g_list_delete_link (transactions, transactions);
 	}
-
-	g_list_free (transactions);
 
 	return ret;
 }
