@@ -77,8 +77,8 @@ CASE (test_deadlock) {
 	GThread *t1, *t2;
 	_mem_open ();
 
-	t1 = g_thread_create (_dead_thread_one, NULL, TRUE, NULL);
-	t2 = g_thread_create (_dead_thread_two, NULL, TRUE, NULL);
+	t1 = g_thread_create ((GThreadFunc)_dead_thread_one, NULL, TRUE, NULL);
+	t2 = g_thread_create ((GThreadFunc)_dead_thread_two, NULL, TRUE, NULL);
 
 	g_thread_join (t1);
 	g_thread_join (t2);
