@@ -26,6 +26,7 @@
  * Error codes
  */
 typedef enum {
+	S4E_NOERROR, /**< No error to report */
 	S4E_EXISTS, /**< Tried to open a database with S4_NEW, but the file already exists */
 	S4E_NOENT, /**< Tried to open a database with S4_EXISTS, but it did not exist */
 	S4E_OPEN, /**< fopen failed when trying to open the database. errno has more details */

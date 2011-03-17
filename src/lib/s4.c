@@ -578,13 +578,13 @@ void s4_sync (s4_t *s4)
  * This function is thread safe, error numbers set in one thread
  * will NOT be seen in another thread.
  *
- * @return The last error number set, or 0 if none has been set
+ * @return The last error number set, or S4E_NOERROR if none has been set
  */
 s4_errno_t s4_errno()
 {
 	s4_errno_t *i = g_static_private_get (&_errno);
 	if (i == NULL) {
-		return 0;
+		return S4E_NOERROR;
 	}
 	return *i;
 }
