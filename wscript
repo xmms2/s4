@@ -55,7 +55,7 @@ def build(bld):
 ## Configuration
 ####
 def configure(conf):
-    if os.environ.has_key('PKG_CONFIG_PREFIX'):
+    if 'PKG_CONFIG_PREFIX' in os.environ:
         prefix = os.environ['PKG_CONFIG_PREFIX']
         if not os.path.isabs(prefix):
             prefix = os.path.abspath(prefix)
