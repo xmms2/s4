@@ -205,15 +205,15 @@ typedef struct s4_transaction_St s4_transaction_t;
 s4_transaction_t *s4_begin (s4_t *s4, int flags);
 int s4_commit (s4_transaction_t *trans);
 int s4_abort (s4_transaction_t *trans);
-int s4_add (s4_t *s4, s4_transaction_t *trans,
+int s4_add (s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src);
-int s4_del (s4_t *s4, s4_transaction_t *trans,
+int s4_del (s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src);
-s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
+s4_resultset_t *s4_query (s4_transaction_t *trans,
 		s4_fetchspec_t *fs, s4_condition_t *cond);
 
 

@@ -357,7 +357,7 @@ static int _write_file (s4_t *s4)
 
 	do {
 		trans = s4_begin (s4, 0);
-		res = s4_query (s4, trans, fs, cond);
+		res = s4_query (trans, fs, cond);
 		_transaction_writing (trans);
 	} while (!s4_commit (trans));
 

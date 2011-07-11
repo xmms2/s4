@@ -50,11 +50,11 @@ static void _dead_thread_one ()
 	s4_transaction_t *trans = s4_begin (s4, 0);
 
 	CU_ASSERT_PTR_NOT_NULL (trans);
-	CU_ASSERT_TRUE (s4_add (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_TRUE (s4_add (trans, "a", val, "b", val, "src"));
 
 	g_usleep (G_USEC_PER_SEC);
 
-	CU_ASSERT_TRUE (s4_add (NULL, trans, "b", val, "a", val, "src"));
+	CU_ASSERT_TRUE (s4_add (trans, "b", val, "a", val, "src"));
 
 	CU_ASSERT_TRUE (s4_commit (trans));
 }
@@ -65,9 +65,9 @@ static void _dead_thread_two ()
 
 	CU_ASSERT_PTR_NOT_NULL (trans);
 	g_usleep (G_USEC_PER_SEC / 2);
-	CU_ASSERT_TRUE (s4_add (NULL, trans, "b", val, "a", val, "src"));
+	CU_ASSERT_TRUE (s4_add (trans, "b", val, "a", val, "src"));
 	g_usleep (G_USEC_PER_SEC);
-	CU_ASSERT_FALSE (s4_add (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_FALSE (s4_add (trans, "a", val, "b", val, "src"));
 
 	CU_ASSERT_FALSE (s4_commit (trans));
 	CU_ASSERT_EQUAL (s4_errno (), S4E_DEADLOCK);
@@ -92,7 +92,7 @@ CASE (test_failed) {
 
 	trans = s4_begin (s4, 0);
 	CU_ASSERT_PTR_NOT_NULL (trans);
-	CU_ASSERT_FALSE (s4_del (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_FALSE (s4_del (trans, "a", val, "b", val, "src"));
 	CU_ASSERT_FALSE (s4_commit (trans));
 	CU_ASSERT_EQUAL (s4_errno (), S4E_EXECUTE);
 
@@ -105,17 +105,17 @@ CASE (test_abort) {
 
 	trans = s4_begin (s4, 0);
 	CU_ASSERT_PTR_NOT_NULL (trans);
-	CU_ASSERT_TRUE (s4_add (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_TRUE (s4_add (trans, "a", val, "b", val, "src"));
 	s4_abort (trans);
 
 	trans = s4_begin (s4, 0);
 	CU_ASSERT_PTR_NOT_NULL (trans);
-	CU_ASSERT_TRUE (s4_add (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_TRUE (s4_add (trans, "a", val, "b", val, "src"));
 	CU_ASSERT_TRUE (s4_commit (trans));
 
 	trans = s4_begin (s4, 0);
 	CU_ASSERT_PTR_NOT_NULL (trans);
-	CU_ASSERT_FALSE (s4_add (NULL, trans, "a", val, "b", val, "src"));
+	CU_ASSERT_FALSE (s4_add (trans, "a", val, "b", val, "src"));
 	CU_ASSERT_FALSE (s4_commit (trans));
 	CU_ASSERT_EQUAL (s4_errno (), S4E_EXECUTE);
 

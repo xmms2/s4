@@ -181,14 +181,13 @@ s4_t *_transaction_get_db (s4_transaction_t *trans)
  * @param src Source.
  * @return 0 on error, non-zero on success.
  */
-int s4_add (s4_t *s4, s4_transaction_t *trans,
+int s4_add (s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src)
 {
 	int ret;
-	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
-	s4_t *db = _transaction_get_db (t);
+	s4_t *db = _transaction_get_db (trans);
 
 	key_a = _string_lookup (db, key_a);
 	key_b = _string_lookup (db, key_b);
@@ -196,20 +195,15 @@ int s4_add (s4_t *s4, s4_transaction_t *trans,
 	val_a = _const_lookup (db, val_a);
 	val_b = _const_lookup (db, val_b);
 
-	if (t->failed || t->deadlocked) {
+	if (trans->failed || trans->deadlocked) {
 		ret = 0;
 	} else {
-		_oplist_insert_add (t->ops, key_a, val_a, key_b, val_b, src);
-		ret = _s4_add (t, key_a, val_a, key_b, val_b, src);
+		_oplist_insert_add (trans->ops, key_a, val_a, key_b, val_b, src);
+		ret = _s4_add (trans, key_a, val_a, key_b, val_b, src);
 
 		if (!ret) {
-			t->failed = 1;
+			trans->failed = 1;
 		}
-	}
-
-
-	if (t != trans) {
-		ret = s4_commit (t);
 	}
 
 	return ret;
@@ -231,14 +225,13 @@ int s4_add (s4_t *s4, s4_transaction_t *trans,
  * @param src Source.
  * @return 0 on error, non-zero on success.
  */
-int s4_del (s4_t *s4, s4_transaction_t *trans,
+int s4_del (s4_transaction_t *trans,
 		const char *key_a, const s4_val_t *val_a,
 		const char *key_b, const s4_val_t *val_b,
 		const char *src)
 {
 	int ret;
-	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
-	s4_t *db = _transaction_get_db (t);
+	s4_t *db = _transaction_get_db (trans);
 
 	key_a = _string_lookup (db, key_a);
 	key_b = _string_lookup (db, key_b);
@@ -246,19 +239,15 @@ int s4_del (s4_t *s4, s4_transaction_t *trans,
 	val_a = _const_lookup (db, val_a);
 	val_b = _const_lookup (db, val_b);
 
-	if (t->failed || t->deadlocked) {
+	if (trans->failed || trans->deadlocked) {
 		ret = 0;
 	} else {
-		_oplist_insert_del (t->ops, key_a, val_a, key_b, val_b, src);
-		ret = _s4_del (t, key_a, val_a, key_b, val_b, src);
+		_oplist_insert_del (trans->ops, key_a, val_a, key_b, val_b, src);
+		ret = _s4_del (trans, key_a, val_a, key_b, val_b, src);
 
 		if (!ret) {
-			t->failed = 1;
+			trans->failed = 1;
 		}
-	}
-
-	if (t != trans) {
-		ret = s4_commit (t);
 	}
 
 	return ret;
@@ -273,22 +262,17 @@ int s4_del (s4_t *s4, s4_transaction_t *trans,
  * @param cond The condition to use when querying.
  * @return A resultset containing the fetched data.
  */
-s4_resultset_t *s4_query (s4_t *s4, s4_transaction_t *trans,
+s4_resultset_t *s4_query (s4_transaction_t *trans,
 		s4_fetchspec_t *spec, s4_condition_t *cond)
 {
-	s4_transaction_t *t = (trans == NULL) ? s4_begin (s4, 0) : trans;
 	s4_resultset_t *ret;
 
-	t->restartable = 0;
+	trans->restartable = 0;
 
-	if (t->failed || t->deadlocked) {
+	if (trans->failed || trans->deadlocked) {
 		ret = s4_resultset_create (0);
 	} else {
-		ret = _s4_query (t, spec, cond);
-	}
-
-	if (t != trans) {
-		s4_commit (t);
+		ret = _s4_query (trans, spec, cond);
 	}
 
 	return ret;
