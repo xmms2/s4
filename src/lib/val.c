@@ -136,6 +136,9 @@ s4_val_t *s4_val_copy (const s4_val_t *val)
  */
 void s4_val_free (s4_val_t *val)
 {
+	if (val == NULL)
+		return;
+
 	if (val->type == S4_VAL_STR) {
 		free ((void*)val->v.str.s);
 		if (val->v.str.ca != NULL)
