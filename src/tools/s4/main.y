@@ -31,7 +31,7 @@ static GList *result_to_list (GList *prev, const s4_result_t *res);
 static GList *set_to_list (const s4_resultset_t *set,
 	int row_start, int row_end,
 	int col_start, int col_end);
-static void add_or_del (int (*func)(s4_t *s4, s4_transaction_t *, const char *,
+static void add_or_del (int (*func)(s4_transaction_t *, const char *,
 									const s4_val_t*, const char *,
 									const s4_val_t*, const char *),
 						list_t *list_a, list_t *list_b);
@@ -273,7 +273,9 @@ result: RESULT_VAR
 	  | QUERY fetch_list cond
 	  {
 		  const int order[2] = {1, 0};
-		  $$ = s4_query (s4, NULL, $2,  $3);
+		  s4_transaction_t *trans = s4_begin (s4, 0);
+		  $$ = s4_query (trans, $2,  $3);
+		  s4_commit (trans);
 		  s4_resultset_sort ($$, order);
 		  s4_cond_unref ($3);
 		  s4_fetchspec_unref ($2);
@@ -452,19 +454,20 @@ GList *set_to_list (const s4_resultset_t *set,
 	return g_list_reverse (ret);
 }
 
-static void add_or_del (int (*func)(s4_t *s4, s4_transaction_t *t, const char *,
+static void add_or_del (int (*func)(s4_transaction_t *t, const char *,
 									const s4_val_t*, const char *,
 									const s4_val_t*, const char *),
 						list_t *list_a, list_t *list_b)
 {
 	list_data_t *da, *db;
 	GList *a, *b;
+	s4_transaction_t *trans = s4_begin (s4, 0);
 
 	for (a = list_a->list; a != NULL; a = g_list_next (a)) {
 		da = a->data;
 		for (b = list_b->list; b != NULL; b = g_list_next (b)) {
 			db = b->data;
-			if (!func (s4, NULL, da->key, da->val, db->key, db->val, db->src)) {
+			if (!func (trans, da->key, da->val, db->key, db->val, db->src)) {
 				printf ("failed on %s %s, %s %s %s",
 					da->key, value_to_string (da->val),
 					db->key, value_to_string (db->val),
@@ -472,6 +475,8 @@ static void add_or_del (int (*func)(s4_t *s4, s4_transaction_t *t, const char *,
 			}
 		}
 	}
+
+	s4_commit (trans);
 }
 
 static int no_semicolon (const char *line)
