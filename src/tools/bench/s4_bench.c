@@ -67,7 +67,9 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, NULL, "a", val, "b", val, "src");
+		t = s4_begin (s4, 0);
+		s4_add (t, "a", val, "b", val, "src");
+		s4_commit (t);
 		s4_val_free (val);
 	}
 
@@ -76,7 +78,9 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, NULL, "a", val, "b", val, "src");
+		t = s4_begin (s4, 0);
+		s4_del (t, "a", val, "b", val, "src");
+		s4_commit (t);
 		s4_val_free (val);
 	}
 
@@ -86,7 +90,7 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, t, "a", val, "b", val, "src");
+		s4_add (t, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 	s4_commit (t);
@@ -97,7 +101,7 @@ int main (int argc, char *argv[])
 	for (i = 0; i < ENTRIES; i++) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, t, "a", val, "b", val, "src");
+		s4_del (t, "a", val, "b", val, "src");
 		s4_val_free (val);
 	}
 	s4_commit (t);
@@ -107,7 +111,9 @@ int main (int argc, char *argv[])
 	for (i = ENTRIES; i > 0; i--) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_add (s4, NULL, "a", val, "b", val, "src");
+		t = s4_begin (s4, 0);
+		s4_add (t, "a", val, "b", val, "src");
+		s4_commit (t);
 		s4_val_free (val);
 	}
 
@@ -116,7 +122,9 @@ int main (int argc, char *argv[])
 	for (i = ENTRIES; i > 0; i--) {
 		s4_val_t *val;
 		val = s4_val_new_int (i);
-		s4_del (s4, NULL, "a", val, "b", val, "src");
+		t = s4_begin (s4, 0);
+		s4_del (t, "a", val, "b", val, "src");
+		s4_commit (t);
 		s4_val_free (val);
 	}
 
