@@ -495,6 +495,7 @@ static int _log_redo (s4_t *s4)
 	log_number_t pos, round, new_checkpoint = -1, new_synced = -1;
 	log_number_t last_valid_logpoint;
 	oplist_t *oplist = NULL;
+	int invalid_entry = 0;
 
 	fflush (s4->log_data->logfile);
 
@@ -522,26 +523,40 @@ static int _log_redo (s4_t *s4)
 	/* Read log entries until fread fails, or the header num is different
 	 * from the expected number.
 	 */
-	while (fread (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile) == 1
+	while (!invalid_entry
+			&& fread (&hdr, sizeof (struct log_header), 1, s4->log_data->logfile) == 1
 			&& hdr.num == (pos + round * LOG_SIZE)) {
 
 		s4->log_data->last_logpoint = s4->log_data->next_logpoint;
 
-		if (hdr.type == LOG_ENTRY_WRAP) {
+		switch (hdr.type) {
+		case LOG_ENTRY_WRAP:
 			round++;
 			rewind (s4->log_data->logfile);
-		} else if (hdr.type == LOG_ENTRY_DEL || hdr.type == LOG_ENTRY_ADD) {
+			break;
+
+		case LOG_ENTRY_DEL:
+		case LOG_ENTRY_ADD:
 			if (!_read_mod (s4, oplist, hdr.type))
-				break;
-		} else if (hdr.type == LOG_ENTRY_CHECKPOINT) {
+				invalid_entry = 1;
+
+			break;
+
+		case LOG_ENTRY_CHECKPOINT:
 			fread (&new_checkpoint, sizeof (log_number_t), 1, s4->log_data->logfile);
-		} else if (hdr.type == LOG_ENTRY_WRITING) {
+			break;
+
+		case LOG_ENTRY_WRITING:
 			new_synced = s4->log_data->last_logpoint;
-		} else if (hdr.type == LOG_ENTRY_BEGIN) {
+			break;
+
+		case LOG_ENTRY_BEGIN:
 			oplist = _oplist_new (_transaction_dummy_alloc (s4));
 			new_checkpoint = -1;
 			new_synced = -1;
-		} else if (hdr.type == LOG_ENTRY_END) {
+			break;
+
+		case LOG_ENTRY_END:
 			if (oplist == NULL) {
 				break;
 			}
@@ -557,10 +572,15 @@ static int _log_redo (s4_t *s4)
 				s4->log_data->last_synced = new_synced;
 			}
 			last_valid_logpoint = s4->log_data->last_logpoint;
-		} else if (hdr.type == LOG_ENTRY_INIT) {
+			break;
+
+		case LOG_ENTRY_INIT:
 			/* Ignore */
-		} else {
+			break;
+
+		default:
 			/* Unknown header type */
+			invalid_entry = 1;
 			break;
 		}
 
