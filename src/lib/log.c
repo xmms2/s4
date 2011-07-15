@@ -744,6 +744,7 @@ log_number_t _log_last_synced (s4_t *s4)
 void _log_init (s4_t *s4, log_number_t last_checkpoint)
 {
 	s4->log_data->last_synced = last_checkpoint;
+	s4->log_data->last_logpoint = last_checkpoint;
 	s4->log_data->last_checkpoint = last_checkpoint;
 }
 
