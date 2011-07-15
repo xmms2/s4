@@ -396,18 +396,26 @@ int _log_write (oplist_t *list)
  * Reads a string from the log file.
  * @param s4 The database
  * @param len The string length.
- * @return A pointer to a constant string.
+ * @return A pointer to a constant string, or NULL on error.
  */
 static const char *_read_str (s4_t *s4, int len)
 {
-	const char *ret;
-	char *str = malloc (len + 1);
-	fread (str, 1, len, s4->log_data->logfile);
+	const char *ret = NULL;
+	char *str = NULL;
+
+	if (len <= 0 || len > LOG_SIZE)
+		goto cleanup;
+
+	str = malloc (len + 1);
+
+	if (fread (str, 1, len, s4->log_data->logfile) != len)
+		goto cleanup;
+
 	str[len] = '\0';
-
 	ret = _string_lookup (s4, str);
-	free (str);
 
+cleanup:
+	free (str);
 	return ret;
 }
 
@@ -415,19 +423,23 @@ static const char *_read_str (s4_t *s4, int len)
  * Reads an S4 value from the log file.
  * @param s4 the database.
  * @param len The value length.
- * @return A pointer to a constant value.
+ * @return A pointer to a constant value, or NULL on error.
  */
 static const s4_val_t *_read_val (s4_t *s4, int len)
 {
-	const s4_val_t *ret;
+	const s4_val_t *ret = NULL;
+
 	if (len == -1) {
 		int32_t i;
 		fread (&i, sizeof (int32_t), 1, s4->log_data->logfile);
 		ret = _int_lookup_val (s4, i);
 	} else {
 		const char *str = _read_str (s4, len);
-		ret = _string_lookup_val (s4, str);
+
+		if (str != NULL)
+			ret = _string_lookup_val (s4, str);
 	}
+
 	return ret;
 }
 
@@ -455,6 +467,12 @@ static int _read_mod (s4_t *s4, oplist_t *list, log_type_t type)
 	key_b = _read_str (s4, mhdr.kb_len);
 	val_b = _read_val (s4, mhdr.vb_len);
 	src = _read_str (s4, mhdr.s_len);
+
+	if (key_a == NULL || key_b == NULL
+			|| val_a == NULL || val_b == NULL
+			|| src == NULL) {
+		return 0;
+	}
 
 	if (type == LOG_ENTRY_ADD) {
 		_oplist_insert_add (list, key_a, val_a, key_b, val_b, src);
