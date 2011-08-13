@@ -17,10 +17,21 @@
 
 #include <stdint.h>
 
-/* Flags */
-#define S4_NEW              1 << 0
-#define S4_EXISTS           1 << 1
-#define S4_MEMORY           1 << 2
+/**
+ * Flags for s4_open
+ */
+typedef enum {
+	S4_NEW    = 1 << 0,
+	S4_EXISTS = 1 << 1,
+	S4_MEMORY = 1 << 2,
+} s4_open_flag_t;
+
+/**
+ * Flags for s4_begin
+ */
+typedef enum {
+	S4_TRANS_READONLY = 1 << 0,
+} s4_transaction_flag_t;
 
 /**
  * Error codes
@@ -38,6 +49,7 @@ typedef enum {
 	S4E_DEADLOCK, /**< The transaction deadlocked and was aborted */
 	S4E_EXECUTE, /**< One of the operations in the transaction failed */
 	S4E_LOGFULL, /**< Not enough room in the log for the transaction. */
+	S4E_READONLY, /**< Tried to use s4_add or s4_del on a read-only transaction */
 } s4_errno_t;
 
 typedef enum {

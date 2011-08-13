@@ -30,7 +30,8 @@ struct s4_transaction_St {
 	oplist_t *ops;
 	GList *locks;
 	s4_lock_t *waiting_for;
-	int restartable, deadlocked, failed;
+	int error_code;
+	int restartable, failed;
 };
 
 
@@ -69,7 +70,8 @@ void _transaction_add_lock (s4_transaction_t *trans, s4_lock_t *lock)
 
 void _transaction_set_deadlocked (s4_transaction_t *trans)
 {
-	trans->deadlocked = 1;
+	trans->failed = 1;
+	trans->error_code = S4E_DEADLOCK;
 }
 
 s4_transaction_t *_transaction_dummy_alloc (s4_t *s4)
@@ -85,6 +87,11 @@ void _transaction_dummy_free (s4_transaction_t *trans)
 	_lock_unlock_all (trans);
 	g_list_free (trans->locks);
 	free (trans);
+}
+
+int _transaction_get_flags (s4_transaction_t *trans)
+{
+	return trans->flags;
 }
 
 /**
@@ -121,9 +128,7 @@ int s4_commit (s4_transaction_t *trans)
 	int ret = 0;
 
 	if (trans->failed) {
-		s4_set_errno (S4E_EXECUTE);
-	} else if (trans->deadlocked) {
-		s4_set_errno (S4E_DEADLOCK);
+		s4_set_errno (trans->error_code);
 	} else {
 		ret = _log_write (trans->ops);
 
@@ -189,13 +194,19 @@ int s4_add (s4_transaction_t *trans,
 	int ret;
 	s4_t *db = _transaction_get_db (trans);
 
+	if (trans->flags & S4_TRANS_READONLY) {
+		trans->failed = 1;
+		trans->error_code = S4E_READONLY;
+		return 0;
+	}
+
 	key_a = _string_lookup (db, key_a);
 	key_b = _string_lookup (db, key_b);
 	src = _string_lookup (db, src);
 	val_a = _const_lookup (db, val_a);
 	val_b = _const_lookup (db, val_b);
 
-	if (trans->failed || trans->deadlocked) {
+	if (trans->failed) {
 		ret = 0;
 	} else {
 		_oplist_insert_add (trans->ops, key_a, val_a, key_b, val_b, src);
@@ -203,6 +214,7 @@ int s4_add (s4_transaction_t *trans,
 
 		if (!ret) {
 			trans->failed = 1;
+			trans->error_code = S4E_EXECUTE;
 		}
 	}
 
@@ -233,13 +245,19 @@ int s4_del (s4_transaction_t *trans,
 	int ret;
 	s4_t *db = _transaction_get_db (trans);
 
+	if (trans->flags & S4_TRANS_READONLY) {
+		trans->failed = 1;
+		trans->error_code = S4E_READONLY;
+		return 0;
+	}
+
 	key_a = _string_lookup (db, key_a);
 	key_b = _string_lookup (db, key_b);
 	src = _string_lookup (db, src);
 	val_a = _const_lookup (db, val_a);
 	val_b = _const_lookup (db, val_b);
 
-	if (trans->failed || trans->deadlocked) {
+	if (trans->failed) {
 		ret = 0;
 	} else {
 		_oplist_insert_del (trans->ops, key_a, val_a, key_b, val_b, src);
@@ -247,6 +265,7 @@ int s4_del (s4_transaction_t *trans,
 
 		if (!ret) {
 			trans->failed = 1;
+			trans->error_code = S4E_EXECUTE;
 		}
 	}
 
@@ -269,7 +288,7 @@ s4_resultset_t *s4_query (s4_transaction_t *trans,
 
 	trans->restartable = 0;
 
-	if (trans->failed || trans->deadlocked) {
+	if (trans->failed) {
 		ret = s4_resultset_create (0);
 	} else {
 		ret = _s4_query (trans, spec, cond);

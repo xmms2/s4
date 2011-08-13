@@ -143,7 +143,7 @@ int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
 
 int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 {
-	int upgrade = 1;
+	int upgrade = !(_transaction_get_flags (trans) & S4_TRANS_READONLY);
 
 	_transaction_set_waiting_for (trans, lock);
 

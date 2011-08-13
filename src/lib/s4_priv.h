@@ -126,6 +126,7 @@ void  _transaction_add_lock (s4_transaction_t *trans, s4_lock_t *lock);
 void _transaction_set_deadlocked (s4_transaction_t *trans);
 s4_transaction_t *_transaction_dummy_alloc (s4_t *s4);
 void _transaction_dummy_free (s4_transaction_t *trans);
+int _transaction_get_flags (s4_transaction_t *trans);
 
 typedef struct oplist_St oplist_t;
 oplist_t *_oplist_new (s4_transaction_t *trans);
