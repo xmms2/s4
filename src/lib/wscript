@@ -30,7 +30,7 @@ def build(bld):
         source = source,
         includes = '../../include',
         uselib = 'glib2',
-        export_incdirs = '../../include',
+        export_includes = '../../include',
         install_path = None
         )
 
