@@ -1,32 +1,42 @@
-s4_suite = ["s4/t_s4.c", "s4/t_sourcepref.c", "s4/t_val.c", "s4/t_cond.c",
-"s4/t_transactions.c", "s4/t_pattern.c"]
+from waflib import Errors
+
+s4_suite = """
+s4/t_s4.c
+s4/t_sourcepref.c
+s4/t_val.c
+s4/t_cond.c
+s4/t_transactions.c
+s4/t_pattern.c
+""".split()
+
+test_s4_src = """
+runner/main.c
+runner/valgrind.c
+""".split() + s4_suite
 
 def configure(conf):
-    if not conf.check_cc(header_name="CUnit/CUnit.h"):
-        return False
-    if not conf.check_cc(lib="cunit", uselib_store="cunit"):
-        return False
+    conf.check_cc(header_name="CUnit/CUnit.h")
+    conf.check_cc(lib="cunit", uselib_store="cunit")
 
     code = """
            static void T (void) __attribute__ ((constructor (220)));
            static void T (void) {};
            int main() { return 0; }
     """
-    if not conf.check_cc(fragment=code, msg="Checking for constructor attribute"):
-        return False
+    conf.check_cc(fragment=code, msg="Checking for constructor attribute")
 
-    conf.check_cfg(package='valgrind', uselib_store='valgrind', args='--cflags')
-
-    return True
+    conf.check_cfg(package='valgrind', uselib_store='valgrind', args='--cflags',
+            mandatory=False)
 
 def build(bld):
-    obj = bld.new_task_gen('cc', 'program')
-    obj.target = "test_s4"
-    obj.source = ['runner/main.c', 'runner/valgrind.c'] + s4_suite
-    obj.includes = '. runner/ ../src ../include'
-    obj.uselib_local = 's4'
-    obj.uselib = 'gthread2 cunit valgrind'
-    obj.install_path = None
+    bld(features = 'c cprogram',
+        target = 'test_s4',
+        source = test_s4_src,
+        includes = ". runner ../src ../include",
+        use = "s4",
+        uselib = "glib2 gthread2 cunit valgrind",
+        install_path = None
+        )
 
-def set_options(o):
+def options(o):
     pass

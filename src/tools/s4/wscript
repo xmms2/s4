@@ -5,24 +5,32 @@
 
 import Options
 
+source = """
+main.y
+lexer.l
+config.c
+print.c
+""".split()
+
 def build(bld):
-	s4 = bld.new_task_gen('cc', 'program')
-	s4.source = ["main.y", "lexer.l", "config.c", "print.c"]
-	s4.target = "s4"
-	s4.uselib_local = "s4"
-	s4.uselib = 'glib2 gthread2 readline'
-	s4.includes = '.'
+    bld(features='c cprogram',
+        target = 's4',
+        name = 's4-tool',
+        source = source,
+        includes = '.',
+        use = "s4",
+        uselib = "glib2 gthread2 readline"
+        )
 
 def configure (conf):
-	conf.check_tool("flex")
-	conf.check_tool("bison")
-	conf.env.append_value('BISONFLAGS', '--verbose')
+    conf.check_tool("flex")
+    conf.check_tool("bison")
+    conf.env.append_value('BISONFLAGS', '--verbose')
 
-	rl_headers=["stdio.h", "readline/readline.h"]
-	conf.check_cc(header_name=rl_headers, mandatory=True)
-	if not conf.check_cc(lib="readline", header_name=rl_headers, function_name='readline', uselib_store="readline"):
-		conf.fatal ("Could not find readline")
+    rl_headers=["stdio.h", "readline/readline.h"]
+    conf.check_cc(header_name=rl_headers)
+    conf.check_cc(lib="readline", header_name=rl_headers, function_name='readline',
+            uselib_store="readline")
 
-
-def set_options (opt):
-	pass
+def options (opt):
+    pass

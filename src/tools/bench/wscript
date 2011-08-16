@@ -5,15 +5,21 @@
 
 import Options
 
+source = """
+s4_bench.c
+logging.c
+""".split()
+
 def build(bld):
-	bench = bld.new_task_gen('cc', 'program')
-	bench.source = ["s4_bench.c", "logging.c"]
-	bench.target = "s4_bench"
-	bench.install_path = 0
-	bench.uselib_local = "s4"
-	bench.uselib = "glib2 gthread2"
+    bld(features = "c cprogram",
+        target = "s4_bench",
+        source = source,
+        use = "s4",
+        uselib = "glib2 gthread2",
+        install_path = None
+        )
 
 def configure (conf):
-	return True
-def set_options (opt):
-	pass
+    return True
+def options (opt):
+    pass
