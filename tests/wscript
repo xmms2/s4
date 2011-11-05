@@ -29,7 +29,7 @@ def configure(conf):
             mandatory=False)
 
 def build(bld):
-    bld(features = 'c cprogram',
+    bld(features = 'c cprogram test',
         target = 'test_s4',
         source = test_s4_src,
         includes = ". runner ../src ../include",
