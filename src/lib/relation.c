@@ -409,7 +409,7 @@ static int _check_cond (s4_condition_t *cond, void *d)
 		const char *key = s4_cond_get_key (cond);
 		int null = key == NULL;
 
-		if (s4_cond_get_flags (cond) && S4_COND_PARENT) {
+		if ((s4_cond_get_flags (cond) & S4_COND_PARENT)) {
 			if (key == l->key || null) {
 				ret = s4_cond_get_filter_function (cond)(l->val, cond);
 			}
