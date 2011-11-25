@@ -50,12 +50,12 @@ void _transaction_writing (s4_transaction_t *trans)
 
 s4_lock_t *_transaction_get_waiting_for (s4_transaction_t *trans)
 {
-	return trans->waiting_for;
+	return g_atomic_pointer_get (&trans->waiting_for);
 }
 
 void _transaction_set_waiting_for (s4_transaction_t *trans, s4_lock_t *waiting_for)
 {
-	trans->waiting_for = waiting_for;
+	g_atomic_pointer_set (&trans->waiting_for, waiting_for);
 }
 
 GList *_transaction_get_locks (s4_transaction_t *trans)
