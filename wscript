@@ -52,10 +52,7 @@ def configure(conf):
             prefix = os.path.abspath(prefix)
         cond.env.PKG_CONFIG_DEFINES = dict(prefix=prefix)
 
-    conf.env.S4_SUBDIRS = [lib_dir]
-
-    if conf.options.build_tests:
-        conf.env.append_value("S4_SUBDIRS", test_dir)
+    conf.env.S4_SUBDIRS = [lib_dir, test_dir]
     if conf.options.build_tools:
         conf.env.append_value("S4_SUBDIRS", tool_dirs)
 
@@ -72,9 +69,9 @@ def configure(conf):
             os.path.join(conf.env.PREFIX, 'lib', 'pkgconfig')
 
     if conf.options.enable_gcov:
-        conf.env.append_value('CFLAGS', '-fprofile-arcs')
-        conf.env.append_value('CFLAGS', '-ftest-coverage')
-        conf.env.append_value('LINKFLAGS', '-fprofile-arcs')
+        conf.env.enable_gcov = True
+        conf.env.append_unique('CFLAGS', ['--coverage', '-pg'])
+        conf.env.append_unique('LINKFLAGS', ['--coverage', '-pg'])
 
     if conf.options.config_prefix:
         for d in conf.options.config_prefix:
@@ -126,12 +123,9 @@ def configure(conf):
     conf.check_cfg(package='gthread-2.0', atleast_version='2.6.0',
             uselib_store='gthread2', args='--cflags --libs')
 
-    subdirs = conf.env.S4_SUBDIRS
+    conf.recurse(conf.env.S4_SUBDIRS)
 
-    for sd in subdirs:
-        conf.sub_config(sd)
-
-    newest = max([os.stat(os.path.join(sd, "wscript")).st_mtime for sd in subdirs])
+    newest = max([os.stat(os.path.join(sd, "wscript")).st_mtime for sd in conf.env.S4_SUBDIRS])
     conf.env.NEWEST_WSCRIPT_SUBDIR = newest
 
     return True
@@ -167,12 +161,8 @@ def options(opt):
                    help="Force a specific Windows version (cross-compilation)")
     opt.add_option('--build-tests', action='store_true', default=False,
                    dest='build_tests', help="Build test suite")
-    opt.add_option('--run-tests', action='store_true', default=False,
-                   dest='run_tests', help="Run test suite")
     opt.add_option('--enable-gcov', action='store_true', default=False,
                    dest='enable_gcov', help="Enable code coverage analysis")
-    opt.add_option('--lcov-report', action="store_true", default=False,
-                   dest='build_lcov', help="Builds an lcov report")
     opt.add_option("--build-tools", action="store_true", default=False,
                     dest="build_tools",
                     help="Build S4 tools to verify and recover databases.")
@@ -180,6 +170,7 @@ def options(opt):
                    dest='ldconfig', help="Don't run ldconfig after install")
 
     opt.sub_options(tool_dirs)
+    opt.sub_options(test_dir)
 
 def shutdown(ctx):
     if 'install' in Options.commands and (
@@ -193,13 +184,3 @@ def shutdown(ctx):
                 subprocess.check_output(['ldconfig', 'libprefix'])
             except:
                 pass
-
-    if ctx.options.run_tests:
-        os.system(os.path.join(out, "tests/test_s4"))
-
-    if ctx.options.build_lcov:
-        cd = os.getcwd()
-        os.chdir(out)
-        os.system("lcov -c -b . -d . -o s4.info")
-        os.system("genhtml -o ../coverage s4.info")
-        os.chdir(cd)

@@ -1,5 +1,5 @@
 /*  XMMS2 - X Music Multiplexer System
- *  Copyright (C) 2003-2009 XMMS2 Team
+ *  Copyright (C) 2003-2011 XMMS2 Team
  *
  *  PLUGINS ARE NOT CONSIDERED TO BE DERIVED WORK !!!
  *
@@ -15,6 +15,9 @@
  */
 
 #include <xcu.h>
+#include "xcu_valgrind.h"
+
+#if defined(HAVE_VALGRIND) && HAVE_VALGRIND == 1
 
 #include <valgrind.h>
 #include <memcheck.h>
@@ -44,3 +47,10 @@ xcu_valgrind_post_case ()
 	}
 
 }
+
+#else
+
+void xcu_valgrind_pre_case () {}
+void xcu_valgrind_post_case () {}
+
+#endif

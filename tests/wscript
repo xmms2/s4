@@ -1,6 +1,6 @@
 from waflib import Errors
 
-s4_suite = """
+test_s4_src = """
 s4/t_s4.c
 s4/t_sourcepref.c
 s4/t_val.c
@@ -9,26 +9,19 @@ s4/t_transactions.c
 s4/t_pattern.c
 """.split()
 
-test_s4_src = """
-runner/main.c
-runner/valgrind.c
-""".split() + s4_suite
-
 def configure(conf):
-    conf.check_cc(header_name="CUnit/CUnit.h")
-    conf.check_cc(lib="cunit", uselib_store="cunit")
+    conf.load("unittest", tooldir="waftools")
 
-    code = """
-           static void T (void) __attribute__ ((constructor (220)));
-           static void T (void) {};
-           int main() { return 0; }
-    """
-    conf.check_cc(fragment=code, msg="Checking for constructor attribute")
+    conf.check_cc(header_name="CUnit/CUnit.h", mandatory=False)
+    conf.check_cc(lib="cunit", uselib_store="cunit", mandatory=False)
+    conf.check_cc(lib="ncurses", uselib_store="ncurses", mandatory=False)
 
-    conf.check_cfg(package='valgrind', uselib_store='valgrind', args='--cflags',
-            mandatory=False)
+    conf.check_cfg(package='valgrind', uselib_store='valgrind', args='--cflags', mandatory=False)
 
 def build(bld):
+    if not bld.env.HAVE_CUNIT_CUNIT_H:
+        return
+
     bld(features = 'c cprogram test',
         target = 'test_s4',
         source = test_s4_src,
@@ -39,4 +32,4 @@ def build(bld):
         )
 
 def options(o):
-    pass
+    o.load("unittest", tooldir="waftools")

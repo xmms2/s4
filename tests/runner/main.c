@@ -1,5 +1,5 @@
 /*  XMMS2 - X Music Multiplexer System
- *  Copyright (C) 2003-2009 XMMS2 Team
+ *  Copyright (C) 2003-2011 XMMS2 Team
  *
  *  PLUGINS ARE NOT CONSIDERED TO BE DERIVED WORK !!!
  *
@@ -15,18 +15,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "xcu.h"
 #include <unistd.h>
 #include <signal.h>
 
 #include <xcu_valgrind.h>
 
-static void __registry_init (void) __attribute__ ((constructor (200)));
-static void __registry_init (void) {
-	if (CU_initialize_registry() != CUE_SUCCESS)
-		_exit (CU_get_error());
-
-}
+@@DECLARE_TEST_CASES@@
 
 static void
 segvhandler(int s)
@@ -53,15 +49,28 @@ int
 main (int argc, char **argv)
 {
 	struct sigaction sa;
+	unsigned int failures;
+
+	if (CU_initialize_registry() != CUE_SUCCESS)
+		return CU_get_error();
 
 	memset (&sa, 0 , sizeof (sa));
 	sa.sa_handler = segvhandler;
 	sa.sa_flags = SA_RESETHAND;
 	sigaction (SIGSEGV, &sa, NULL);
 
+	@@REGISTER_TEST_SUITES@@
+
 	CU_basic_set_mode(CU_BRM_VERBOSE);
 	CU_basic_run_tests();
+
+	failures = CU_get_number_of_failures ();
+
 	CU_cleanup_registry();
 
-	return CU_get_error();
+	if (failures > 0) {
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
 }
