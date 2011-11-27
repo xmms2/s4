@@ -9,7 +9,7 @@ if sys.version_info < (2,4):
     raise RuntimeError("Python 2.4 or newer is required")
 
 import os
-from waflib import Options
+from waflib import Options, Utils, Logs
 
 BASEVERSION = "0.01"
 APPNAME = 's4'
@@ -40,7 +40,7 @@ def build(bld):
         raise SystemExit(1)
 
     bld.add_subdirs(subdirs)
-
+    bld.add_post_fun(shutdown)
 
 ####
 ## Configuration
@@ -173,14 +173,20 @@ def options(opt):
     opt.sub_options(test_dir)
 
 def shutdown(ctx):
-    if 'install' in Options.commands and (
-            ctx.options.ldconfig or
-            (ctx.options.ldconfig is None and os.geteuid() == 0)):
-        ldconfig = '/sbin/ldconfig'
-        if os.path.isfile(ldconfig):
-            libprefix = Utils.subst_vars('${PREFIX]/lib', ctx.env)
-            try:
-                import subprocess
-                subprocess.check_output(['ldconfig', 'libprefix'])
-            except:
-                pass
+    if ctx.cmd != 'install':
+        return
+
+    # explicitly avoid running ldconfig on --without-ldconfig
+    if ctx.options.ldconfig is False:
+        return
+
+    # implicitly run ldconfig when running as root if not told otherwise
+    if ctx.options.ldconfig is None and os.geteuid() != 0:
+        return
+
+    if not os.path.isfile('/sbin/ldconfig'):
+        return
+
+    libprefix = Utils.subst_vars('${LIBDIR}', ctx.env)
+    Logs.info("- ldconfig '%s'" % libprefix)
+    ctx.exec_command('/sbin/ldconfig %s' % libprefix)
