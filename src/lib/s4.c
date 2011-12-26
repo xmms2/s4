@@ -599,7 +599,7 @@ void s4_set_errno (s4_errno_t err)
 	s4_errno_t *i = g_static_private_get (&_errno);
 	if (i == NULL) {
 		i = malloc (sizeof (s4_errno_t));
-		g_static_private_set (&_errno, i, NULL);
+		g_static_private_set (&_errno, i, (GDestroyNotify) free);
 	}
 
 	*i = err;
