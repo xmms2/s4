@@ -16,7 +16,7 @@
 #include "s4.h"
 #include <glib.h>
 
-SETUP (Condition) {
+SETUP (Pattern) {
 	return 0;
 }
 
@@ -46,6 +46,16 @@ CASE (test_pattern) {
 	p = s4_pattern_create ("boring", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
 	CU_ASSERT_TRUE (match_str (p, "boring"));
+	CU_ASSERT_FALSE (match_str (p, ""));
+	CU_ASSERT_FALSE (match_str (p, "boringer"));
+	CU_ASSERT_FALSE (match_str (p, "very boring"));
+	CU_ASSERT_FALSE (match_int (p, 1234));
+	s4_pattern_free (p);
+
+	p = s4_pattern_create ("", 0);
+	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_TRUE (match_str (p, ""));
+	CU_ASSERT_FALSE (match_str (p, "boring"));
 	CU_ASSERT_FALSE (match_str (p, "boringer"));
 	CU_ASSERT_FALSE (match_str (p, "very boring"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
@@ -55,6 +65,7 @@ CASE (test_pattern) {
 	CU_ASSERT_PTR_NOT_NULL (p);
 	CU_ASSERT_TRUE (match_str (p, "boring"));
 	CU_ASSERT_TRUE (match_str (p, "boringer"));
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "very boring"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
 	s4_pattern_free (p);
@@ -64,9 +75,22 @@ CASE (test_pattern) {
 	CU_ASSERT_TRUE (match_str (p, "boring"));
 	CU_ASSERT_TRUE (match_str (p, "booorrring"));
 	CU_ASSERT_TRUE (match_str (p, "boasdfing"));
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "boringer"));
 	CU_ASSERT_FALSE (match_str (p, "bori"));
 	CU_ASSERT_FALSE (match_str (p, "very boring"));
+	CU_ASSERT_FALSE (match_int (p, 1234));
+	s4_pattern_free (p);
+
+	p = s4_pattern_create ("*boring", 0);
+	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_TRUE (match_str (p, "boring"));
+	CU_ASSERT_TRUE (match_str (p, "aaboring"));
+	CU_ASSERT_TRUE (match_str (p, "asdfboring"));
+	CU_ASSERT_TRUE (match_str (p, "very boring"));
+	CU_ASSERT_FALSE (match_str (p, ""));
+	CU_ASSERT_FALSE (match_str (p, "boringer"));
+	CU_ASSERT_FALSE (match_str (p, "bori"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
 	s4_pattern_free (p);
 
@@ -74,13 +98,27 @@ CASE (test_pattern) {
 	CU_ASSERT_PTR_NOT_NULL (p);
 	CU_ASSERT_TRUE (match_str (p, "boring"));
 	CU_ASSERT_TRUE (match_str (p, "boming"));
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "boringer"));
 	CU_ASSERT_FALSE (match_str (p, "very boring"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
 	s4_pattern_free (p);
 
+	p = s4_pattern_create ("*a*", 0);
+	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_TRUE (match_str (p, "a"));
+	CU_ASSERT_TRUE (match_str (p, "ab"));
+	CU_ASSERT_TRUE (match_str (p, "ba"));
+	CU_ASSERT_TRUE (match_str (p, "bbaabb"));
+	CU_ASSERT_FALSE (match_str (p, ""));
+	CU_ASSERT_FALSE (match_str (p, "boring"));
+	CU_ASSERT_FALSE (match_str (p, "bb"));
+	CU_ASSERT_FALSE (match_str (p, "cc"));
+	s4_pattern_free (p);
+
 	p = s4_pattern_create ("12?4", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "boring"));
 	CU_ASSERT_TRUE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "1294"));
@@ -94,6 +132,7 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("*a*b?d*e*", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_TRUE (match_str (p, "abcde"));
 	CU_ASSERT_FALSE (match_str (p, "boring"));
 	CU_ASSERT_TRUE (match_str (p, "..abcde"));
@@ -108,6 +147,7 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("123", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "123"));
 	CU_ASSERT_FALSE (match_str (p, "0123"));
@@ -119,6 +159,7 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("-123", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "-123"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
@@ -130,6 +171,7 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("?123", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_FALSE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "0123"));
 	CU_ASSERT_FALSE (match_int (p, 1234));
@@ -139,6 +181,7 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("12*34", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_TRUE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "1287634"));
 	CU_ASSERT_FALSE (match_str (p, "0123"));
@@ -152,12 +195,16 @@ CASE (test_pattern) {
 
 	p = s4_pattern_create ("*1*2*3*", 0);
 	CU_ASSERT_PTR_NOT_NULL (p);
+	CU_ASSERT_FALSE (match_str (p, ""));
 	CU_ASSERT_TRUE (match_str (p, "1234"));
 	CU_ASSERT_TRUE (match_str (p, "0123"));
 	CU_ASSERT_TRUE (match_int (p, 1234));
 	CU_ASSERT_TRUE (match_int (p, 1123));
 	CU_ASSERT_TRUE (match_int (p, -123));
 	CU_ASSERT_TRUE (match_int (p, 123));
+	CU_ASSERT_FALSE (match_str (p, ""));
+	CU_ASSERT_FALSE (match_int (p, 1));
+	CU_ASSERT_FALSE (match_int (p, 12));
 	CU_ASSERT_FALSE (match_int (p, -321));
 	s4_pattern_free (p);
 }
