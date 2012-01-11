@@ -339,7 +339,7 @@ _str_pattern_match (pattern_t *p, const char *str)
 
 	if (first) {
 		/* If this is the first (and last) sub-pattern it must be an exact match */
-		if (p->len != len)
+		if (p->len != len || p->next != NULL)
 			return 0;
 		return _match_pattern (str, p);
 	} else if (p->len <= (len - i)) {
