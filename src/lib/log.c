@@ -403,7 +403,7 @@ static const char *_read_str (s4_t *s4, int len)
 	const char *ret = NULL;
 	char *str = NULL;
 
-	if (len <= 0 || len > LOG_SIZE)
+	if (len < 0 || len > LOG_SIZE)
 		goto cleanup;
 
 	str = malloc (len + 1);
