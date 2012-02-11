@@ -126,6 +126,8 @@ s4_transaction_t *s4_begin (s4_t *s4, int flags)
 int s4_commit (s4_transaction_t *trans)
 {
 	int ret = 0;
+	int need_sync = 0;
+	s4_t *s4 = _transaction_get_db (trans);
 
 	if (trans->failed) {
 		s4_set_errno (trans->error_code);
@@ -133,7 +135,7 @@ int s4_commit (s4_transaction_t *trans)
 		ret = _log_write (trans->ops);
 
 		if (ret == 0) {
-			_start_sync (_transaction_get_db (trans));
+			need_sync = 1;
 			s4_set_errno (S4E_LOGFULL);
 		}
 	}
@@ -143,8 +145,12 @@ int s4_commit (s4_transaction_t *trans)
 		_oplist_rollback (trans->ops);
 	}
 
-	_log_unlock_file (_transaction_get_db (trans));
+	_log_unlock_file (s4);
 	_transaction_free (trans);
+
+	if (need_sync) {
+		_sync (s4);
+	}
 
 	return ret;
 }
