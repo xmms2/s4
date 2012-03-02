@@ -188,6 +188,8 @@ void s4_resultrow_set_col (s4_resultrow_t *row, int col_no, s4_result_t *col);
 int s4_resultrow_get_col (const s4_resultrow_t *row, int col_no, const s4_result_t **col);
 
 typedef struct s4_resultset_St s4_resultset_t;
+typedef struct s4_order_entry_St s4_order_entry_t;
+typedef struct s4_order_St s4_order_t;
 
 s4_resultset_t *s4_resultset_create (int col_count);
 void s4_resultset_add_row (s4_resultset_t *set, const s4_resultrow_t *row);
@@ -198,8 +200,19 @@ int s4_resultset_get_rowcount (const s4_resultset_t *set);
 void s4_resultset_free (s4_resultset_t *set);
 s4_resultset_t *s4_resultset_ref (s4_resultset_t *set);
 void s4_resultset_unref (s4_resultset_t *set);
-void s4_resultset_sort (s4_resultset_t *set, const int *order);
+void s4_resultset_sort (s4_resultset_t *set, s4_order_t *order);
 void s4_resultset_shuffle (s4_resultset_t *set);
+
+typedef enum {
+	S4_ORDER_ASCENDING,
+	S4_ORDER_DESCENDING,
+} s4_order_direction_t;
+
+s4_order_t *s4_order_create (void);
+s4_order_entry_t *s4_order_add_column (s4_order_t *order, s4_cmp_mode_t collation, s4_order_direction_t direction);
+s4_order_entry_t *s4_order_add_random (s4_order_t *order, int seed);
+void s4_order_entry_add_choice (s4_order_entry_t *entry, int column);
+void s4_order_free (s4_order_t *order);
 
 /* pattern.c */
 typedef struct s4_pattern_St s4_pattern_t;
