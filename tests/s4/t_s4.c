@@ -33,12 +33,12 @@ CLEANUP () {
 char *name;
 s4_t *s4;
 
-static void _mem_open ()
+static void _mem_open (void)
 {
 	s4 = s4_open (NULL, NULL, S4_MEMORY);
 }
 
-static void _mem_close ()
+static void _mem_close (void)
 {
 	s4_close (s4);
 }
@@ -49,7 +49,7 @@ static void _open (int flags)
 	s4 = s4_open (name, NULL, flags);
 }
 
-static void _close ()
+static void _close (void)
 {
 	char *logname = g_strconcat (name, ".log", NULL);
 	s4_close (s4);

@@ -30,12 +30,12 @@ SETUP (Transactions) {
 	return 0;
 }
 
-static void _mem_open ()
+static void _mem_open (void)
 {
 	s4 = s4_open (NULL, NULL, S4_MEMORY);
 }
 
-static void _mem_close ()
+static void _mem_close (void)
 {
 	s4_close (s4);
 }
@@ -45,7 +45,7 @@ CLEANUP () {
 	return 0;
 }
 
-static void _dead_thread_one ()
+static void _dead_thread_one (void)
 {
 	s4_transaction_t *trans = s4_begin (s4, 0);
 
@@ -59,7 +59,7 @@ static void _dead_thread_one ()
 	CU_ASSERT_TRUE (s4_commit (trans));
 }
 
-static void _dead_thread_two ()
+static void _dead_thread_two (void)
 {
 	s4_transaction_t *trans = s4_begin (s4, 0);
 
