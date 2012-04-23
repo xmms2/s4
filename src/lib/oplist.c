@@ -214,8 +214,3 @@ int _oplist_execute (oplist_t *list, int rollback_on_failure)
 
 	return 1;
 }
-
-int _oplist_is_empty (oplist_t *list)
-{
-	return list->ops == NULL;
-}
