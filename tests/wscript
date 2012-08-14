@@ -27,7 +27,7 @@ def build(bld):
         source = test_s4_src,
         includes = ". runner ../src ../include",
         use = "s4",
-        uselib = "glib2 gthread2 cunit valgrind",
+        uselib = "glib2 gthread2 cunit ncurses valgrind",
         install_path = None
         )
 
