@@ -92,7 +92,7 @@ static void _lock_del_trans (s4_lock_t *lock, s4_transaction_t *trans)
 static int _lock_will_deadlock_helper (s4_lock_t *lock, s4_transaction_t *trans, GHashTable *visited, int first)
 {
 	GHashTableIter iter;
-	GList *transactions = NULL;
+	GList *waiting_for = NULL;
 	s4_transaction_t *t;
 	int ret = 0;
 
@@ -109,7 +109,7 @@ static int _lock_will_deadlock_helper (s4_lock_t *lock, s4_transaction_t *trans,
 	/* Get a list of all transactions holding this lock */
 	while (g_hash_table_iter_next (&iter, (void**)&t, NULL)) {
 		if (t != trans) {
-			transactions = g_list_prepend (transactions, t);
+			waiting_for = g_list_prepend (waiting_for, _transaction_get_waiting_for (t));
 		} else {
 			/* If we found a lock that this transaction holds
 			 * and it's not the first lock, we have a deadlock.
@@ -121,13 +121,12 @@ static int _lock_will_deadlock_helper (s4_lock_t *lock, s4_transaction_t *trans,
 	g_mutex_unlock (lock->lock);
 
 	/* Check all the locks the transactions in the list are waiting for */
-	while (!ret && transactions != NULL) {
-		t = transactions->data;
-		ret = _lock_will_deadlock_helper (_transaction_get_waiting_for (t), trans, visited, 0);
-		transactions = g_list_delete_link (transactions, transactions);
+	while (!ret && waiting_for != NULL) {
+		ret = _lock_will_deadlock_helper (waiting_for->data, trans, visited, 0);
+		waiting_for = g_list_delete_link (waiting_for, waiting_for);
 	}
 
-	g_list_free (transactions);
+	g_list_free (waiting_for);
 
 	return ret;
 }
