@@ -17,9 +17,6 @@
 #include <glib.h>
 
 SETUP (Sourcepref) {
-	if (!g_thread_get_initialized ())
-		g_thread_init (NULL);
-
 	return 0;
 }
 

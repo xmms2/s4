@@ -34,10 +34,10 @@ struct s4_St {
 	s4_entry_data_t *entry_data;
 	s4_log_data_t *log_data;
 
-	GCond *sync_cond, *sync_finished_cond;
+	GCond sync_cond, sync_finished_cond;
 	int sync_thread_run;
 	GThread *sync_thread;
-	GMutex *sync_lock;
+	GMutex sync_lock;
 
 	char *filename;
 	char *tmp_filename;

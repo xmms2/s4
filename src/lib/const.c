@@ -28,15 +28,15 @@
 struct s4_const_data_St {
 	GStringChunk *strings;
 	GHashTable *strings_table;
-	GStaticMutex strings_lock;
+	GMutex strings_lock;
 
 	GHashTable *int_table;
-	GStaticMutex int_lock;
+	GMutex int_lock;
 
 	GHashTable *coll_table;
-	GStaticMutex coll_lock;
+	GMutex coll_lock;
 	GHashTable *case_table;
-	GStaticMutex case_lock;
+	GMutex case_lock;
 };
 
 s4_const_data_t *_const_create_data ()
@@ -52,10 +52,10 @@ s4_const_data_t *_const_create_data ()
 	data->coll_table = g_hash_table_new (NULL, NULL);
 	data->case_table = g_hash_table_new (NULL, NULL);
 
-	g_static_mutex_init (&data->strings_lock);
-	g_static_mutex_init (&data->int_lock);
-	g_static_mutex_init (&data->coll_lock);
-	g_static_mutex_init (&data->case_lock);
+	g_mutex_init (&data->strings_lock);
+	g_mutex_init (&data->int_lock);
+	g_mutex_init (&data->coll_lock);
+	g_mutex_init (&data->case_lock);
 
 	return data;
 }
@@ -68,10 +68,10 @@ void _const_free_data (s4_const_data_t *data)
 	g_hash_table_destroy (data->int_table);
 	g_string_chunk_free (data->strings);
 
-	g_static_mutex_free (&data->strings_lock);
-	g_static_mutex_free (&data->case_lock);
-	g_static_mutex_free (&data->coll_lock);
-	g_static_mutex_free (&data->int_lock);
+	g_mutex_clear (&data->strings_lock);
+	g_mutex_clear (&data->case_lock);
+	g_mutex_clear (&data->coll_lock);
+	g_mutex_clear (&data->int_lock);
 
 	free (data);
 }
@@ -110,7 +110,7 @@ const s4_val_t *_string_lookup_val (s4_t *s4, const char *str)
 {
 	s4_val_t *ret;
 
-	g_static_mutex_lock (&s4->const_data->strings_lock);
+	g_mutex_lock (&s4->const_data->strings_lock);
 
 	ret = g_hash_table_lookup (s4->const_data->strings_table, str);
 	if (ret == NULL) {
@@ -119,7 +119,7 @@ const s4_val_t *_string_lookup_val (s4_t *s4, const char *str)
 		g_hash_table_insert (s4->const_data->strings_table, (void*)str, ret);
 	}
 
-	g_static_mutex_unlock (&s4->const_data->strings_lock);
+	g_mutex_unlock (&s4->const_data->strings_lock);
 
 	return ret;
 }
@@ -158,7 +158,7 @@ const char *_string_lookup_casefolded (s4_t *s4, const char *str)
 {
 	const char *ret;
 
-	g_static_mutex_lock (&s4->const_data->case_lock);
+	g_mutex_lock (&s4->const_data->case_lock);
 	ret = g_hash_table_lookup (s4->const_data->case_table, str);
 
 	if (ret == NULL) {
@@ -169,7 +169,7 @@ const char *_string_lookup_casefolded (s4_t *s4, const char *str)
 		g_hash_table_insert (s4->const_data->case_table, (void*)str, (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->const_data->case_lock);
+	g_mutex_unlock (&s4->const_data->case_lock);
 
 	return ret;
 }
@@ -186,7 +186,7 @@ const char *_string_lookup_collated (s4_t *s4, const char *str)
 {
 	const char *ret;
 
-	g_static_mutex_lock (&s4->const_data->coll_lock);
+	g_mutex_lock (&s4->const_data->coll_lock);
 	ret = g_hash_table_lookup (s4->const_data->coll_table, str);
 
 	if (ret == NULL) {
@@ -197,7 +197,7 @@ const char *_string_lookup_collated (s4_t *s4, const char *str)
 		g_hash_table_insert (s4->const_data->coll_table, (void*)str, (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->const_data->coll_lock);
+	g_mutex_unlock (&s4->const_data->coll_lock);
 
 	return ret;
 }
@@ -206,7 +206,7 @@ const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i)
 {
 	const s4_val_t *ret;
 
-	g_static_mutex_lock (&s4->const_data->int_lock);
+	g_mutex_lock (&s4->const_data->int_lock);
 	ret = g_hash_table_lookup (s4->const_data->int_table, GINT_TO_POINTER (i));
 
 	if (ret == NULL) {
@@ -214,7 +214,7 @@ const s4_val_t *_int_lookup_val (s4_t *s4, int32_t i)
 		g_hash_table_insert (s4->const_data->int_table, GINT_TO_POINTER (i), (void*)ret);
 	}
 
-	g_static_mutex_unlock (&s4->const_data->int_lock);
+	g_mutex_unlock (&s4->const_data->int_lock);
 
 	return ret;
 }

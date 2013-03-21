@@ -31,8 +31,8 @@
  */
 
 struct s4_lock_St {
-	GMutex *lock;
-	GCond *upgrade_signal, *signal;
+	GMutex lock;
+	GCond upgrade_signal, signal;
 	GHashTable *transactions;
 	int writers_waiting;
 	int readers;
@@ -44,9 +44,9 @@ struct s4_lock_St {
 s4_lock_t *_lock_alloc ()
 {
 	s4_lock_t *lock = calloc (sizeof (s4_lock_t), 1);
-	lock->lock = g_mutex_new ();
-	lock->signal = g_cond_new ();
-	lock->upgrade_signal = g_cond_new ();
+	g_mutex_init (&lock->lock);
+	g_cond_init (&lock->signal);
+	g_cond_init (&lock->upgrade_signal);
 	lock->transactions = g_hash_table_new (NULL, NULL);
 
 	return lock;
@@ -55,9 +55,9 @@ s4_lock_t *_lock_alloc ()
 /* Frees a lock structure */
 void _lock_free (s4_lock_t *lock)
 {
-	g_mutex_free (lock->lock);
-	g_cond_free (lock->signal);
-	g_cond_free (lock->upgrade_signal);
+	g_mutex_clear (&lock->lock);
+	g_cond_clear (&lock->signal);
+	g_cond_clear (&lock->upgrade_signal);
 	g_hash_table_destroy (lock->transactions);
 	free (lock);
 }
@@ -103,7 +103,7 @@ static int _lock_will_deadlock_helper (s4_lock_t *lock, s4_transaction_t *trans,
 	/* Add this lock to the table of visited locks */
 	g_hash_table_insert (visited, lock, GINT_TO_POINTER (1));
 
-	g_mutex_lock (lock->lock);
+	g_mutex_lock (&lock->lock);
 	g_hash_table_iter_init (&iter, lock->transactions);
 
 	/* Get a list of all transactions holding this lock */
@@ -118,7 +118,7 @@ static int _lock_will_deadlock_helper (s4_lock_t *lock, s4_transaction_t *trans,
 		}
 	}
 
-	g_mutex_unlock (lock->lock);
+	g_mutex_unlock (&lock->lock);
 
 	/* Check all the locks the transactions in the list are waiting for */
 	while (!ret && waiting_for != NULL) {
@@ -154,7 +154,7 @@ int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
 		return 0;
 	}
 
-	g_mutex_lock (lock->lock);
+	g_mutex_lock (&lock->lock);
 
 	if (_lock_has_trans (lock, trans)) {
 		/* If we already hold this lock, but not exclusively,
@@ -164,14 +164,14 @@ int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
 			lock->want_upgrade = 1;
 			lock->readers--;
 			while (lock->readers) {
-				g_cond_wait (lock->upgrade_signal, lock->lock);
+				g_cond_wait (&lock->upgrade_signal, &lock->lock);
 			}
 			lock->want_upgrade = 0;
 		}
 	} else {
 		lock->writers_waiting++;
 		while (lock->readers || lock->exclusive || lock->upgrade) {
-			g_cond_wait (lock->signal, lock->lock);
+			g_cond_wait (&lock->signal, &lock->lock);
 		}
 		lock->writers_waiting--;
 
@@ -182,7 +182,7 @@ int _lock_exclusive (s4_lock_t *lock, s4_transaction_t *trans)
 	_transaction_set_waiting_for (trans, NULL);
 	lock->exclusive = 1;
 
-	g_mutex_unlock (lock->lock);
+	g_mutex_unlock (&lock->lock);
 	return 1;
 }
 
@@ -203,12 +203,12 @@ int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 		return 0;
 	}
 
-	g_mutex_lock (lock->lock);
+	g_mutex_lock (&lock->lock);
 
 	/* If we do not already hold this lock we have to aquire it */
 	if (!_lock_has_trans (lock, trans)) {
 		while (lock->exclusive || lock->writers_waiting || (lock->upgrade && upgrade)) {
-			g_cond_wait (lock->signal, lock->lock);
+			g_cond_wait (&lock->signal, &lock->lock);
 		}
 
 		lock->readers++;
@@ -220,7 +220,7 @@ int _lock_shared (s4_lock_t *lock, s4_transaction_t *trans)
 	}
 
 	_transaction_set_waiting_for (trans, NULL);
-	g_mutex_unlock (lock->lock);
+	g_mutex_unlock (&lock->lock);
 	return 1;
 }
 
@@ -229,18 +229,18 @@ static void _lock_unlock (s4_lock_t *lock, s4_transaction_t *trans)
 {
 	int upgrade = !(_transaction_get_flags (trans) & S4_TRANS_READONLY);
 
-	g_mutex_lock (lock->lock);
+	g_mutex_lock (&lock->lock);
 	if (lock->exclusive) {
 		lock->exclusive = 0;
-		g_cond_signal (lock->signal);
+		g_cond_signal (&lock->signal);
 	} else if (lock->readers) {
 		lock->readers--;
 
 		if (lock->readers == 0) {
 			if (lock->want_upgrade) {
-				g_cond_signal (lock->upgrade_signal);
+				g_cond_signal (&lock->upgrade_signal);
 			} else {
-				g_cond_signal (lock->signal);
+				g_cond_signal (&lock->signal);
 			}
 		}
 
@@ -251,7 +251,7 @@ static void _lock_unlock (s4_lock_t *lock, s4_transaction_t *trans)
 		lock->upgrade = 0;
 	}
 
-	g_mutex_unlock (lock->lock);
+	g_mutex_unlock (&lock->lock);
 }
 
 /* Unlocks all locks held by trans */

@@ -118,10 +118,8 @@ def configure(conf):
 
     # Glib is required by everyone, so check for it here and let them
     # assume its presence.
-    conf.check_cfg(package='glib-2.0', atleast_version='2.8.0',
+    conf.check_cfg(package='glib-2.0', atleast_version='2.32.0',
             uselib_store='glib2', args='--cflags --libs')
-    conf.check_cfg(package='gthread-2.0', atleast_version='2.6.0',
-            uselib_store='gthread2', args='--cflags --libs')
 
     conf.recurse(conf.env.S4_SUBDIRS)
 

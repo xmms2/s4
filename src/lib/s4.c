@@ -20,7 +20,7 @@
 #include <glib/gstdio.h>
 #include <errno.h>
 
-static GStaticPrivate _errno = G_STATIC_PRIVATE_INIT;
+static GPrivate _errno = G_PRIVATE_INIT (g_free);
 
 /**
  *
@@ -393,18 +393,18 @@ static int _write_file (s4_t *s4)
 
 static void *_sync_thread (s4_t *s4)
 {
-	g_mutex_lock (s4->sync_lock);
+	g_mutex_lock (&s4->sync_lock);
 	while (s4->sync_thread_run) {
 		if (s4->sync_thread_run)
-			g_cond_wait (s4->sync_cond, s4->sync_lock);
-		g_mutex_unlock (s4->sync_lock);
+			g_cond_wait (&s4->sync_cond, &s4->sync_lock);
+		g_mutex_unlock (&s4->sync_lock);
 
 		s4_sync (s4);
 
-		g_mutex_lock (s4->sync_lock);
-		g_cond_broadcast (s4->sync_finished_cond);
+		g_mutex_lock (&s4->sync_lock);
+		g_cond_broadcast (&s4->sync_finished_cond);
 	}
-	g_mutex_unlock (s4->sync_lock);
+	g_mutex_unlock (&s4->sync_lock);
 
 	return NULL;
 }
@@ -412,27 +412,27 @@ static void *_sync_thread (s4_t *s4)
 /* Start sync */
 void _start_sync (s4_t *s4)
 {
-	g_mutex_lock (s4->sync_lock);
-	g_cond_signal (s4->sync_cond);
-	g_mutex_unlock (s4->sync_lock);
+	g_mutex_lock (&s4->sync_lock);
+	g_cond_signal (&s4->sync_cond);
+	g_mutex_unlock (&s4->sync_lock);
 }
 
 /* Start and wait for sync to finish */
 void _sync (s4_t *s4)
 {
-	g_mutex_lock (s4->sync_lock);
-	g_cond_signal (s4->sync_cond);
-	g_cond_wait (s4->sync_finished_cond, s4->sync_lock);
-	g_mutex_unlock (s4->sync_lock);
+	g_mutex_lock (&s4->sync_lock);
+	g_cond_signal (&s4->sync_cond);
+	g_cond_wait (&s4->sync_finished_cond, &s4->sync_lock);
+	g_mutex_unlock (&s4->sync_lock);
 }
 
 static s4_t *_alloc (void)
 {
 	s4_t* s4 = calloc (1, sizeof(s4_t));
 
-	s4->sync_lock = g_mutex_new ();
-	s4->sync_cond = g_cond_new ();
-	s4->sync_finished_cond = g_cond_new ();
+	g_mutex_init (&s4->sync_lock);
+	g_cond_init (&s4->sync_cond);
+	g_cond_init (&s4->sync_finished_cond);
 
 	s4->const_data = _const_create_data ();
 	s4->index_data = _index_create_data ();
@@ -451,9 +451,9 @@ static void _free (s4_t *s4)
 {
 	_free_relations (s4);
 
-	g_mutex_free (s4->sync_lock);
-	g_cond_free (s4->sync_cond);
-	g_cond_free (s4->sync_finished_cond);
+	g_mutex_clear (&s4->sync_lock);
+	g_cond_clear (&s4->sync_cond);
+	g_cond_clear (&s4->sync_finished_cond);
 
 	_const_free_data (s4->const_data);
 	_index_free_data (s4->index_data);
@@ -531,7 +531,7 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 	s4_sync (s4);
 
 	s4->sync_thread_run = 1;
-	s4->sync_thread = g_thread_create ((GThreadFunc)_sync_thread, s4, TRUE, NULL);
+	s4->sync_thread = g_thread_new ("s4 sync", (GThreadFunc)_sync_thread, s4);
 
 	return s4;
 }
@@ -545,10 +545,10 @@ s4_t *s4_open (const char *filename, const char **indices, int open_flags)
 int s4_close (s4_t* s4)
 {
 	if (!(s4->open_flags & S4_MEMORY)) {
-		g_mutex_lock (s4->sync_lock);
+		g_mutex_lock (&s4->sync_lock);
 		s4->sync_thread_run = 0;
-		g_cond_signal (s4->sync_cond);
-		g_mutex_unlock (s4->sync_lock);
+		g_cond_signal (&s4->sync_cond);
+		g_mutex_unlock (&s4->sync_lock);
 		g_thread_join (s4->sync_thread);
 
 		_log_close (s4);
@@ -582,7 +582,7 @@ void s4_sync (s4_t *s4)
  */
 s4_errno_t s4_errno()
 {
-	s4_errno_t *i = g_static_private_get (&_errno);
+	s4_errno_t *i = g_private_get (&_errno);
 	if (i == NULL) {
 		return S4E_NOERROR;
 	}
@@ -596,10 +596,10 @@ s4_errno_t s4_errno()
  */
 void s4_set_errno (s4_errno_t err)
 {
-	s4_errno_t *i = g_static_private_get (&_errno);
+	s4_errno_t *i = g_private_get (&_errno);
 	if (i == NULL) {
 		i = malloc (sizeof (s4_errno_t));
-		g_static_private_set (&_errno, i, (GDestroyNotify) free);
+		g_private_set (&_errno, i);
 	}
 
 	*i = err;

@@ -20,9 +20,6 @@
 #include <glib/gstdio.h>
 
 SETUP (S4) {
-	if (!g_thread_get_initialized ())
-		g_thread_init (NULL);
-
 	return 0;
 }
 

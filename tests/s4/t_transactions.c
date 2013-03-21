@@ -23,9 +23,6 @@ s4_t *s4;
 s4_val_t *val;
 
 SETUP (Transactions) {
-	if (!g_thread_get_initialized ())
-		g_thread_init (NULL);
-
 	val = s4_val_new_int (1);
 	return 0;
 }
@@ -77,8 +74,8 @@ CASE (test_deadlock) {
 	GThread *t1, *t2;
 	_mem_open ();
 
-	t1 = g_thread_create ((GThreadFunc)_dead_thread_one, NULL, TRUE, NULL);
-	t2 = g_thread_create ((GThreadFunc)_dead_thread_two, NULL, TRUE, NULL);
+	t1 = g_thread_new ("thread 1", (GThreadFunc)_dead_thread_one, NULL);
+	t2 = g_thread_new ("thread 2", (GThreadFunc)_dead_thread_two, NULL);
 
 	g_thread_join (t1);
 	g_thread_join (t2);

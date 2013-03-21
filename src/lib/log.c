@@ -62,7 +62,7 @@ struct mod_header {
 struct s4_log_data_St {
 	FILE *logfile;
 	int log_users;
-	GMutex *lock;
+	GMutex lock;
 
 	log_number_t last_checkpoint;
 	log_number_t last_synced;
@@ -74,14 +74,14 @@ s4_log_data_t *_log_create_data ()
 {
 	s4_log_data_t *ret = calloc (1, sizeof (s4_log_data_t));
 
-	ret->lock = g_mutex_new ();
+	g_mutex_init (&ret->lock);
 
 	return ret;
 }
 
 void _log_free_data (s4_log_data_t *data)
 {
-	g_mutex_free (data->lock);
+	g_mutex_clear (&data->lock);
 	free (data);
 }
 
@@ -209,7 +209,7 @@ static int _estimate_size (oplist_t *list, int *writing) {
  */
 static void _log_lock (s4_t *s4)
 {
-	g_mutex_lock (s4->log_data->lock);
+	g_mutex_lock (&s4->log_data->lock);
 }
 
 /**
@@ -218,7 +218,7 @@ static void _log_lock (s4_t *s4)
  */
 static void _log_unlock (s4_t *s4)
 {
-	g_mutex_unlock (s4->log_data->lock);
+	g_mutex_unlock (&s4->log_data->lock);
 }
 
 
