@@ -569,7 +569,6 @@ int main(int argc, const char *argv[])
 	pref_table = g_hash_table_new_full (g_str_hash, g_str_equal,
 		free, (GDestroyNotify)s4_sourcepref_unref);
 
-	g_thread_init (NULL);
 	config_init ();
 
 	s4 = s4_open (argv[1], NULL, S4_EXISTS);
