@@ -1,5 +1,5 @@
 /*  XMMS2 - X Music Multiplexer System
- *  Copyright (C) 2003-2011 XMMS2 Team
+ *  Copyright (C) 2003-2013 XMMS2 Team
  *
  *  PLUGINS ARE NOT CONSIDERED TO BE DERIVED WORK !!!
  *
@@ -14,43 +14,60 @@
  *  Lesser General Public License for more details.
  */
 
-#include <xcu.h>
-#include "xcu_valgrind.h"
+#include "memory_status.h"
 
 #if defined(HAVE_VALGRIND) && HAVE_VALGRIND == 1
 
 #include <valgrind.h>
 #include <memcheck.h>
 
-
-static int pre_test_leaks;
+static int _memory_baseline_leaks;
+static int _memory_baseline_errors;
 
 void
-xcu_valgrind_pre_case ()
+memory_status_calibrate (const char *marker)
 {
 	int l, d, r, s;
 
+	VALGRIND_PRINTF ("Calibrating: %s\n", marker);
+
 	VALGRIND_DO_LEAK_CHECK;
 	VALGRIND_COUNT_LEAKS(l, d, r, s);
-	pre_test_leaks = l;
+	_memory_baseline_leaks = l;
+
+	_memory_baseline_errors = VALGRIND_COUNT_ERRORS;
 }
 
-void
-xcu_valgrind_post_case ()
+int
+memory_status_verify (const char *marker)
 {
-	int l, d, r, s;
+	int l, d, r, s, status;
+
+	VALGRIND_PRINTF ("Verifying: %s\n", marker);
+
+	status = MEMORY_OK;
+
+	if (VALGRIND_COUNT_ERRORS > _memory_baseline_errors)
+		status |= MEMORY_ERROR;
 
 	VALGRIND_DO_LEAK_CHECK;
 	VALGRIND_COUNT_LEAKS(l, d, r, s);
-	if (l > pre_test_leaks) {
-		CU_FAIL ("Memory leak detected");
-	}
 
+	if (l > _memory_baseline_leaks)
+		status |= MEMORY_LEAK;
+
+	return status;
 }
 
 #else
 
-void xcu_valgrind_pre_case () {}
-void xcu_valgrind_post_case () {}
+void memory_status_calibrate (const char *marker)
+{
+}
+
+int memory_status_verify (const char *marker)
+{
+	return MEMORY_OK;
+}
 
 #endif

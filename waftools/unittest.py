@@ -46,6 +46,10 @@ def scrape_test_cases(node):
 @before_method("process_source")
 def generate_runner(self):
     self.source = self.to_nodes(self.source)
+    try:
+        self.add_objects = self.to_list(self.add_objects)
+    except (AttributeError):
+        self.add_objects = []
 
     suites = []
     for node in self.source:
@@ -54,20 +58,18 @@ def generate_runner(self):
             suites.append(result)
 
     if suites:
+        # Generate and add runner
         test_runner_template = os.path.join("tests", "runner", "main.c")
-        test_runner_valgrind = os.path.join("tests", "runner", "valgrind.c")
-
         runner = self.bld.srcnode.find_resource(test_runner_template)
-        valgrind = self.bld.srcnode.find_resource(test_runner_valgrind)
-
         target = self.path.find_or_declare("test_runner_%s.c" % self.target)
 
         task = self.create_task("create_test_runner", [runner] + self.source, target)
         task.suites = suites
 
-        self.source += [target, valgrind]
-        if self.env.HAVE_VALGRIND:
-            self.defines = ["HAVE_VALGRIND=1"]
+        self.source += [target]
+
+        # link valgrind_object in
+        self.add_objects += ["memorystatus"]
 
 def monkey_patch_test_runner():
     original = Task.classes["utest"].run
@@ -88,6 +90,9 @@ def monkey_patch_test_runner():
                 "--log-file=%s.log" % self.inputs[0].abspath(),
                 "--leak-check=full",
                 "--suppressions=%s" % suppression,
+                "--num-callers=20",
+                "--malloc-fill=0xa1",
+                "--free-fill=0xa1",
                 self.inputs[0].abspath()
             ]
         original(self)

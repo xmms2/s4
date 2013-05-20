@@ -22,12 +22,21 @@ def build(bld):
     if not bld.env.HAVE_CUNIT_CUNIT_H:
         return
 
+    bld(features = 'c',
+        target = 'memorystatus',
+        source = ['runner/memory_status.c'],
+        includes = 'utils',
+        uselib = 'valgrind',
+        defines = ["HAVE_VALGRIND=%d" % int(bld.env.HAVE_VALGRIND)],
+        install_path = None,
+        )
+
     bld(features = 'c cprogram test',
         target = 'test_s4',
         source = test_s4_src,
         includes = ". runner ../src ../include",
         use = "s4",
-        uselib = "glib2 gthread2 cunit ncurses valgrind",
+        uselib = "glib2 gthread2 cunit ncurses",
         install_path = None
         )
 
