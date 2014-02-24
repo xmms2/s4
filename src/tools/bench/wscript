@@ -3,8 +3,6 @@
 # WAF build scripts for XMMS2
 # Copyright (C) 2006-2009 XMMS2 Team
 
-import Options
-
 source = """
 s4_bench.c
 logging.c

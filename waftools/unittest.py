@@ -1,5 +1,5 @@
 from waflib import Task, Logs, Errors, Options, Utils
-from TaskGen import feature, before_method
+from waflib.TaskGen import feature, before_method
 import os
 import re
 

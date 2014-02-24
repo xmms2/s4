@@ -39,7 +39,7 @@ def build(bld):
         bld.fatal("You need to run waf configure")
         raise SystemExit(1)
 
-    bld.add_subdirs(subdirs)
+    bld.recurse(subdirs)
     bld.add_post_fun(shutdown)
 
 ####
@@ -56,8 +56,9 @@ def configure(conf):
     if conf.options.build_tools:
         conf.env.append_value("S4_SUBDIRS", tool_dirs)
 
-    conf.check_tool('misc gnu_dirs')
-    conf.check_tool('gcc')
+    conf.load('misc')
+    conf.load('gnu_dirs')
+    conf.load('gcc')
     conf.env.append_value('CFLAGS', ['-Wall', '-g'])
 
     if conf.options.target_platform:
@@ -142,8 +143,8 @@ def _list_cb(option, opt, value, parser):
     setattr(parser.values, option.dest, vals)
 
 def options(opt):
-    opt.tool_options('gnu_dirs')
-    opt.tool_options('gcc')
+    opt.load('gnu_dirs')
+    opt.load('gcc')
 
     opt.add_option('--with-custom-version', type='string',
                    dest='customversion', help="Override git commit hash version")
@@ -167,8 +168,8 @@ def options(opt):
     opt.add_option('--without-ldconfig', action='store_false', default=True,
                    dest='ldconfig', help="Don't run ldconfig after install")
 
-    opt.sub_options(tool_dirs)
-    opt.sub_options(test_dir)
+    opt.recurse(tool_dirs)
+    opt.recurse(test_dir)
 
 def shutdown(ctx):
     if ctx.cmd != 'install':

@@ -3,8 +3,6 @@
 # WAF build scripts for XMMS2
 # Copyright (C) 2006-2009 XMMS2 Team
 
-import Options
-
 source = """
 main.y
 lexer.l
@@ -23,8 +21,8 @@ def build(bld):
         )
 
 def configure (conf):
-    conf.check_tool("flex")
-    conf.check_tool("bison")
+    conf.load("flex")
+    conf.load("bison")
     conf.env.append_value('BISONFLAGS', '--verbose')
 
     rl_headers=["stdio.h", "readline/readline.h"]
