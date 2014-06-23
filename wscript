@@ -9,7 +9,7 @@ if sys.version_info < (2,4):
     raise RuntimeError("Python 2.4 or newer is required")
 
 import os
-from waflib import Options, Utils, Logs
+from waflib import Errors, Options, Utils, Logs
 
 BASEVERSION = "0.01"
 APPNAME = 's4'
@@ -52,7 +52,7 @@ def configure(conf):
             prefix = os.path.abspath(prefix)
         cond.env.PKG_CONFIG_DEFINES = dict(prefix=prefix)
 
-    conf.env.S4_SUBDIRS = [lib_dir, test_dir]
+    conf.env.S4_SUBDIRS = [lib_dir]
     if conf.options.build_tools:
         conf.env.append_value("S4_SUBDIRS", tool_dirs)
 
@@ -123,6 +123,13 @@ def configure(conf):
             uselib_store='glib2', args='--cflags --libs')
 
     conf.recurse(conf.env.S4_SUBDIRS)
+
+    # Don't require tests to be built.
+    try:
+        conf.recurse(test_dir)
+        conf.env.append_value("S4_SUBDIRS", test_dir)
+    except Errors.ConfigurationError:
+        pass
 
     newest = max([os.stat(os.path.join(sd, "wscript")).st_mtime for sd in conf.env.S4_SUBDIRS])
     conf.env.NEWEST_WSCRIPT_SUBDIR = newest
