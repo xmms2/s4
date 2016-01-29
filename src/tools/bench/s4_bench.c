@@ -51,7 +51,6 @@ int main (int argc, char *argv[])
 	char *filename = tmpnam (NULL);
 	GTimeVal cur, prev;
 
-	g_thread_init (NULL);
 	log_init(G_LOG_LEVEL_MASK & ~G_LOG_LEVEL_DEBUG);
 	g_get_current_time (&prev);
 
