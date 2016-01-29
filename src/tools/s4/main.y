@@ -272,8 +272,17 @@ result: RESULT_VAR
 	  }
 	  | QUERY fetch_list cond
 	  {
-		  const int order[2] = {1, 0};
-		  s4_transaction_t *trans = s4_begin (s4, 0);
+		  s4_order_t *order;
+		  s4_order_entry_t *entry;
+		  s4_transaction_t *trans;
+
+		  order = s4_order_create ();
+		  entry = s4_order_add_column (order,
+		                               S4_CMP_COLLATE,
+		                               S4_ORDER_ASCENDING);
+		  s4_order_entry_add_choice (entry, 0);
+
+		  trans = s4_begin (s4, 0);
 		  $$ = s4_query (trans, $2,  $3);
 		  s4_commit (trans);
 		  s4_resultset_sort ($$, order);
