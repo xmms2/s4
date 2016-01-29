@@ -42,7 +42,10 @@ static void _mem_close (void)
 
 static void _open (int flags)
 {
-	name = strdup (tmpnam (NULL));
+	int fd = g_file_open_tmp ("t_s4-XXXXXX", &name, NULL);
+	g_close (fd, NULL);
+	g_unlink (name);
+
 	s4 = s4_open (name, NULL, flags);
 }
 

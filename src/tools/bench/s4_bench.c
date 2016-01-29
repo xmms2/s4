@@ -47,12 +47,16 @@ int main (int argc, char *argv[])
 {
 	s4_t *s4;
 	s4_transaction_t *t;
-	int i;
-	char *filename = tmpnam (NULL);
+	int i, fd;
+	char *filename;
 	GTimeVal cur, prev;
 
 	log_init(G_LOG_LEVEL_MASK & ~G_LOG_LEVEL_DEBUG);
 	g_get_current_time (&prev);
+
+	fd = g_file_open_tmp ("s4bench-XXXXXX", &filename, NULL);
+	g_close (fd, NULL);
+	g_unlink (filename);
 
 	s4 = s4_open (filename, NULL, S4_NEW);
 
@@ -135,6 +139,8 @@ int main (int argc, char *argv[])
 
 	g_unlink (filename);
 	g_unlink (g_strconcat (filename, ".log", NULL));
+
+	g_free (filename);
 
 	take_time ("g_unlink took", &prev, &cur);
 
