@@ -609,6 +609,8 @@ int main(int argc, const char *argv[])
 		case S4E_EXISTS:
 			printf ("File exists?? If you see this, file a bug report!\n");
 			break;
+		default:
+			break;
 		}
 		return 1;
 	}
