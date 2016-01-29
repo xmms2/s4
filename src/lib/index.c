@@ -355,7 +355,9 @@ GList *_index_search (s4_index_t *index, index_function_t func, void *func_data)
 
 	found = g_hash_table_new (NULL, NULL);
 
-	for (; i >= 0 && !func (index->data[i].val, func_data); i--); i++;
+	for (; i >= 0 && !func (index->data[i].val, func_data); i--)
+		;
+	i++;
 	for (; i < index->size && !func (index->data[i].val, func_data); i++) {
 		for (j = 0; j < index->data[i].size; j++) {
 			if (g_hash_table_lookup (found, index->data[i].data[j].data) == NULL) {
