@@ -16,12 +16,15 @@ def configure(conf):
     conf.check_cc(lib='cunit', uselib_store='cunit')
     conf.check_cc(lib='ncurses', uselib_store='ncurses', mandatory=False)
 
+    if conf.check_cc(cflags="-Wno-unused-but-set-variable", mandatory=False):
+        conf.env.append_unique("CFLAGS_DISABLE_UNUSEDBUTSETVARIABLE", "-Wno-unused-but-set-variable")
+
 def build(bld):
     bld(features = 'c',
         target = 'memorystatus',
         source = ['runner/memory_status.c'],
         includes = 'utils',
-        use = 'valgrind',
+        use = 'valgrind DISABLE_UNUSEDBUTSETVARIABLE',
         install_path = None,
         )
 
