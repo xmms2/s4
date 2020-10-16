@@ -27,8 +27,8 @@ CLEANUP () {
 	return 0;
 }
 
-char *name;
-s4_t *s4;
+static char *name;
+static s4_t *s4;
 
 static void _mem_open (void)
 {

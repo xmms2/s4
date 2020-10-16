@@ -19,8 +19,8 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 
-s4_t *s4;
-s4_val_t *val;
+static s4_t *s4;
+static s4_val_t *val;
 
 SETUP (Transactions) {
 	val = s4_val_new_int (1);
