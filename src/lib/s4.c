@@ -275,7 +275,7 @@ static void _result_to_pairs (s4_resultset_t *res, save_data_t *sd)
 	int row_no;
 
 	for (row_no = 0; s4_resultset_get_row (res, row_no, &row); row_no++) {
-		int32_t va, ka, i;
+		int32_t va = 0, ka, i;
 		const s4_val_t *val_a, *val_b;
 		const char *key_a, *key_b, *src, *str;
 		const s4_result_t *id_res, *val_res;
