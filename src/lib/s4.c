@@ -367,7 +367,7 @@ static int _write_file (s4_t *s4)
 	s4_fetchspec_free (fs);
 	s4_resultset_free (res);
 
-	strncpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
+	memcpy (hdr.magic, S4_MAGIC, S4_MAGIC_LEN);
 	hdr.version = S4_VERSION;
 	for (j = 0; j < 16; j++) {
 		hdr.uuid[j] = s4->uuid[j];
