@@ -36,8 +36,6 @@ struct s4_val_St {
 	} v;
 };
 
-#define INT_SIZE ((size_t)&((s4_val_t*)0)->v.i + sizeof (int32_t))
-
 /**
  *
  * @defgroup Value Value
@@ -102,7 +100,7 @@ s4_val_t *s4_val_new_internal_string (const char *str, s4_t *s4)
  */
 s4_val_t *s4_val_new_int (int32_t i)
 {
-	s4_val_t *val = malloc (INT_SIZE);
+	s4_val_t *val = malloc (sizeof (s4_val_t));
 	val->type = S4_VAL_INT;
 	val->v.i = i;
 
